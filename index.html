@@ -155,14 +155,16 @@
 #loanCalculatorMenus .loan-menu-btn{min-height:48px;font-weight:800}
 #loanCalculatorMenus .loan-menu-btn.active{background:var(--accent)!important;color:#0E0E10!important;border-color:var(--accent)!important;box-shadow:0 0 0 2px rgba(201,138,44,.18)}
 ''</style>
-</head>
+<style>
+.premium-menu{border:2px solid var(--line);background:linear-gradient(145deg,var(--card),var(--bg));margin-bottom:12px}.premium-kicker{font-size:.78rem;letter-spacing:.14em;font-weight:900;color:var(--brass)}.premium-menu-head h2{font-size:1.65rem;margin:4px 0;font-weight:900}.premium-menu-head p{margin:0;color:var(--muted)}.premium-menu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}.premium-menu-item{display:flex;align-items:center;gap:12px;text-align:left;padding:15px;border:2px solid var(--line);border-radius:16px;background:var(--card);cursor:pointer}.premium-menu-item b{display:block;font-size:1rem;font-weight:900}.premium-menu-item small{display:block;color:var(--muted);margin-top:3px}.premium-menu-item.active{border-color:var(--brass);box-shadow:0 0 0 2px rgba(180,130,30,.18)}.premium-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--brass);color:#111;font-weight:900;font-size:1.2rem;flex:0 0 auto}.premium-actions{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}.app-modal{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:9999;display:none;padding:20px;align-items:center;justify-content:center}.app-modal.open{display:flex}.app-modal-card{width:min(720px,96vw);max-height:88vh;overflow:auto;background:var(--card);color:var(--text);border:2px solid var(--line);border-radius:22px;padding:20px}.app-modal-head{display:flex;justify-content:space-between;align-items:center}.app-modal-head button{font-size:1.8rem;border:0;background:transparent;color:inherit}.help-grid{display:grid;gap:12px;margin-top:16px}.help-grid>div{padding:14px;border:1px solid var(--line);border-radius:14px}.help-grid p{margin:6px 0 0;color:var(--muted)}#askMeInput{width:100%;box-sizing:border-box;margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--text);font:inherit}.ask-answer{margin-top:12px;padding:14px;border-radius:14px;background:var(--bg)}.floating-ask{position:fixed;right:18px;bottom:18px;z-index:5000;border:2px solid var(--brass);background:var(--brass);color:#111;border-radius:999px;padding:13px 18px;font-weight:900;box-shadow:0 8px 24px rgba(0,0,0,.25)}@media(max-width:700px){.premium-menu-grid{grid-template-columns:1fr}.premium-menu-head h2{font-size:1.35rem}}
+</style></head>
 <body>
 <div class="wrap">
 
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v2.3</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v2.4</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -633,7 +635,7 @@
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v2.3</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v2.4</strong>
   </footer>
 </div>
 
@@ -1313,7 +1315,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.3 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.4 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -2095,5 +2097,31 @@ document.getElementById('reconRunBtn').addEventListener('click', () => {
 
 try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:',e);}
 </script>
-</body>
+<div id="calculatorHelpModal" class="app-modal"><div class="app-modal-card"><div class="app-modal-head"><h2>❔ How to Use</h2><button onclick="closeAppModal('calculatorHelpModal')">×</button></div><div class="help-grid">
+<div><b>1. EMI Calculator</b><p>Use one annual interest rate for the entire loan.</p></div>
+<div><b>2. Slab-wise Term Loan EMI</b><p>Use the separate menu, then enter each outstanding-balance slab and its annual rate.</p></div>
+<div><b>3. Bank Statement Interest</b><p>Load the statement, confirm Date/Debit/Credit/Balance, set saved interest slabs and calculate.</p></div>
+<div><b>4. Review</b><p>Check the daily/account statement, total interest and financial-year summary.</p></div>
+<div><b>Important</b><p>Verify applicable bank terms, opening balance, rates and rounding before relying on a result.</p></div>
+</div></div></div>
+<div id="askMeModal" class="app-modal"><div class="app-modal-card"><div class="app-modal-head"><h2>💬 Ask Me</h2><button onclick="closeAppModal('askMeModal')">×</button></div><p class="hint">Ask about using the calculator.</p><textarea id="askMeInput" rows="4" placeholder="How do I calculate slab-wise EMI?"></textarea><button class="btn primary" onclick="answerAskMe()">Ask</button><div id="askMeAnswer" class="ask-answer"></div></div></div>
+<button id="floatingAskMe" class="floating-ask" onclick="openAskMe()">💬 Ask Me</button>
+<script>
+function openCalcMenu(mode){
+ document.querySelectorAll('.premium-menu-item').forEach((b,i)=>b.classList.toggle('active',['emi','slab','interest','other'][i]===mode));
+ if(mode==='emi' && typeof showLoanCalculator==='function') showLoanCalculator('standard');
+ if(mode==='slab' && typeof showLoanCalculator==='function') showLoanCalculator('slab');
+ if(mode==='interest'){document.getElementById('pInterestCompare')?.scrollIntoView({behavior:'smooth'});}
+}
+function openCalculatorHelp(){document.getElementById('calculatorHelpModal')?.classList.add('open')}
+function openAskMe(){document.getElementById('askMeModal')?.classList.add('open');setTimeout(()=>document.getElementById('askMeInput')?.focus(),100)}
+function closeAppModal(id){document.getElementById(id)?.classList.remove('open')}
+function answerAskMe(){
+ const q=(document.getElementById('askMeInput')?.value||'').toLowerCase(),a=document.getElementById('askMeAnswer');
+ if(/slab|progressive/.test(q)) a.textContent='Open SLAB-WISE TERM LOAN EMI. Enter the loan amount and period, then set each slab limit and annual rate. The rates are applied progressively to the outstanding balance.';
+ else if(/emi|installment|instalment/.test(q)) a.textContent='Use EMI CALCULATOR for one rate. Use SLAB-WISE TERM LOAN EMI when different rates apply to different outstanding-balance slabs.';
+ else if(/statement|interest|bank/.test(q)) a.textContent='Open BANK STATEMENT INTEREST, confirm the statement columns, check the opening balance and set the applicable interest slabs before calculating.';
+ else a.textContent='Ask me about EMI, slab-wise term-loan EMI, bank-statement interest, slab settings, loan period, account statement or financial-year interest.';
+}
+</script></body>
 </html>
