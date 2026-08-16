@@ -133,7 +133,7 @@ window.populateSIQInterestColumnDetails=populateSIQInterestColumnDetails;
   footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--rule); text-align: center; font-size: 11.5px; color: var(--muted); }
   footer strong { color: var(--ink); }
 
-  /* v1.4 — Bank Statement Interest Comparison */
+  /* v1.5 — Bank Statement Interest Comparison */
   .stmt-slab-row{
     display:grid;
     grid-template-columns:1.1fr 1.4fr 1.2fr 1.6fr auto;
@@ -159,7 +159,7 @@ window.populateSIQInterestColumnDetails=populateSIQInterestColumnDetails;
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v1.4</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v1.5</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -443,7 +443,7 @@ window.populateSIQInterestColumnDetails=populateSIQInterestColumnDetails;
         <div><label for="mapDebit">Debit / withdrawal column</label><select id="mapDebit"></select></div>
         <div><label for="mapCredit">Credit / deposit column</label><select id="mapCredit"></select></div>
         <div><label for="mapBalance">Balance column</label><select id="mapBalance"></select></div>
-        <div><label for="mapHeaderRow">First row is header?</label><select id="mapHeaderRow"><option value="yes">Yes</option><option value="no">No</option></select></div>
+        <div><label for="mapHeaderRow">Header row</label><select id="mapHeaderRow"><option value="auto">Auto-detect</option><option value="yes">First row</option><option value="no">No header row</option></select></div>
       </div>
       <div class="note" style="margin-top:16px;margin-bottom:0">
         If a brought-forward / opening balance exists, the calculation starts on the 1st of the first month. If there is no brought-forward balance and the first transaction is after the 1st, the first transaction day's closing balance is required; later months start on the 1st with the previous closing balance carried forward.
@@ -565,7 +565,7 @@ window.populateSIQInterestColumnDetails=populateSIQInterestColumnDetails;
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v1.4</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v1.5</strong>
   </footer>
 </div>
 
@@ -1131,7 +1131,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v1.4 ---------- */
+/* ---------- Bank Statement Interest Calculator v1.5 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -1262,11 +1262,51 @@ function stmtGuessColumn(headers,keywords){
   return -1;
 }
 
+function stmtFindHeaderRow(rows){
+  const max=Math.min(rows.length,20);
+  const keys=[
+    'date','txn date','transaction date','value date','posting date',
+    'narration','description','particulars','details','cheque','chq',
+    'debit','withdrawal','dr','credit','deposit','cr','balance',
+    'closing balance','running balance'
+  ];
+  let best=-1,bestScore=-1;
+  for(let i=0;i<max;i++){
+    const cells=(rows[i]||[]).map(x=>String(x??'').trim().toLowerCase());
+    const joined=cells.join(' | ');
+    let score=0;
+    cells.forEach(c=>{
+      keys.forEach(k=>{
+        if(c===k) score+=5;
+        else if(c.includes(k)) score+=2;
+      });
+    });
+    // Strong boost when the row looks like a bank statement header.
+    if(/date/.test(joined))score+=3;
+    if(/debit|withdrawal|\bdr\b/.test(joined))score+=3;
+    if(/credit|deposit|\bcr\b/.test(joined))score+=3;
+    if(/balance/.test(joined))score+=3;
+    if(/narration|description|particulars/.test(joined))score+=2;
+    if(score>bestScore){bestScore=score;best=i;}
+  }
+  return bestScore>=7?best:-1;
+}
+
+function stmtHeaderInfo(rows){
+  const mode=document.getElementById('mapHeaderRow').value;
+  if(mode==='no') return {headerIndex:-1,headers:null,start:0};
+  if(mode==='yes') return {headerIndex:0,headers:rows[0]||[],start:1};
+  const idx=stmtFindHeaderRow(rows);
+  if(idx>=0) return {headerIndex:idx,headers:rows[idx]||[],start:idx+1};
+  return {headerIndex:0,headers:rows[0]||[],start:1};
+}
+
 function populateStatementPreview(rows){
   stmtRawRows=rows;
   const maxCols=rows.reduce((m,r)=>Math.max(m,r.length),0);
-  const headerIsRow0=document.getElementById('mapHeaderRow').value!=='no';
-  const headers=headerIsRow0?rows[0]:null;
+  const info=stmtHeaderInfo(rows);
+  const headers=info.headers;
+
   const options=()=>{
     let h='<option value="-1">— not present —</option>';
     for(let i=0;i<maxCols;i++){
@@ -1275,35 +1315,44 @@ function populateStatementPreview(rows){
     }
     return h;
   };
-  ['mapDate','mapDebit','mapCredit','mapBalance'].forEach(id=>document.getElementById(id).innerHTML=options());
+
+  ['mapDate','mapDebit','mapCredit','mapBalance'].forEach(id=>{
+    document.getElementById(id).innerHTML=options();
+  });
+
   if(headers){
-    const dc=stmtGuessColumn(headers,['date','txn date','transaction date','value date']);
-    const db=stmtGuessColumn(headers,['debit','withdrawal','dr amount','dr amt']);
-    const cr=stmtGuessColumn(headers,['credit','deposit','cr amount','cr amt']);
+    const dc=stmtGuessColumn(headers,['date','txn date','transaction date','posting date','value date']);
+    const db=stmtGuessColumn(headers,['debit','withdrawal','dr amount','dr amt','debit amount']);
+    const cr=stmtGuessColumn(headers,['credit','deposit','cr amount','cr amt','credit amount']);
     const ba=stmtGuessColumn(headers,['balance','closing balance','running balance']);
     if(dc>=0)document.getElementById('mapDate').value=dc;
     if(db>=0)document.getElementById('mapDebit').value=db;
     if(cr>=0)document.getElementById('mapCredit').value=cr;
     if(ba>=0)document.getElementById('mapBalance').value=ba;
   }
-  const preview=rows.slice(0,8);
+
+  const previewStart=Math.max(0,info.headerIndex>=0?info.headerIndex:0);
+  const preview=rows.slice(previewStart,Math.min(rows.length,previewStart+8));
   document.getElementById('stmtPreviewTable').innerHTML=
     `<thead><tr>${Array.from({length:maxCols},(_,i)=>`<th style="text-align:left">${stmtEsc(headers&&headers[i]?headers[i]:'Col '+(i+1))}</th>`).join('')}</tr></thead>`+
     `<tbody>${preview.map(r=>`<tr>${Array.from({length:maxCols},(_,i)=>`<td style="text-align:left">${stmtEsc(r[i]??'')}</td>`).join('')}</tr>`).join('')}</tbody>`;
-  document.getElementById('stmtPreviewSub').textContent=`${rows.length} rows detected — review mapping before calculation.`;
-  document.getElementById('stmtPreviewCard').style.display='block';
+
+  document.getElementById('stmtPreviewSub').textContent=
+    `${rows.length} rows detected — ${info.headerIndex>=0?'header row '+(info.headerIndex+1)+' detected; review mapping before calculation.':'no clear header row detected; review mapping before calculation.'}`;
+
   document.getElementById('stmtMappingCard').style.display='block';
+  document.getElementById('stmtPreviewCard').style.display='block';
   document.getElementById('stmtSlabCard').style.display='block';
   document.getElementById('stmtResults').style.display='none';
 }
 
 function stmtRowsFromMapping(){
-  const headerYes=document.getElementById('mapHeaderRow').value!=='no';
+  const info=stmtHeaderInfo(stmtRawRows);
   const dateCol=Number(document.getElementById('mapDate').value);
   const debitCol=Number(document.getElementById('mapDebit').value);
   const creditCol=Number(document.getElementById('mapCredit').value);
   const balCol=Number(document.getElementById('mapBalance').value);
-  const start=headerYes?1:0;
+  const start=info.start;
   const rows=[];
   for(let i=start;i<stmtRawRows.length;i++){
     const r=stmtRawRows[i]||[];
@@ -1573,7 +1622,11 @@ function stmtShowDaily(){
 
 function stmtRunCalculation(){
   const rows=stmtRowsFromMapping();
-  if(!rows.length){alert('No valid transactions were found. Check the Date, Debit/Credit and Balance mappings.');return;}
+  if(!rows.length){
+    const info=stmtHeaderInfo(stmtRawRows);
+    alert('No valid transactions were found.\n\nHeader row: '+(info.headerIndex>=0?(info.headerIndex+1):'not detected')+'\nDate column: '+document.getElementById('mapDate').value+'\nDebit column: '+document.getElementById('mapDebit').value+'\nCredit column: '+document.getElementById('mapCredit').value+'\nBalance column: '+document.getElementById('mapBalance').value+'\n\nPlease confirm the column mapping and try again.');
+    return;
+  }
   const slabs=stmtNormaliseSlabs(stmtSlabRows());
   const errors=stmtValidateSlabs(slabs);
   if(errors.length){alert(errors.join('\n'));return;}
