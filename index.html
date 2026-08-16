@@ -102,7 +102,7 @@
   footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--rule); text-align: center; font-size: 11.5px; color: var(--muted); }
   footer strong { color: var(--ink); }
 
-  /* v1.2 — Bank Statement Interest Comparison */
+  /* v1.3 — Bank Statement Interest Comparison */
   .stmt-slab-row{
     display:grid;
     grid-template-columns:1.1fr 1.4fr 1.2fr 1.6fr auto;
@@ -128,7 +128,7 @@
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v1.2</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v1.3</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -418,7 +418,7 @@
         If a brought-forward / opening balance exists, the calculation starts on the 1st of the first month. If there is no brought-forward balance and the first transaction is after the 1st, the first transaction day's closing balance is required; later months start on the 1st with the previous closing balance carried forward.
       </div>
       <div class="row" style="margin-top:18px">
-        <button id="stmtCalcBtn" class="btn" type="button">Calculate interest comparison</button>
+        <button id="stmtCalcBtn" class="btn" type="button">Calculate interest comparison</button><button id="stmtSettingsBtn" class="btn primary" type="button">⚙ Interest Settings</button>
         <button id="stmtResetBtn" class="btn" type="button">Reset</button>
       </div>
     </div>
@@ -428,8 +428,8 @@
       <div class="table-scroll"><table id="stmtPreviewTable"></table></div>
     </div>
 
-    <div class="card input-card" id="stmtSlabCard" style="display:none;">
-      <div class="stub-title">Step 2 — Progressive interest slabs</div>
+    <div class="card input-card" id="stmtSlabCard" style="display:block;">
+      <div class="stub-title">⚙ Interest Settings — Slabs &amp; Rates</div>
       <div class="stub-sub" style="margin:4px 0 14px;color:var(--muted)">
         Each day's closing balance is progressively split across these slabs. The slab amount, not the full balance, earns the slab rate.
       </div>
@@ -534,7 +534,7 @@
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v1.2</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v1.3</strong>
   </footer>
 </div>
 
@@ -1100,7 +1100,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v1.2 ---------- */
+/* ---------- Bank Statement Interest Calculator v1.3 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
