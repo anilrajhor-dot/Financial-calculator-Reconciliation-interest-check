@@ -155,7 +155,7 @@
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v1.8</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v1.9</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -196,8 +196,17 @@
           <select id="emiInterestMethod"><option value="flat" selected>Single annual rate</option><option value="slab">Progressive slab rates</option></select>
         </div>
         <div>
+          <label for="periodYears">Loan period — Years</label>
+          <input type="number" id="periodYears" value="5" min="0" step="1" />
+        </div>
+        <div>
+          <label for="periodMonths">Additional months</label>
+          <input type="number" id="periodMonths" value="0" min="0" max="11" step="1" />
+        </div>
+        <div>
           <label for="count">No. of installments</label>
-          <input type="number" id="count" value="60" min="1" />
+          <input type="number" id="count" value="60" min="1" readonly />
+          <div class="hint">Calculated automatically from loan period and frequency.</div>
         </div>
         <div>
           <label for="freq">Frequency</label>
@@ -235,6 +244,7 @@
         <div class="stub-title">⚙ EMI Interest Slabs &amp; Rates</div>
         <div class="stub-sub" style="margin:4px 0 14px;color:var(--muted)">Progressive rates apply to the outstanding loan balance each period. Example: first ₹3,00,000 at 7%, next ₹2,00,000 at 8%, and any balance above ₹5,00,000 at 9%.</div>
         <div id="emiSlabs"></div>
+        <div class="formula-box" style="margin-top:12px"><b>Slab EMI method:</b> each installment calculates interest on the opening outstanding balance by slab. The EMI is solved so that the balance reaches zero at the end of the selected period. Example: ₹5,00,000 = ₹3,00,000 @ 7% + ₹2,00,000 @ 8%.</div>
         <div class="row" style="margin-top:12px"><button id="emiAddSlabBtn" class="btn" type="button">+ Add slab</button><button id="emiResetSlabBtn" class="btn" type="button">Reset EMI slabs</button><span id="emiSlabSave" class="hint"></span></div>
       </div>
       <div class="note">Both repayment types pay that period's interest on the outstanding balance first, then principal. With <strong>Equal installment</strong>, the total EMI is fixed and the interest/principal mix shifts each month. With <strong>Equal principal</strong>, the principal portion is fixed every month, so interest &mdash; and therefore the total installment &mdash; shrinks month by month. During a <strong>moratorium</strong>, no principal is repaid: choose whether you pay the interest in cash each month, or let it accrue and get added to the principal (capitalized) before EMI/installments begin.</div>
@@ -253,6 +263,7 @@
         <div class="stub-sub" id="ledgerSub"></div>
       </div>
       <div id="folios"></div>
+      <div id="fyInterestSummary" style="margin-top:16px"></div>
     </div>
   </div>
 
@@ -597,7 +608,7 @@
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v1.8</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v1.9</strong>
   </footer>
 </div>
 
@@ -719,10 +730,22 @@ function computeSchedule({ principal, annualRate, count, freqMonths, startDate, 
 let chart = null;
 let expandedYear = null;
 
+
+function syncEmiPeriodToCount(){
+  const y=Math.max(0,Math.floor(Number(document.getElementById('periodYears')?.value)||0));
+  const m=Math.max(0,Math.min(11,Math.floor(Number(document.getElementById('periodMonths')?.value)||0)));
+  const freq=Number(document.getElementById('freq')?.value)||1;
+  const totalMonths=y*12+m;
+  const count=Math.max(1,Math.ceil(totalMonths/freq));
+  const el=document.getElementById('count');
+  if(el) el.value=count;
+  return count;
+}
+
 function renderEmi() {
   const principal = Number(document.getElementById('principal').value) || 0;
   const annualRate = Number(document.getElementById('rate').value) || 0;
-  const count = Number(document.getElementById('count').value) || 0;
+  const count = syncEmiPeriodToCount();
   const freqMonths = Number(document.getElementById('freq').value);
   const repaymentType = document.getElementById('repayType').value;
   const moratoriumMonths = Number(document.getElementById('moratMonths').value) || 0;
@@ -753,6 +776,9 @@ function renderEmi() {
         { label: "Total interest paid", value: fmtINR(totalInterest), color: "var(--clay)" },
         { label: "Total principal", value: fmtINR(principal), color: "var(--green)" },
       ];
+  if(method==='slab'){
+    stats.push({ label: "Interest method", value: "Progressive slabs", color: "var(--brass)" });
+  }
   if (moratoriumMonths > 0) {
     if (moratoriumMode === 'accrued') {
       stats.push({ label: "Interest capitalized in moratorium", value: fmtINR(moratoriumInterest), color: "var(--brass)" });
@@ -847,6 +873,24 @@ function renderEmi() {
       </div>`;
   }).join('');
 
+  // Financial year interest summary: April to March.
+  const fyMap = new Map();
+  rows.forEach(r => {
+    const d=r.dueDate, y=d.getMonth()>=3?d.getFullYear():d.getFullYear()-1;
+    const key=`FY ${y}-${String(y+1).slice(-2)}`;
+    if(!fyMap.has(key)) fyMap.set(key,{interest:0,principal:0,installment:0,from:y,to:y+1});
+    const z=fyMap.get(key); z.interest+=r.interest; z.principal+=r.principalPaid; z.installment+=r.installment;
+  });
+  const fyEntries=[...fyMap.entries()].sort((a,b)=>a[1].from-b[1].from);
+  document.getElementById('fyInterestSummary').innerHTML=`
+    <div class="stub-title">Financial Year-wise Interest</div>
+    <div class="stub-sub" style="margin:4px 0 10px;color:var(--muted)">Interest payable during each Indian financial year (1 April to 31 March).</div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Financial Year</th><th>Interest</th><th>Principal</th><th>Total instalments</th></tr></thead>
+      <tbody>${fyEntries.map(([fy,z])=>`<tr><td><strong>${fy}</strong></td><td class="debit">${fmtINR(z.interest)}</td><td class="credit">${fmtINR(z.principal)}</td><td>${fmtINR(z.installment)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><th>Total</th><th>${fmtINR(fyEntries.reduce((a,[,z])=>a+z.interest,0))}</th><th>${fmtINR(fyEntries.reduce((a,[,z])=>a+z.principal,0))}</th><th>${fmtINR(fyEntries.reduce((a,[,z])=>a+z.installment,0))}</th></tr></tfoot>
+    </table></div>`;
+
   document.querySelectorAll('.folio-toggle').forEach(btn => {
     btn.addEventListener('click', () => {
       const y = Number(btn.dataset.year);
@@ -856,7 +900,7 @@ function renderEmi() {
   });
 }
 
-['principal','rate','count','freq','startDate','repayType','moratMonths','moratMode'].forEach(id => {
+['principal','rate','periodYears','periodMonths','freq','startDate','repayType','moratMonths','moratMode'].forEach(id => {
   document.getElementById(id).addEventListener('input', renderEmi);
   document.getElementById(id).addEventListener('change', renderEmi);
 });
@@ -1192,7 +1236,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v1.8 ---------- */
+/* ---------- Bank Statement Interest Calculator v1.9 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
