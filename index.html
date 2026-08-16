@@ -155,7 +155,7 @@
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v1.7</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v1.8</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -192,6 +192,10 @@
           <input type="number" id="rate" value="9.5" step="0.01" min="0" />
         </div>
         <div>
+          <label for="emiInterestMethod">Interest method</label>
+          <select id="emiInterestMethod"><option value="flat" selected>Single annual rate</option><option value="slab">Progressive slab rates</option></select>
+        </div>
+        <div>
           <label for="count">No. of installments</label>
           <input type="number" id="count" value="60" min="1" />
         </div>
@@ -226,6 +230,12 @@
             <option value="accrued">Interest accrued (added to principal)</option>
           </select>
         </div>
+      </div>
+      <div id="emiSlabSettings" class="card input-card" style="display:none;margin-top:14px;box-shadow:none;border:1px solid var(--line);">
+        <div class="stub-title">⚙ EMI Interest Slabs &amp; Rates</div>
+        <div class="stub-sub" style="margin:4px 0 14px;color:var(--muted)">Progressive rates apply to the outstanding loan balance each period. Example: first ₹3,00,000 at 7%, next ₹2,00,000 at 8%, and any balance above ₹5,00,000 at 9%.</div>
+        <div id="emiSlabs"></div>
+        <div class="row" style="margin-top:12px"><button id="emiAddSlabBtn" class="btn" type="button">+ Add slab</button><button id="emiResetSlabBtn" class="btn" type="button">Reset EMI slabs</button><span id="emiSlabSave" class="hint"></span></div>
       </div>
       <div class="note">Both repayment types pay that period's interest on the outstanding balance first, then principal. With <strong>Equal installment</strong>, the total EMI is fixed and the interest/principal mix shifts each month. With <strong>Equal principal</strong>, the principal portion is fixed every month, so interest &mdash; and therefore the total installment &mdash; shrinks month by month. During a <strong>moratorium</strong>, no principal is repaid: choose whether you pay the interest in cash each month, or let it accrue and get added to the principal (capitalized) before EMI/installments begin.</div>
     </div>
@@ -462,7 +472,7 @@
     <div class="card input-card" id="stmtSlabCard" style="display:block;">
       <div class="stub-title">⚙ Interest Settings — Slabs &amp; Rates</div>
       <div class="stub-sub" style="margin:4px 0 14px;color:var(--muted)">
-        Each day's closing balance is progressively split across these slabs. The slab amount, not the full balance, earns the slab rate.
+        Each day's closing balance is progressively split across these slabs. Daily interest = daily product × annual rate ÷ 365. The slab amount, not the full balance, earns the slab rate.
       </div>
       <div class="note">
         Example: if the closing balance is &#8377;8,00,000, a &#8377;3,00,000 first slab is calculated at its rate, the next slab only on the next portion, and so on.
@@ -587,7 +597,7 @@
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v1.7</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v1.8</strong>
   </footer>
 </div>
 
@@ -606,6 +616,29 @@ document.querySelectorAll('.tab').forEach(tab => {
 const fmtDate = (d) => d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 const fmtINR = (n) => isFinite(n) ? n.toLocaleString("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 }) : "—";
 const addMonths = (date, months) => { const d = new Date(date); d.setMonth(d.getMonth() + months); return d; };
+
+const EMI_DEFAULT_SLABS=[{to:300000,rate:7},{to:500000,rate:8},{to:null,rate:9}];
+function emiNormaliseSlabs(slabs){return (slabs||[]).map(x=>({to:(x.to===null||x.to===''||x.to===undefined)?null:Number(x.to),rate:Number(x.rate)||0})).filter(x=>x.to===null||isFinite(x.to));}
+function emiLoadSlabs(){try{const x=JSON.parse(localStorage.getItem('financial_emi_interest_slabs_v1')||'null');if(Array.isArray(x)&&x.length)return emiNormaliseSlabs(x);}catch(e){}return EMI_DEFAULT_SLABS.map(x=>({...x}));}
+function emiSaveSlabs(slabs){try{localStorage.setItem('financial_emi_interest_slabs_v1',JSON.stringify(emiNormaliseSlabs(slabs)));}catch(e){}}
+function emiAllocate(balance,slabs){const b=Math.max(0,Number(balance)||0),parts=[];let prev=0;for(const s of emiNormaliseSlabs(slabs)){if(b<=prev)break;const upper=s.to===null?Infinity:s.to;const portion=Math.max(0,Math.min(b,upper)-prev);if(portion>0)parts.push({portion,rate:s.rate});if(!isFinite(upper))break;prev=upper;}return parts;}
+function emiSlabInterest(balance,slabs,periodFactor){return emiAllocate(balance,slabs).reduce((a,p)=>a+p.portion*p.rate/100*periodFactor,0);}
+function emiRenderSlabs(){const el=document.getElementById('emiSlabs');if(!el)return;const slabs=emiLoadSlabs();el.innerHTML=slabs.map((x,i)=>`<div class="stmt-slab-row"><div class="wide"><div class="slab-label">Slab ${i+1}</div></div><div><label>Upto amount</label><input class="emi-slab-to" type="number" min="0" step="1" value="${x.to===null?'':x.to}" placeholder="No limit"></div><div><label>Annual rate %</label><input class="emi-slab-rate" type="number" min="0" step="0.01" value="${x.rate}"></div><div><label>Coverage</label><div class="hint">${x.to===null?'Above previous slab':'First ₹'+fmtINR(x.to)}</div></div><div><button class="btn sm" type="button" onclick="emiRemoveSlab(${i})" ${slabs.length<=1?'disabled':''}>Remove</button></div></div>`).join('');el.querySelectorAll('input').forEach(inp=>inp.addEventListener('change',emiPersistSlabs));}
+function emiCurrentSlabs(){return [...document.querySelectorAll('#emiSlabs .stmt-slab-row')].map(r=>({to:r.querySelector('.emi-slab-to').value===''?null:Number(r.querySelector('.emi-slab-to').value),rate:Number(r.querySelector('.emi-slab-rate').value)||0}));}
+function emiPersistSlabs(){emiSaveSlabs(emiCurrentSlabs());if(document.getElementById('emiSlabSave'))document.getElementById('emiSlabSave').textContent='✓ Saved. Slabs remain unchanged until Reset EMI slabs.';renderEmi();}
+function emiAddSlab(){const s=emiLoadSlabs(),last=s[s.length-1];if(last.to===null){const prev=s.length>1?s[s.length-2].to:500000;s.splice(s.length-1,0,{to:Number(prev||0)+200000,rate:last.rate});}else s.push({to:null,rate:last.rate});emiSaveSlabs(s);emiRenderSlabs();renderEmi();}
+function emiRemoveSlab(i){const s=emiLoadSlabs();if(s.length<=1)return;s.splice(i,1);emiSaveSlabs(s);emiRenderSlabs();renderEmi();}
+function emiResetSlabs(){emiSaveSlabs(EMI_DEFAULT_SLABS);emiRenderSlabs();renderEmi();}
+function emiSlabSchedule({principal,count,freqMonths,startDate,repaymentType,moratoriumMonths,moratoriumMode,slabs}){
+ let rows=[],balance=principal,period=0,moratoriumInterest=0;const morat=Math.max(0,Math.floor(moratoriumMonths||0)),pf=freqMonths/12;
+ for(let m=1;m<=morat;m++){period++;const opening=balance,interest=emiSlabInterest(opening,slabs,pf),dueDate=addMonths(startDate,m);moratoriumInterest+=interest;if(moratoriumMode==='accrued'){balance=opening+interest;rows.push({period,dueDate,opening,installment:0,interest,principalPaid:0,closing:balance,moratorium:true,moratoriumPaid:false});}else rows.push({period,dueDate,opening,installment:interest,interest,principalPaid:0,closing:balance,moratorium:true,moratoriumPaid:true});}
+ const scheduleStart=addMonths(startDate,morat),n=count;
+ if(repaymentType==='equal-principal'){const pp0=balance/n;for(let i=1;i<=n;i++){const opening=balance,interest=emiSlabInterest(opening,slabs,pf),pp=i===n?balance:pp0,inst=pp+interest;balance=Math.max(0,balance-pp);period++;rows.push({period,dueDate:addMonths(scheduleStart,i*freqMonths),opening,installment:inst,interest,principalPaid:pp,closing:balance,moratorium:false});}const rr=rows.filter(r=>!r.moratorium);return {rows,installment:rr[0]?.installment||0,firstInstallment:rr[0]?.installment||0,lastInstallment:rr.at(-1)?.installment||0,moratoriumInterest,effectivePrincipal:balance,moratoriumMonths:morat};}
+ const startBalance=balance;function remaining(emi){let b=startBalance;for(let i=1;i<=n;i++){const interest=emiSlabInterest(b,slabs,pf);b-=emi-interest;if(b<=0)return 0;}return b;}
+ let lo=0,hi=Math.max(startBalance/n,1);for(let z=0;z<100&&remaining(hi)>0.0001;z++)hi*=2;for(let z=0;z<120;z++){const mid=(lo+hi)/2;if(remaining(mid)>0)lo=mid;else hi=mid;}const installment=hi;balance=startBalance;
+ for(let i=1;i<=n;i++){const opening=balance,interest=emiSlabInterest(opening,slabs,pf);let pp=installment-interest,inst=installment;if(i===n){pp=balance;inst=pp+interest;}balance=Math.max(0,balance-pp);period++;rows.push({period,dueDate:addMonths(scheduleStart,i*freqMonths),opening,installment:inst,interest,principalPaid:pp,closing:balance,moratorium:false});}
+ return {rows,installment,moratoriumInterest,effectivePrincipal:balance,moratoriumMonths:morat,slab:true};
+}
 
 function computeSchedule({ principal, annualRate, count, freqMonths, startDate, repaymentType, moratoriumMonths, moratoriumMode }) {
   const monthlyRate = annualRate / 100 / 12;
@@ -698,7 +731,10 @@ function renderEmi() {
   if (!principal || !count || !startDateVal) return;
 
   const startDate = new Date(startDateVal + "T00:00:00");
-  const { rows, installment, firstInstallment, lastInstallment, moratoriumInterest, effectivePrincipal } = computeSchedule({ principal, annualRate, count, freqMonths, startDate, repaymentType, moratoriumMonths, moratoriumMode });
+  const method=document.getElementById('emiInterestMethod')?.value||'flat';
+  const args={ principal, annualRate, count, freqMonths, startDate, repaymentType, moratoriumMonths, moratoriumMode };
+  const calc=method==='slab'?emiSlabSchedule({...args,slabs:emiLoadSlabs()}):computeSchedule(args);
+  const { rows, installment, firstInstallment, lastInstallment, moratoriumInterest, effectivePrincipal } = calc;
 
   const regularRows = rows.filter(r => !r.moratorium);
   const totalInterest = rows.reduce((s, r) => s + r.interest, 0);
@@ -777,7 +813,7 @@ function renderEmi() {
   const years = Array.from(byYear.entries());
   if (expandedYear === null && years.length) expandedYear = years[0][0];
 
-  document.getElementById('ledgerSub').textContent = `${rows.length} entries, grouped by folio year — tap a year to expand`;
+  document.getElementById('ledgerSub').textContent = `${rows.length} entries, grouped by folio year — ${method==='slab'?'progressive slab interest':'single annual rate'} — tap a year to expand`;
 
   document.getElementById('folios').innerHTML = years.map(([year, yearRows]) => {
     const open = expandedYear === year || years.length === 1;
@@ -824,6 +860,9 @@ function renderEmi() {
   document.getElementById(id).addEventListener('input', renderEmi);
   document.getElementById(id).addEventListener('change', renderEmi);
 });
+document.getElementById('emiInterestMethod')?.addEventListener('change',()=>{const on=document.getElementById('emiInterestMethod').value==='slab';document.getElementById('emiSlabSettings').style.display=on?'block':'none';if(on)emiRenderSlabs();renderEmi();});
+document.getElementById('emiAddSlabBtn')?.addEventListener('click',emiAddSlab);
+document.getElementById('emiResetSlabBtn')?.addEventListener('click',emiResetSlabs);
 
 document.getElementById('startDate').value = new Date().toISOString().slice(0,10);
 try { renderEmi(); } catch (e) { console.error('renderEmi failed:', e); }
@@ -1153,7 +1192,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v1.7 ---------- */
+/* ---------- Bank Statement Interest Calculator v1.8 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -1285,36 +1324,9 @@ function stmtGuessColumn(headers,keywords){
 }
 
 function stmtFindHeaderRow(rows){
-  // Bank statements often contain title, customer and summary rows before
-  // the actual transaction header. Find the row that contains the transaction
-  // schema, not merely a row containing the word "Balance".
-  let best=-1,bestScore=-1;
-  for(let i=0;i<rows.length;i++){
-    const cells=(rows[i]||[]).map(x=>String(x??'').trim().toLowerCase());
-    const joined=cells.join(' | ');
-    const hasDate=cells.some(c=>c==='transaction date'||c==='date'||c.includes('transaction date')||c==='txn date');
-    const hasValueDate=cells.some(c=>c==='value date'||c==='value dt');
-    const hasBalance=cells.some(c=>c==='balance'||c.includes('closing balance')||c.includes('running balance'));
-    const hasDebit=cells.some(c=>c==='debit'||c.includes('withdrawal')||c==='dr amount');
-    const hasCredit=cells.some(c=>c==='credit'||c.includes('deposit')||c==='cr amount');
-    const hasNarration=cells.some(c=>c==='narration'||c==='description'||c==='particulars'||c.includes('transaction details'));
-    const hasCheque=cells.some(c=>c.includes('cheque')||c.includes('chq')||c.includes('reference'));
-    // A real transaction header should contain Date and Balance and at least
-    // one movement/narration field. This excludes the "Opening Balance" summary row.
-    if(!(hasDate && hasBalance && (hasDebit||hasCredit||hasNarration))) continue;
-    let score=50;
-    if(hasValueDate)score+=12;
-    if(hasNarration)score+=10;
-    if(hasDebit)score+=10;
-    if(hasCredit)score+=10;
-    if(hasCheque)score+=5;
-    if(cells.some(c=>c==='transaction date'))score+=15;
-    if(cells.some(c=>c==='balance'))score+=10;
-    if(score>bestScore){bestScore=score;best=i;}
-  }
-  return best;
+  const max=Math.min(rows.length,30);let best=-1,bestScore=-1;
+  for(let i=0;i<max;i++){const cells=(rows[i]||[]).map(x=>String(x??'').trim().toLowerCase()),j=cells.join(' | ');const date=/\bdate\b|transaction date|txn date|posting date/.test(j),bal=/\bbalance\b|closing balance|running balance/.test(j),flow=/debit|withdrawal|credit|deposit|\bdr\b|\bcr\b/.test(j),nar=/narration|description|particulars|transaction details/.test(j);if(date&&bal&&(flow||nar)){let score=20+(flow?5:0)+(nar?4:0)+(cells.length>=5?3:0)+(/transaction date/.test(j)?5:0);if(/opening balance|total debit|total credit|closing balance/.test(j)&&!date)score-=20;if(score>bestScore){bestScore=score;best=i;}}}return best;
 }
-
 function stmtHeaderInfo(rows){
   const mode=document.getElementById('mapHeaderRow').value;
   if(mode==='no') return {headerIndex:-1,headers:null,start:0};
@@ -1392,18 +1404,16 @@ function stmtRowsFromMapping(){
 }
 
 function stmtExtractOpening(rows){
-  // Look for an explicit opening / brought-forward amount in the raw statement.
-  for(const r of stmtRawRows){
-    const s=(r||[]).map(x=>String(x??'')).join(' ');
-    const m=s.match(/(?:opening\s+balance|brought\s+forward|balance\s+b\/f|opening\s+bal(?:ance)?)[^\d₹-]*([₹-]?\s*[\d,]+(?:\.\d+)?)/i);
-    if(m){
-      const n=parseNumberFlexible(m[1]);
-      if(isFinite(n))return n;
+  for(let i=0;i<stmtRawRows.length;i++){
+    const r=stmtRawRows[i]||[], joined=r.map(x=>String(x??'')).join(' ').toLowerCase();
+    if(/opening\s+balance/.test(joined)){
+      const same=parseNumberFlexible(r[0]); if(isFinite(same))return same;
+      const next=stmtRawRows[i+1]||[]; const n=parseNumberFlexible(next[0]); if(isFinite(n))return n;
     }
   }
+  for(const r of stmtRawRows){const s=(r||[]).map(x=>String(x??'')).join(' ');const m=s.match(/(?:opening\s+balance|brought\s+forward|balance\s+b\/f|opening\s+bal(?:ance)?)[^\d₹-]*([₹-]?\s*[\d,]+(?:\.\d+)?)/i);if(m){const n=parseNumberFlexible(m[1]);if(isFinite(n))return n;}}
   return null;
 }
-
 function stmtBuildDaily(rows){
   if(!rows.length)return {days:[],error:'No dated transactions could be read from the mapped statement.'};
   const first=new Date(rows[0].date.getFullYear(),rows[0].date.getMonth(),rows[0].date.getDate());
@@ -1552,14 +1562,14 @@ function stmtCalculate(rows,slabs,manualBankInterest){
   daily.days.forEach(d=>{
     const parts=stmtAllocate(d.balance,slabs);
     let interest=0;
-    parts.forEach(p=>interest+=p.portion*p.rate/100/d.daysInMonth);
+    parts.forEach(p=>interest+=p.portion*p.rate/100/365);
     total+=interest;out.push({...d,parts,interest});
   });
   const by={};
   out.forEach(d=>{
     const m=by[d.month]??={month:d.month,days:d.daysInMonth,calculatedDays:0,dailyProduct:0,interest:0,slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),actualInterest:0};
     m.dailyProduct+=d.balance;m.calculatedDays++;m.interest+=d.interest;
-    d.parts.forEach((p,i)=>{m.slabProducts[i]+=p.portion;m.slabInterest[i]+=p.portion*p.rate/100/d.daysInMonth;});
+    d.parts.forEach((p,i)=>{m.slabProducts[i]+=p.portion;m.slabInterest[i]+=p.portion*p.rate/100/365;});
   });
   rows.forEach(r=>{
     if(r.credit>0&&/monthly interest credit|interest credit|\binterest\b|\bint\.?\s*credit/i.test(r.narration||'')){
@@ -1603,7 +1613,7 @@ function stmtRenderResults(result,slabs){
   });
   h+=`</tbody><tfoot><tr><th style="text-align:left">TOTAL</th><th></th><th>${months.reduce((a,m)=>a+m.calculatedDays,0)}</th><th>₹${stmtMoney(months.reduce((a,m)=>a+m.dailyProduct,0))}</th><th>₹${stmtMoney(result.total)}</th><th>${bankAvailable?'₹'+stmtMoney(totalBank):'—'}</th><th>${bankAvailable?((diff>=0?'+':'−')+'₹'+stmtMoney(Math.abs(diff||0))):'—'}</th><th></th></tr></tfoot>`;
   document.getElementById('stmtTable').innerHTML=h;
-  let note='Daily closing balance × applicable progressive slab rate ÷ actual days in that calendar month.';
+  let note='Daily product × annual rate ÷ 365. Daily product is the applicable balance/slab portion for that date.';
   if(result.partial){
     note += result.firstMonthMode==='from-first-transaction'
       ? ' No brought-forward balance was available, so the first month starts on '+stmtDate(result.startDate)+'; later months start on the 1st.'
@@ -1626,14 +1636,14 @@ function stmtShowDaily(){
   days.forEach(d=>{bh+=`<tr><td style="text-align:left">${stmtDate(d.date)}</td><td>₹${stmtMoney(d.balance)}</td></tr>`;});
   bh+='</tbody></table>';
   const bs=document.getElementById('stmtBalanceSchedule'); if(bs)bs.innerHTML='<h3 style="margin:12px 0 6px">Daily Date &amp; Balance Schedule</h3>'+bh;
-  let h='<thead><tr><th style="text-align:left">Date</th><th>Days in month</th><th>Closing balance</th><th>Daily product</th>';
+  let h='<thead><tr><th style="text-align:left">Date</th><th>Days in month</th><th>Closing balance</th><th>Daily product</th><th>Interest basis</th>';
   slabs.forEach((s,i)=>h+=`<th>Slab ${i+1} product</th><th>Rate</th><th>Daily interest</th>`);
   h+='<th>Total daily interest</th></tr></thead><tbody>';
   days.forEach(d=>{
-    h+=`<tr><td style="text-align:left">${stmtDate(d.date)}</td><td>${d.daysInMonth}</td><td>₹${stmtMoney(d.balance)}</td><td>₹${stmtMoney(d.balance)}</td>`;
+    h+=`<tr><td style="text-align:left">${stmtDate(d.date)}</td><td>${d.daysInMonth}</td><td>₹${stmtMoney(d.balance)}</td><td>₹${stmtMoney(d.balance)}</td><td>365-day basis</td>`;
     slabs.forEach((s,i)=>{
       const p=d.parts[i]||{portion:0,rate:s.rate};
-      const di=p.portion*p.rate/100/d.daysInMonth;
+      const di=p.portion*p.rate/100/365;
       h+=`<td>₹${stmtMoney(p.portion)}</td><td>${Number(p.rate).toFixed(2)}%</td><td>₹${stmtMoney(di)}</td>`;
     });
     h+=`<td><b>₹${stmtMoney(d.interest)}</b></td></tr>`;
@@ -1643,7 +1653,7 @@ function stmtShowDaily(){
   h+='</tbody><tfoot><tr><th colspan="3" style="text-align:left">TOTAL</th><th>₹'+stmtMoney(totalProduct)+'</th>';
   slabs.forEach((s,i)=>{
     const product=days.reduce((a,d)=>a+((d.parts[i]||{}).portion||0),0);
-    const interest=days.reduce((a,d)=>a+((d.parts[i] ? d.parts[i].portion*d.parts[i].rate/100/d.daysInMonth : 0)),0);
+    const interest=days.reduce((a,d)=>a+((d.parts[i] ? d.parts[i].portion*d.parts[i].rate/100/365 : 0)),0);
     h+=`<th>₹${stmtMoney(product)}</th><th></th><th>₹${stmtMoney(interest)}</th>`;
   });
   h+=`<th>₹${stmtMoney(totalInterest)}</th></tr></tfoot>`;
