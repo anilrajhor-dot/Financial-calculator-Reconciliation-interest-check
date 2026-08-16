@@ -151,7 +151,10 @@
 .loan-menu-panel{border:1px solid var(--line)}
 #emiCalculatorMenu .btn.active{background:var(--accent)!important;color:#0E0E10!important;border-color:var(--accent)!important;font-weight:800}
 #emiCalculatorMenu .btn{min-height:46px}
-</style>
+
+#loanCalculatorMenus .loan-menu-btn{min-height:48px;font-weight:800}
+#loanCalculatorMenus .loan-menu-btn.active{background:var(--accent)!important;color:#0E0E10!important;border-color:var(--accent)!important;box-shadow:0 0 0 2px rgba(201,138,44,.18)}
+''</style>
 </head>
 <body>
 <div class="wrap">
@@ -159,7 +162,7 @@
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v2.2</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v2.3</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -181,6 +184,15 @@
 
   <!-- EMI MODULE -->
   <div class="module active" id="module-emi">
+    <div id="loanCalculatorMenus" class="card" style="margin-bottom:16px;border:2px solid var(--accent)">
+      <div class="eyebrow">LOAN CALCULATORS</div>
+      <h2 style="margin:4px 0 10px">Choose a Loan Calculator</h2>
+      <div class="row" style="gap:10px;flex-wrap:wrap">
+        <button id="standardEmiMenuBtn" class="btn primary loan-menu-btn" type="button" onclick="openLoanMenu('standard')">EMI Calculator</button>
+        <button id="slabEmiMenuBtn" class="btn loan-menu-btn" type="button" onclick="openLoanMenu('slab')">Slab-wise Term Loan EMI</button>
+      </div>
+      <p id="loanMenuDescription" class="hint" style="margin:10px 0 0">Standard EMI using one annual interest rate throughout the loan.</p>
+    </div>
     <div class="eyebrow">LEDGER &middot; 01 REPAYMENT SCHEDULE</div>
     <h1 class="page-title">Loan &amp; EMI Passbook</h1>
     <p class="lede">Enter the loan terms below. Every installment repays interest on the outstanding balance first, then principal &mdash; like an entry in a bank passbook.</p>
@@ -621,7 +633,7 @@
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v2.2</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v2.3</strong>
   </footer>
 </div>
 
@@ -759,6 +771,25 @@ function syncEmiPeriodToCount(){
   return count;
 }
 
+
+
+function openLoanMenu(mode){
+  const standard=mode==='standard';
+  const method=document.getElementById('emiInterestMethod');
+  if(method) method.value=standard?'flat':'slab';
+  const rateWrap=document.getElementById('rate')?.closest('.grid > div');
+  const methodWrap=document.getElementById('emiInterestMethod')?.closest('.grid > div');
+  const slab=document.getElementById('emiSlabSettings');
+  if(rateWrap) rateWrap.style.display=standard?'block':'none';
+  if(methodWrap) methodWrap.style.display=standard?'none':'none';
+  if(slab) slab.style.display=standard?'none':'block';
+  const b1=document.getElementById('standardEmiMenuBtn'), b2=document.getElementById('slabEmiMenuBtn');
+  if(b1){b1.classList.toggle('primary',standard);b1.classList.toggle('active',standard);}
+  if(b2){b2.classList.toggle('primary',!standard);b2.classList.toggle('active',!standard);}
+  const d=document.getElementById('loanMenuDescription');
+  if(d) d.textContent=standard ? 'Standard EMI using one annual interest rate throughout the loan.' : 'Separate slab-wise term loan EMI. Set the outstanding-balance slabs and rates below; the slab settings remain unchanged until Reset EMI slabs.';
+  renderEmi();
+}
 
 function showLoanCalculator(mode){
   const std=document.getElementById('standardEmiMenuPanel');
@@ -1282,7 +1313,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.2 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.3 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -2061,6 +2092,8 @@ document.getElementById('reconRunBtn').addEventListener('click', () => {
   const statement = buildReconciliationStatement(booksBalance, bankBalanceActual, result.booksOnly, result.bankOnly);
   renderReconResults(result, statement, booksBalance, bankBalanceActual);
 });
+
+try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:',e);}
 </script>
 </body>
 </html>
