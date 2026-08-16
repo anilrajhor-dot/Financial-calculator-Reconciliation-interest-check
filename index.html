@@ -157,6 +157,80 @@
 ''</style>
 <style>
 .premium-menu{border:2px solid var(--line);background:linear-gradient(145deg,var(--card),var(--bg));margin-bottom:12px}.premium-kicker{font-size:.78rem;letter-spacing:.14em;font-weight:900;color:var(--brass)}.premium-menu-head h2{font-size:1.65rem;margin:4px 0;font-weight:900}.premium-menu-head p{margin:0;color:var(--muted)}.premium-menu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}.premium-menu-item{display:flex;align-items:center;gap:12px;text-align:left;padding:15px;border:2px solid var(--line);border-radius:16px;background:var(--card);cursor:pointer}.premium-menu-item b{display:block;font-size:1rem;font-weight:900}.premium-menu-item small{display:block;color:var(--muted);margin-top:3px}.premium-menu-item.active{border-color:var(--brass);box-shadow:0 0 0 2px rgba(180,130,30,.18)}.premium-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--brass);color:#111;font-weight:900;font-size:1.2rem;flex:0 0 auto}.premium-actions{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}.app-modal{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:9999;display:none;padding:20px;align-items:center;justify-content:center}.app-modal.open{display:flex}.app-modal-card{width:min(720px,96vw);max-height:88vh;overflow:auto;background:var(--card);color:var(--text);border:2px solid var(--line);border-radius:22px;padding:20px}.app-modal-head{display:flex;justify-content:space-between;align-items:center}.app-modal-head button{font-size:1.8rem;border:0;background:transparent;color:inherit}.help-grid{display:grid;gap:12px;margin-top:16px}.help-grid>div{padding:14px;border:1px solid var(--line);border-radius:14px}.help-grid p{margin:6px 0 0;color:var(--muted)}#askMeInput{width:100%;box-sizing:border-box;margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--text);font:inherit}.ask-answer{margin-top:12px;padding:14px;border-radius:14px;background:var(--bg)}.floating-ask{position:fixed;right:18px;bottom:18px;z-index:5000;border:2px solid var(--brass);background:var(--brass);color:#111;border-radius:999px;padding:13px 18px;font-weight:900;box-shadow:0 8px 24px rgba(0,0,0,.25)}@media(max-width:700px){.premium-menu-grid{grid-template-columns:1fr}.premium-menu-head h2{font-size:1.35rem}}
+</style><style id="contrastFixV25">
+/* v2.5 — high-contrast dark-mode results */
+body.dark .summary .stat{
+  background:#F7F9F7 !important;
+  color:#16221F !important;
+}
+body.dark .summary .stat-label{
+  color:#405149 !important;
+  font-weight:800 !important;
+}
+body.dark .summary .stat-value{
+  color:#16221F !important;
+  font-weight:900 !important;
+  opacity:1 !important;
+  text-shadow:none !important;
+}
+body.dark .summary .stat-value.debit,
+body.dark .summary .stat-value.stmt-review{
+  color:#B33F31 !important;
+}
+body.dark .summary .stat-value.credit,
+body.dark .summary .stat-value.stmt-good{
+  color:#08745B !important;
+}
+body.dark #summary .stat-value{
+  color:#16221F !important;
+}
+body.dark #summary .stat-value[style*="var(--clay)"]{color:#B33F31 !important}
+body.dark #summary .stat-value[style*="var(--green)"]{color:#08745B !important}
+body.dark #summary .stat-value[style*="var(--brass)"]{color:#9A5C00 !important}
+body.dark #summary .stat-value[style*="var(--ink)"]{color:#16221F !important}
+
+body.dark .chart-card{
+  background:#17201C !important;
+  border-color:#3E4E46 !important;
+}
+body.dark .chart-title{
+  color:#F4F8F5 !important;
+  font-weight:800 !important;
+}
+body.dark .stub-title{
+  color:#F4F8F5 !important;
+  font-weight:800 !important;
+}
+body.dark .stub-sub,
+body.dark .stmt-daily-note{
+  color:#C7D3CD !important;
+}
+body.dark .card.ledger{
+  border-color:#3E4E46 !important;
+}
+body.dark .card.ledger table{
+  color:#F0F5F2 !important;
+}
+body.dark .card.ledger th{
+  color:#C7D3CD !important;
+  font-weight:800 !important;
+}
+body.dark .card.ledger td{
+  color:#F0F5F2 !important;
+  border-bottom-color:#34433C !important;
+}
+body.dark .card.ledger thead tr{
+  background:#202B26 !important;
+}
+body.dark .card.ledger tbody tr:hover{
+  background:#26332D !important;
+}
+
+/* Make important result numbers unmistakable on mobile */
+@media(max-width:700px){
+  body.dark .summary .stat-value{font-size:22px !important;letter-spacing:-.02em}
+  body.dark .summary .stat-label{font-size:10.5px !important}
+}
 </style></head>
 <body>
 <div class="wrap">
@@ -164,7 +238,7 @@
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v2.4</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v2.5</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -635,7 +709,7 @@
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v2.4</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v2.5</strong>
   </footer>
 </div>
 
@@ -871,21 +945,27 @@ function renderEmi() {
     if (typeof Chart === 'undefined') throw new Error('Chart.js did not load (offline or blocked CDN) — skipping chart, rest of the app is unaffected.');
     const ctx = document.getElementById('chart').getContext('2d');
     if (chart) chart.destroy();
+    const isDark = document.body.classList.contains('dark');
+    const chartText = isDark ? '#E6EEE9' : '#5B6B63';
+    const chartGrid = isDark ? '#3A4942' : '#E7ECE7';
+    const chartPrincipal = isDark ? '#2FA58B' : '#0F6E5C';
+    const chartInterest = isDark ? '#F07A69' : '#B5493B';
+    const chartBalance = isDark ? '#E0A43A' : '#C98A2C';
     chart = new Chart(ctx, {
       data: {
         labels,
         datasets: [
-          { type: 'bar', label: 'Principal', data: rows.map(r => r.principalPaid), backgroundColor: '#0F6E5C', stack: 'a' },
-        { type: 'bar', label: 'Interest', data: rows.map(r => r.interest), backgroundColor: '#B5493B', stack: 'a' },
-        { type: 'line', label: 'Balance', data: rows.map(r => r.closing), borderColor: '#C98A2C', borderWidth: 2, pointRadius: 0, yAxisID: 'y' },
+          { type: 'bar', label: 'Principal', data: rows.map(r => r.principalPaid), backgroundColor: chartPrincipal, stack: 'a' },
+        { type: 'bar', label: 'Interest', data: rows.map(r => r.interest), backgroundColor: chartInterest, stack: 'a' },
+        { type: 'line', label: 'Balance', data: rows.map(r => r.closing), borderColor: chartBalance, borderWidth: 2, pointRadius: 0, yAxisID: 'y' },
       ],
     },
     options: {
       responsive: true,
       interaction: { mode: 'index', intersect: false },
       scales: {
-        x: { ticks: { autoSkip: false, callback: (v, i) => i % step === 0 ? labels[i] : '', font: { size: 11 }, color: '#5B6B63' }, grid: { display: false } },
-        y: { ticks: { font: { size: 11 }, color: '#5B6B63', callback: (v) => (v/1000).toFixed(0) + 'k' }, grid: { color: '#E7ECE7' }, stacked: true },
+        x: { ticks: { autoSkip: false, callback: (v, i) => i % step === 0 ? labels[i] : '', font: { size: 11 }, color: chartText }, grid: { display: false } },
+        y: { ticks: { font: { size: 11 }, color: chartText, callback: (v) => (v/1000).toFixed(0) + 'k' }, grid: { color: chartGrid }, stacked: true },
       },
       plugins: {
         legend: { labels: { font: { size: 12, family: "'IBM Plex Sans', sans-serif" } } },
@@ -1315,7 +1395,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.4 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.5 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
