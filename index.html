@@ -147,6 +147,10 @@
     .stmt-slab-row .wide{grid-column:1/-1}
     #stmtTable,#stmtDailyTable{min-width:980px}
   }
+
+.loan-menu-panel{border:1px solid var(--line)}
+#emiCalculatorMenu .btn.active{background:var(--accent)!important;color:#0E0E10!important;border-color:var(--accent)!important;font-weight:800}
+#emiCalculatorMenu .btn{min-height:46px}
 </style>
 </head>
 <body>
@@ -155,7 +159,7 @@
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v2.1</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v2.2</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -262,7 +266,16 @@
         <div class="stub-title">Installment-wise register</div>
         <div class="stub-sub" id="ledgerSub"></div>
       </div>
-      <div id="folios"></div>
+      <div id="slabTermLoanCalculator" class="card loan-menu-panel" style="display:none;margin-top:14px">
+  <h3>Slab-wise Term Loan EMI</h3>
+  <p class="hint">Separate calculator for loans where interest is charged progressively by outstanding-balance slab.</p>
+  <div class="formula-box" style="margin-top:10px">
+    <b>Example:</b> ₹5,00,000 outstanding = ₹3,00,000 at 7% + ₹2,00,000 at 8%.
+    The slab rates are applied to the outstanding balance for each instalment period.
+  </div>
+</div>
+
+<div id="folios"></div>
       <div id="fyInterestSummary" style="margin-top:16px"></div>
     </div>
   </div>
@@ -608,7 +621,7 @@
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v2.1</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v2.2</strong>
   </footer>
 </div>
 
@@ -744,6 +757,26 @@ function syncEmiPeriodToCount(){
   const el=document.getElementById('count');
   if(el) el.value=count;
   return count;
+}
+
+
+function showLoanCalculator(mode){
+  const std=document.getElementById('standardEmiMenuPanel');
+  const slab=document.getElementById('slabTermLoanCalculator');
+  const normalCard=document.getElementById('emiCalculatorCard');
+  const b1=document.getElementById('menuStandardEMI');
+  const b2=document.getElementById('menuSlabEMI');
+  if(std) std.style.display=mode==='standard'?'block':'none';
+  if(slab) slab.style.display=mode==='slab'?'block':'none';
+  if(normalCard) normalCard.style.display=mode==='standard'?'block':'none';
+  if(b1){b1.classList.toggle('primary',mode==='standard');b1.classList.toggle('active',mode==='standard');}
+  if(b2){b2.classList.toggle('primary',mode==='slab');b2.classList.toggle('active',mode==='slab');}
+  // The existing slab inputs/results are moved into the dedicated slab menu
+  // when available, without changing the underlying calculation engine.
+  const slabSettings=document.getElementById('emiSlabSettings');
+  const slabResults=document.getElementById('slabEmiResults');
+  if(slabSettings) slabSettings.style.display=mode==='slab'?'block':'none';
+  if(slabResults) slabResults.style.display=mode==='slab'?'block':'none';
 }
 
 function renderEmi() {
@@ -1249,7 +1282,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.1 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.2 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
