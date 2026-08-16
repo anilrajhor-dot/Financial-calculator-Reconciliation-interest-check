@@ -155,7 +155,7 @@
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v1.9</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v2.1</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -193,15 +193,15 @@
         </div>
         <div>
           <label for="emiInterestMethod">Interest method</label>
-          <select id="emiInterestMethod"><option value="flat" selected>Single annual rate</option><option value="slab">Progressive slab rates</option></select>
+          <select id="emiInterestMethod"><option value="flat" selected>Single annual rate</option><option value="slab">Progressive slab rates — Term Loan</option></select><button id="emiSlabQuickBtn" class="btn sm" type="button" style="margin-top:6px">⚙ Set slab rates</button>
         </div>
         <div>
           <label for="periodYears">Loan period — Years</label>
-          <input type="number" id="periodYears" value="5" min="0" step="1" />
+          <select id="periodYears"><option value="0">0 Years</option><option value="1">1 Year</option><option value="2">2 Years</option><option value="3">3 Years</option><option value="4">4 Years</option><option value="5" selected>5 Years</option><option value="6">6 Years</option><option value="7">7 Years</option><option value="8">8 Years</option><option value="9">9 Years</option><option value="10">10 Years</option><option value="11">11 Years</option><option value="12">12 Years</option><option value="13">13 Years</option><option value="14">14 Years</option><option value="15">15 Years</option><option value="16">16 Years</option><option value="17">17 Years</option><option value="18">18 Years</option><option value="19">19 Years</option><option value="20">20 Years</option><option value="21">21 Years</option><option value="22">22 Years</option><option value="23">23 Years</option><option value="24">24 Years</option><option value="25">25 Years</option><option value="26">26 Years</option><option value="27">27 Years</option><option value="28">28 Years</option><option value="29">29 Years</option><option value="30">30 Years</option></select>
         </div>
         <div>
           <label for="periodMonths">Additional months</label>
-          <input type="number" id="periodMonths" value="0" min="0" max="11" step="1" />
+          <select id="periodMonths"><option value="0" selected>0 Months</option><option value="1">1 Month</option><option value="2">2 Months</option><option value="3">3 Months</option><option value="4">4 Months</option><option value="5">5 Months</option><option value="6">6 Months</option><option value="7">7 Months</option><option value="8">8 Months</option><option value="9">9 Months</option><option value="10">10 Months</option><option value="11">11 Months</option></select>
         </div>
         <div>
           <label for="count">No. of installments</label>
@@ -608,7 +608,7 @@
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v1.9</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v2.1</strong>
   </footer>
 </div>
 
@@ -731,6 +731,10 @@ let chart = null;
 let expandedYear = null;
 
 
+function emiInterestBreakdown(balance,slabs,freqMonths){
+  return emiAllocate(balance,slabs).map((p,i)=>'S'+(i+1)+': ₹'+fmtINR(p.portion)+' @ '+Number(p.rate).toFixed(2)+'% = ₹'+fmtINR(p.portion*p.rate/100*(freqMonths/12))).join('<br>');
+}
+
 function syncEmiPeriodToCount(){
   const y=Math.max(0,Math.floor(Number(document.getElementById('periodYears')?.value)||0));
   const m=Math.max(0,Math.min(11,Math.floor(Number(document.getElementById('periodMonths')?.value)||0)));
@@ -850,6 +854,7 @@ function renderEmi() {
         <td>${r.moratorium ? 'M' + r.period : r.period}</td>
         <td>${fmtDate(r.dueDate)}</td>
         <td>${fmtINR(r.opening)}</td>
+        <td>${method==='slab' ? emiInterestBreakdown(r.opening, emiLoadSlabs(), freqMonths) : '—'}</td>
         <td class="debit">${fmtINR(r.interest)}</td>
         <td class="credit">${fmtINR(r.principalPaid)}</td>
         <td style="font-weight:600">${r.moratorium && !r.moratoriumPaid ? '<em style="font-weight:400;color:var(--muted);">accrued</em>' : fmtINR(r.installment)}</td>
@@ -865,7 +870,7 @@ function renderEmi() {
         <div class="table-scroll">
           <table>
             <thead><tr>
-              <th>#</th><th>Due date</th><th>Opening bal.</th><th>Interest</th><th>Principal</th><th>Installment</th><th>Closing bal.</th>
+              <th>#</th><th>Due date</th><th>Opening bal.</th><th>Slab-wise interest</th><th>Total interest</th><th>Principal</th><th>Installment</th><th>Closing bal.</th>
             </tr></thead>
             <tbody>${body}</tbody>
           </table>
@@ -905,6 +910,14 @@ function renderEmi() {
   document.getElementById(id).addEventListener('change', renderEmi);
 });
 document.getElementById('emiInterestMethod')?.addEventListener('change',()=>{const on=document.getElementById('emiInterestMethod').value==='slab';document.getElementById('emiSlabSettings').style.display=on?'block':'none';if(on)emiRenderSlabs();renderEmi();});
+document.getElementById('emiSlabQuickBtn')?.addEventListener('click',()=>{
+  const sel=document.getElementById('emiInterestMethod');
+  sel.value='slab';
+  document.getElementById('emiSlabSettings').style.display='block';
+  emiRenderSlabs();
+  document.getElementById('emiSlabSettings').scrollIntoView({behavior:'smooth',block:'start'});
+  renderEmi();
+});
 document.getElementById('emiAddSlabBtn')?.addEventListener('click',emiAddSlab);
 document.getElementById('emiResetSlabBtn')?.addEventListener('click',emiResetSlabs);
 
@@ -1236,7 +1249,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v1.9 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.1 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -1448,14 +1461,41 @@ function stmtRowsFromMapping(){
 }
 
 function stmtExtractOpening(rows){
-  for(let i=0;i<stmtRawRows.length;i++){
-    const r=stmtRawRows[i]||[], joined=r.map(x=>String(x??'')).join(' ').toLowerCase();
-    if(/opening\s+balance/.test(joined)){
-      const same=parseNumberFlexible(r[0]); if(isFinite(same))return same;
-      const next=stmtRawRows[i+1]||[]; const n=parseNumberFlexible(next[0]); if(isFinite(n))return n;
+  // IDFC-style statements often have a summary row:
+  // "Opening Balance | Total Debit | Total Credit | Closing Balance"
+  // followed by a numeric row. Never parse the text label itself as zero.
+  const raw=stmtRawRows||[];
+  for(let i=0;i<raw.length;i++){
+    const r=raw[i]||[];
+    const joined=r.map(x=>String(x??'')).join(' ').toLowerCase();
+    if(/opening\s+balance|brought\s+forward|balance\s+b\/f|opening\s+bal(?:ance)?/.test(joined)){
+      for(let j=i;j<=Math.min(i+2,raw.length-1);j++){
+        const rr=raw[j]||[];
+        for(let c=0;c<rr.length;c++){
+          const v=rr[c];
+          if(typeof v==='number' && isFinite(v) && Number(v)!==0) return Number(v);
+          const text=String(v??'').trim();
+          if(/^[-+]?₹?\s*[\d,]+(?:\.\d+)?$/.test(text)){
+            const n=parseNumberFlexible(text);
+            if(isFinite(n)) return n;
+          }
+        }
+      }
     }
   }
-  for(const r of stmtRawRows){const s=(r||[]).map(x=>String(x??'')).join(' ');const m=s.match(/(?:opening\s+balance|brought\s+forward|balance\s+b\/f|opening\s+bal(?:ance)?)[^\d₹-]*([₹-]?\s*[\d,]+(?:\.\d+)?)/i);if(m){const n=parseNumberFlexible(m[1]);if(isFinite(n))return n;}}
+  // Fallback: explicit label followed by a numeric value anywhere in the same row.
+  for(const r of raw){
+    const cells=(r||[]).map(x=>String(x??''));
+    const joined=cells.join(' ');
+    if(/opening\s+balance|brought\s+forward|balance\s+b\/f|opening\s+bal(?:ance)?/i.test(joined)){
+      for(const cell of cells){
+        if(/^[-+]?₹?\s*[\d,]+(?:\.\d+)?$/.test(cell.trim())){
+          const n=parseNumberFlexible(cell);
+          if(isFinite(n)) return n;
+        }
+      }
+    }
+  }
   return null;
 }
 function stmtBuildDaily(rows){
@@ -1658,6 +1698,9 @@ function stmtRenderResults(result,slabs){
   h+=`</tbody><tfoot><tr><th style="text-align:left">TOTAL</th><th></th><th>${months.reduce((a,m)=>a+m.calculatedDays,0)}</th><th>₹${stmtMoney(months.reduce((a,m)=>a+m.dailyProduct,0))}</th><th>₹${stmtMoney(result.total)}</th><th>${bankAvailable?'₹'+stmtMoney(totalBank):'—'}</th><th>${bankAvailable?((diff>=0?'+':'−')+'₹'+stmtMoney(Math.abs(diff||0))):'—'}</th><th></th></tr></tfoot>`;
   document.getElementById('stmtTable').innerHTML=h;
   let note='Daily product × annual rate ÷ 365. Daily product is the applicable balance/slab portion for that date.';
+  if(result.opening!==null && result.opening!==undefined){
+    note += ' Opening / brought-forward balance used for the first day: ₹'+stmtMoney(result.opening)+'.';
+  }
   if(result.partial){
     note += result.firstMonthMode==='from-first-transaction'
       ? ' No brought-forward balance was available, so the first month starts on '+stmtDate(result.startDate)+'; later months start on the 1st.'
@@ -1680,7 +1723,7 @@ function stmtShowDaily(){
   days.forEach(d=>{bh+=`<tr><td style="text-align:left">${stmtDate(d.date)}</td><td>₹${stmtMoney(d.balance)}</td></tr>`;});
   bh+='</tbody></table>';
   const bs=document.getElementById('stmtBalanceSchedule'); if(bs)bs.innerHTML='<h3 style="margin:12px 0 6px">Daily Date &amp; Balance Schedule</h3>'+bh;
-  let h='<thead><tr><th style="text-align:left">Date</th><th>Days in month</th><th>Closing balance</th><th>Daily product</th><th>Interest basis</th>';
+  let h='<thead><tr><th style="text-align:left">Date</th><th>Days in month</th><th>Closing balance</th><th>Daily product (Balance)</th><th>Interest basis</th>';
   slabs.forEach((s,i)=>h+=`<th>Slab ${i+1} product</th><th>Rate</th><th>Daily interest</th>`);
   h+='<th>Total daily interest</th></tr></thead><tbody>';
   days.forEach(d=>{
