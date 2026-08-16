@@ -102,7 +102,7 @@
   footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--rule); text-align: center; font-size: 11.5px; color: var(--muted); }
   footer strong { color: var(--ink); }
 
-  /* v1.1 — Bank Statement Interest Comparison */
+  /* v1.2 — Bank Statement Interest Comparison */
   .stmt-slab-row{
     display:grid;
     grid-template-columns:1.1fr 1.4fr 1.2fr 1.6fr auto;
@@ -128,7 +128,7 @@
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v1.1</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v1.2</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -534,7 +534,7 @@
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v1.1</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v1.2</strong>
   </footer>
 </div>
 
@@ -1100,7 +1100,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v1.1 ---------- */
+/* ---------- Bank Statement Interest Calculator v1.2 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
