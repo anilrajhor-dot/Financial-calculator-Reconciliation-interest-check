@@ -6,38 +6,7 @@
 <title>Anil Sharma Financial Calculators</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js">
-function populateSIQInterestColumnDetails(rows){
-  const ids=['siqMapDate','siqMapValueDate','siqMapNarration','siqMapRef','siqMapDebit','siqMapCredit','siqMapAmount','siqMapDrCr','siqMapBalance'];
-  const roles={
-    siqMapDate:['date','transaction date','txn date','posting date','post date'],
-    siqMapValueDate:['value date','value dt'],
-    siqMapNarration:['narration','description','particulars','transaction details','remarks','details'],
-    siqMapRef:['ref no','reference','cheque no','utr','transaction id'],
-    siqMapDebit:['debit','withdrawal','payment','dr amount','dr amt'],
-    siqMapCredit:['credit','deposit','receipt','cr amount','cr amt'],
-    siqMapAmount:['amount','transaction amount','value'],
-    siqMapDrCr:['dr/cr','dr / cr','type','indicator','cr/dr'],
-    siqMapBalance:['balance','closing balance','running balance','available balance']
-  };
-  const header=(rows&&rows.length)?rows[0].map(x=>String(x??'')):['Column 1','Column 2','Column 3','Column 4'];
-  function score(h, keys){
-    h=h.toLowerCase();
-    return Math.max(...keys.map(k=>h===k?100:h.includes(k)?k.length:0),0);
-  }
-  ids.forEach(id=>{
-    const el=document.getElementById(id); if(!el)return;
-    el.innerHTML='<option value="-1">— not present —</option>'+header.map((h,i)=>`<option value="${i}">${String(h||'Column '+(i+1)).replace(/</g,'&lt;')}</option>`).join('');
-    let best=-1,bs=0;
-    header.forEach((h,i)=>{const z=score(h,roles[id]);if(z>bs){bs=z;best=i;}});
-    if(best>=0) el.value=best;
-  });
-  const status=document.getElementById('siqColumnStatus');
-  if(status) status.innerHTML='<b>StatementIQ mapping:</b> Date, Balance, Debit/Credit (or Amount + Dr/Cr) and Narration are recognised automatically. Review the selections before calculating.';
-}
-window.populateSIQInterestColumnDetails=populateSIQInterestColumnDetails;
-
-</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
@@ -130,10 +99,37 @@ window.populateSIQInterestColumnDetails=populateSIQInterestColumnDetails;
   .btn { font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600; color: #fff; background: var(--green); border: none; padding: 10px 18px; border-radius: 4px; cursor: pointer; }
   .btn:hover { background: #0b5949; }
 
+  /* v1.7 — appearance, highlighted bank-statement menu and health check */
+  body.dark{
+    --paper:#111714;--ink:#EDF4F0;--muted:#A9B9B1;--rule:#2E3A35;
+    --green:#2FA58B;--clay:#F07A69;--brass:#E0A43A;
+    background:var(--paper);color:var(--ink);
+  }
+  body.dark .card,body.dark .ledger,body.dark .input-card{background:#17201C;border-color:var(--rule)}
+  body.dark input,body.dark select{background:#101612;color:var(--ink);border-color:#425149}
+  body.dark .note{background:#1A211E;color:var(--muted);border-color:#39463F}
+  body.dark .stmt-slab-row{background:#151D19;border-color:var(--rule)}
+  .appearance-tools{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin:10px 0 0}
+  .appearance-tools .btn{padding:8px 12px}
+  #tabs .tab[data-module="statement"]{
+    font-weight:800;border:2px solid var(--brass);box-shadow:0 0 0 2px rgba(201,138,44,.14);
+  }
+  #tabs .tab[data-module="statement"].active{
+    background:var(--brass);color:#17130A;border-color:var(--brass);font-weight:900;
+  }
+  #tabs .tab[data-module="health"]{
+    font-weight:800;border:2px solid var(--green);
+  }
+  #tabs .tab[data-module="health"].active{
+    background:var(--green);color:#fff;font-weight:900;
+  }
+  .health-ok{color:var(--green);font-weight:800}
+  .health-bad{color:var(--clay);font-weight:800}
+
   footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--rule); text-align: center; font-size: 11.5px; color: var(--muted); }
   footer strong { color: var(--ink); }
 
-  /* v1.6 — Bank Statement Interest Comparison */
+  /* v1.7 — Bank Statement Interest Comparison */
   .stmt-slab-row{
     display:grid;
     grid-template-columns:1.1fr 1.4fr 1.2fr 1.6fr auto;
@@ -159,12 +155,15 @@ window.populateSIQInterestColumnDetails=populateSIQInterestColumnDetails;
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v1.6</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v1.7</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
       Former General Manager<br/>Central Bank of India
     </div>
+  </div>
+  <div class="appearance-tools">
+    <button id="darkModeBtn" class="btn" type="button">🌙 Dark mode</button>
   </div>
 
   <div class="tabs" id="tabs">
@@ -173,6 +172,7 @@ window.populateSIQInterestColumnDetails=populateSIQInterestColumnDetails;
     <button class="tab" data-module="age">Age Calculator</button>
     <button class="tab" data-module="statement">Bank Statement Interest</button>
     <button class="tab" data-module="recon">Reconciliation</button>
+    <button class="tab" data-module="health">🩺 Health Check</button>
   </div>
 
   <!-- EMI MODULE -->
@@ -473,7 +473,7 @@ window.populateSIQInterestColumnDetails=populateSIQInterestColumnDetails;
         <button id="stmtResetSlabBtn" class="btn" type="button">Reset built-in slabs</button>
         <span id="stmtSlabTotal" class="hint"></span>
       </div>
-      <div id="stmtSlabSave" class="hint" style="margin-top:8px;color:var(--green)">✓ Slab settings are saved automatically on this device.</div>
+      <div id="stmtSlabSave" class="hint" style="margin-top:8px;color:var(--green)">✓ Slab settings are saved automatically on this device and will not change when a statement is reloaded or recalculated. Use <b>Reset built-in slabs</b> to replace them.</div>
     </div>
 
     <div id="stmtResults" style="display:none;">
@@ -565,8 +565,29 @@ window.populateSIQInterestColumnDetails=populateSIQInterestColumnDetails;
     </div>
   </div>
 
+
+  <!-- HEALTH CHECK MODULE -->
+  <div class="module" id="module-health">
+    <div class="eyebrow">CONTROL &middot; 06 APP HEALTH</div>
+    <h1 class="page-title">App Health Check</h1>
+    <p class="lede">Check navigation, statement mapping, slab settings, calculation functions, dark mode and local storage before relying on the results.</p>
+    <div class="card input-card">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div>
+          <div class="stub-title">Health Check</div>
+          <div class="hint">Run the checks after uploading a statement if you want to verify the interest calculator.</div>
+        </div>
+        <button id="healthRunBtn" class="btn" type="button">Run Health Check</button>
+      </div>
+      <div id="healthSummary" class="summary" style="margin-top:16px"></div>
+      <div class="table-scroll" style="margin-top:14px">
+        <table id="healthTable"></table>
+      </div>
+    </div>
+  </div>
+
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v1.6</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v1.7</strong>
   </footer>
 </div>
 
@@ -1132,7 +1153,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v1.6 ---------- */
+/* ---------- Bank Statement Interest Calculator v1.7 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -1415,7 +1436,10 @@ function stmtBuildDaily(rows){
     if(opening===null||!isFinite(opening)){
       return {days:[],error:'Opening / brought-forward balance could not be established from the statement.',missingOpening:true};
     }
+    // An explicit brought-forward/opening balance means the interest period starts
+    // on the 1st of that calendar month, even when the first transaction is later.
     startDate=new Date(first.getFullYear(),first.getMonth(),1);
+    firstMonthMode='from-opening-balance';
   }
 
   const end=new Date(last.getFullYear(),last.getMonth()+1,0);
@@ -1497,14 +1521,18 @@ function stmtPersistSlabs(){
   stmtRenderSlabs(slabs);
 }
 function stmtAddSlab(){
+  // Preserve every existing slab's amount and rate. Only the newly introduced
+  // slab receives defaults. Existing settings remain unchanged until Reset.
   let s=stmtSlabRows();
   if(!s.length)s=STMT_DEFAULT_SLABS.map(x=>({...x}));
-  const last=s[s.length-1];
+  const last={...s[s.length-1]};
   if(last.to===null){
     const prev=s.length>1?s[s.length-2].to:300000;
-    s.splice(s.length-1,0,{to:Number(prev||300000)+500000,rate:Number(last.rate||4)});
+    const newTo=Number(prev||300000)+500000;
+    s.splice(s.length-1,0,{to:newTo,rate:last.rate});
+    // The existing final slab retains its rate and becomes the no-limit slab.
   }else{
-    s.push({to:null,rate:Number(last.rate||4)+1});
+    s.push({to:null,rate:last.rate});
   }
   s=stmtNormaliseSlabs(s);stmtSaveSlabs(s);stmtRenderSlabs(s);
 }
@@ -1578,8 +1606,8 @@ function stmtRenderResults(result,slabs){
   let note='Daily closing balance × applicable progressive slab rate ÷ actual days in that calendar month.';
   if(result.partial){
     note += result.firstMonthMode==='from-first-transaction'
-      ? ' The first month starts on '+stmtDate(result.startDate)+' because no brought-forward balance was available; later months start on the 1st.'
-      : ' The calculation follows the statement-period rule and carries the closing balance into subsequent months.';
+      ? ' No brought-forward balance was available, so the first month starts on '+stmtDate(result.startDate)+'; later months start on the 1st.'
+      : ' An opening / brought-forward balance is available, so the first month starts on the 1st; the balance is carried forward until the first transaction changes it.';
   }
   document.getElementById('stmtLedgerSub').insertAdjacentHTML('afterend',`<div class="note" style="margin:10px 20px">${stmtEsc(note)}</div>`);
   document.getElementById('stmtResults').style.display='block';
@@ -1671,11 +1699,51 @@ document.getElementById('stmtPrintBtn').addEventListener('click',()=>window.prin
 document.getElementById('stmtResetBtn').addEventListener('click',()=>{
   document.getElementById('stmtFile').value='';
   stmtRawRows=[];stmtLastResult=null;
+  // Statement Reset clears statement/calculation data only; saved slabs remain intact until Reset built-in slabs.
   ['stmtMappingCard','stmtPreviewCard','stmtSlabCard','stmtResults'].forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById('stmtStatus').style.display='none';
   document.getElementById('stmtBankInterest').value='';
 });
 stmtRenderSlabs(stmtLoadSlabs());
+
+
+/* ---------- Appearance ---------- */
+(function initAppearance(){
+  const saved=localStorage.getItem('financial_calculators_dark_mode');
+  if(saved==='1')document.body.classList.add('dark');
+  const btn=document.getElementById('darkModeBtn');
+  function sync(){ if(btn)btn.textContent=document.body.classList.contains('dark')?'☀️ Light mode':'🌙 Dark mode'; }
+  sync();
+  btn?.addEventListener('click',()=>{
+    document.body.classList.toggle('dark');
+    localStorage.setItem('financial_calculators_dark_mode',document.body.classList.contains('dark')?'1':'0');
+    sync();
+  });
+})();
+
+/* ---------- App Health Check ---------- */
+function runHealthCheck(){
+  const tests=[];
+  const add=(name,ok,detail)=>tests.push({name,ok,detail});
+  add('Bank Statement Interest menu',!!document.querySelector('[data-module="statement"]'),'Highlighted menu is present');
+  add('Health Check menu',!!document.querySelector('[data-module="health"]'),'Health Check tab is present');
+  add('Statement upload',!!document.getElementById('stmtFile'),'Upload control is present');
+  add('Column mapping',!!document.getElementById('mapDate')&&!!document.getElementById('mapBalance'),'Date and Balance mapping controls are present');
+  add('Interest Settings',!!document.getElementById('stmtSlabs')&&!!document.getElementById('stmtAddSlabBtn'),'Slab/rate settings are present');
+  add('Slab persistence',!!localStorage.getItem('financial_stmt_interest_slabs_v11'),'Saved slab configuration exists');
+  add('Dark mode',document.body.classList.contains('dark'),'Dark mode is currently '+(document.body.classList.contains('dark')?'ON':'OFF'));
+  add('Daily interest engine',typeof stmtCalculate==='function'&&typeof stmtBuildDaily==='function'&&typeof stmtAllocate==='function','Calculation functions are available');
+  let rows=[];
+  try{rows=stmtRowsFromMapping();}catch(e){}
+  add('Statement rows',rows.length>0,rows.length?rows.length+' transaction rows mapped':'Upload a statement and confirm mapping to test transaction rows');
+  const slabs=stmtLoadSlabs();
+  add('Slab validity',stmtValidateSlabs(slabs).length===0,stmtValidateSlabs(slabs).length?'Invalid slab configuration':'Slab configuration is valid');
+  const ok=tests.filter(x=>x.ok).length, total=tests.length;
+  document.getElementById('healthSummary').innerHTML=`<div class="stat"><div class="stat-label">Checks passed</div><div class="stat-value ${ok===total?'health-ok':'health-bad'}">${ok} / ${total}</div></div><div class="stat"><div class="stat-label">Status</div><div class="stat-value">${ok===total?'READY':'REVIEW'}</div></div>`;
+  document.getElementById('healthTable').innerHTML='<thead><tr><th style="text-align:left">Check</th><th>Status</th><th style="text-align:left">Details</th></tr></thead><tbody>'+
+    tests.map(t=>`<tr><td style="text-align:left">${stmtEsc(t.name)}</td><td class="${t.ok?'health-ok':'health-bad'}">${t.ok?'PASS':'CHECK'}</td><td style="text-align:left">${stmtEsc(t.detail)}</td></tr>`).join('')+'</tbody>';
+}
+document.getElementById('healthRunBtn')?.addEventListener('click',runHealthCheck);
 
 /* ---------- Bank Reconciliation ---------- */
 let reconBooksRows = [];
