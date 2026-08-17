@@ -158,7 +158,7 @@
 <style>
 .premium-menu{border:2px solid var(--line);background:linear-gradient(145deg,var(--card),var(--bg));margin-bottom:12px}.premium-kicker{font-size:.78rem;letter-spacing:.14em;font-weight:900;color:var(--brass)}.premium-menu-head h2{font-size:1.65rem;margin:4px 0;font-weight:900}.premium-menu-head p{margin:0;color:var(--muted)}.premium-menu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}.premium-menu-item{display:flex;align-items:center;gap:12px;text-align:left;padding:15px;border:2px solid var(--line);border-radius:16px;background:var(--card);cursor:pointer}.premium-menu-item b{display:block;font-size:1rem;font-weight:900}.premium-menu-item small{display:block;color:var(--muted);margin-top:3px}.premium-menu-item.active{border-color:var(--brass);box-shadow:0 0 0 2px rgba(180,130,30,.18)}.premium-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--brass);color:#111;font-weight:900;font-size:1.2rem;flex:0 0 auto}.premium-actions{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}.app-modal{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:9999;display:none;padding:20px;align-items:center;justify-content:center}.app-modal.open{display:flex}.app-modal-card{width:min(720px,96vw);max-height:88vh;overflow:auto;background:var(--card);color:var(--text);border:2px solid var(--line);border-radius:22px;padding:20px}.app-modal-head{display:flex;justify-content:space-between;align-items:center}.app-modal-head button{font-size:1.8rem;border:0;background:transparent;color:inherit}.help-grid{display:grid;gap:12px;margin-top:16px}.help-grid>div{padding:14px;border:1px solid var(--line);border-radius:14px}.help-grid p{margin:6px 0 0;color:var(--muted)}#askMeInput{width:100%;box-sizing:border-box;margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--text);font:inherit}.ask-answer{margin-top:12px;padding:14px;border-radius:14px;background:var(--bg)}.floating-ask{position:fixed;right:18px;bottom:18px;z-index:5000;border:2px solid var(--brass);background:var(--brass);color:#111;border-radius:999px;padding:13px 18px;font-weight:900;box-shadow:0 8px 24px rgba(0,0,0,.25)}@media(max-width:700px){.premium-menu-grid{grid-template-columns:1fr}.premium-menu-head h2{font-size:1.35rem}}
 </style><style id="contrastFixV25">
-/* v2.8 — high-contrast dark-mode results */
+/* v2.9 — high-contrast dark-mode results */
 body.dark .summary .stat{
   background:#F7F9F7 !important;
   color:#16221F !important;
@@ -235,6 +235,63 @@ body.dark .card.ledger tbody tr:hover{
 .slab-amort-card{margin-top:28px}
 .slab-amort-card .chart-subtitle{font-size:12.5px;color:var(--muted);padding:0 12px 12px}
 body.dark .slab-amort-card .chart-subtitle{color:#C7D3CD}
+</style><style id="folioContrastV29">
+/* v2.9 — fix dim folio/register text in dark mode */
+body.dark .ledger .stub{
+  background:#17201C !important;
+  color:#F2F7F4 !important;
+}
+body.dark .ledger .stub-title{
+  color:#F2F7F4 !important;
+}
+body.dark .ledger .stub-sub{
+  color:#C8D5CE !important;
+}
+body.dark .ledger .folio-toggle{
+  background:#202B26 !important;
+  color:#F2F7F4 !important;
+  border-top-color:#3E4E46 !important;
+  border-bottom-color:#3E4E46 !important;
+}
+body.dark .ledger .folio-toggle:hover{
+  background:#293730 !important;
+}
+body.dark .ledger .folio-name{
+  color:#F4F8F5 !important;
+  font-weight:900 !important;
+}
+body.dark .ledger .folio-meta{
+  color:#D5E0DA !important;
+}
+body.dark .ledger .folio-meta .debit{
+  color:#F07A69 !important;
+}
+body.dark .ledger .folio-meta .credit{
+  color:#2FA58B !important;
+}
+body.dark .ledger .table-scroll{
+  background:#17201C !important;
+}
+body.dark .ledger table{
+  background:#17201C !important;
+  color:#F0F5F2 !important;
+}
+body.dark .ledger thead tr{
+  background:#202B26 !important;
+}
+body.dark .ledger th{
+  color:#D1DDD6 !important;
+}
+body.dark .ledger td{
+  color:#F0F5F2 !important;
+  border-bottom-color:#34433C !important;
+}
+body.dark .ledger td.debit{
+  color:#F07A69 !important;
+}
+body.dark .ledger td.credit{
+  color:#2FA58B !important;
+}
 </style></head>
 <body>
 <div class="wrap">
@@ -242,7 +299,7 @@ body.dark .slab-amort-card .chart-subtitle{color:#C7D3CD}
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v2.8</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v2.9</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -719,7 +776,7 @@ body.dark .slab-amort-card .chart-subtitle{color:#C7D3CD}
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v2.8</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v2.9</strong>
   </footer>
 </div>
 
@@ -1468,7 +1525,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.8 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.9 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
