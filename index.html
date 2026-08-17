@@ -158,7 +158,7 @@
 <style>
 .premium-menu{border:2px solid var(--line);background:linear-gradient(145deg,var(--card),var(--bg));margin-bottom:12px}.premium-kicker{font-size:.78rem;letter-spacing:.14em;font-weight:900;color:var(--brass)}.premium-menu-head h2{font-size:1.65rem;margin:4px 0;font-weight:900}.premium-menu-head p{margin:0;color:var(--muted)}.premium-menu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}.premium-menu-item{display:flex;align-items:center;gap:12px;text-align:left;padding:15px;border:2px solid var(--line);border-radius:16px;background:var(--card);cursor:pointer}.premium-menu-item b{display:block;font-size:1rem;font-weight:900}.premium-menu-item small{display:block;color:var(--muted);margin-top:3px}.premium-menu-item.active{border-color:var(--brass);box-shadow:0 0 0 2px rgba(180,130,30,.18)}.premium-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--brass);color:#111;font-weight:900;font-size:1.2rem;flex:0 0 auto}.premium-actions{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}.app-modal{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:9999;display:none;padding:20px;align-items:center;justify-content:center}.app-modal.open{display:flex}.app-modal-card{width:min(720px,96vw);max-height:88vh;overflow:auto;background:var(--card);color:var(--text);border:2px solid var(--line);border-radius:22px;padding:20px}.app-modal-head{display:flex;justify-content:space-between;align-items:center}.app-modal-head button{font-size:1.8rem;border:0;background:transparent;color:inherit}.help-grid{display:grid;gap:12px;margin-top:16px}.help-grid>div{padding:14px;border:1px solid var(--line);border-radius:14px}.help-grid p{margin:6px 0 0;color:var(--muted)}#askMeInput{width:100%;box-sizing:border-box;margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--text);font:inherit}.ask-answer{margin-top:12px;padding:14px;border-radius:14px;background:var(--bg)}.floating-ask{position:fixed;right:18px;bottom:18px;z-index:5000;border:2px solid var(--brass);background:var(--brass);color:#111;border-radius:999px;padding:13px 18px;font-weight:900;box-shadow:0 8px 24px rgba(0,0,0,.25)}@media(max-width:700px){.premium-menu-grid{grid-template-columns:1fr}.premium-menu-head h2{font-size:1.35rem}}
 </style><style id="contrastFixV25">
-/* v2.5 — high-contrast dark-mode results */
+/* v2.8 — high-contrast dark-mode results */
 body.dark .summary .stat{
   background:#F7F9F7 !important;
   color:#16221F !important;
@@ -231,6 +231,10 @@ body.dark .card.ledger tbody tr:hover{
   body.dark .summary .stat-value{font-size:22px !important;letter-spacing:-.02em}
   body.dark .summary .stat-label{font-size:10.5px !important}
 }
+</style><style id="slabAmortV26">
+.slab-amort-card{margin-top:28px}
+.slab-amort-card .chart-subtitle{font-size:12.5px;color:var(--muted);padding:0 12px 12px}
+body.dark .slab-amort-card .chart-subtitle{color:#C7D3CD}
 </style></head>
 <body>
 <div class="wrap">
@@ -238,7 +242,7 @@ body.dark .card.ledger tbody tr:hover{
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v2.5</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v2.8</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -347,6 +351,12 @@ body.dark .card.ledger tbody tr:hover{
     <div class="card chart-card">
       <div class="chart-title">Principal vs. interest, per installment</div>
       <canvas id="chart" height="110"></canvas>
+    </div>
+
+    <div class="card chart-card slab-amort-card" id="slabAmortisationCard" style="display:none;">
+      <div class="chart-title">Slab-wise EMI Amortisation — Full Term</div>
+      <div class="chart-subtitle" id="slabAmortisationSub">Principal repayment, slab-wise interest and closing balance for every instalment.</div>
+      <canvas id="slabAmortChart" height="125"></canvas>
     </div>
 
     <div class="card ledger">
@@ -709,7 +719,7 @@ body.dark .card.ledger tbody tr:hover{
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v2.5</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v2.8</strong>
   </footer>
 </div>
 
@@ -829,6 +839,7 @@ function computeSchedule({ principal, annualRate, count, freqMonths, startDate, 
 }
 
 let chart = null;
+let slabAmortChart = null;
 let expandedYear = null;
 
 
@@ -978,6 +989,68 @@ function renderEmi() {
     console.warn('EMI chart skipped:', chartErr.message);
     const canvas = document.getElementById('chart');
     if (canvas) canvas.style.display = 'none';
+  }
+
+
+  // Dedicated slab-wise amortisation chart: full selected term, with
+  // principal + each slab's interest stacked and closing balance as a line.
+  const slabCard = document.getElementById('slabAmortisationCard');
+  const slabCanvas = document.getElementById('slabAmortChart');
+  if (slabCard && slabCanvas) {
+    if (method === 'slab') {
+      slabCard.style.display = 'block';
+      const slabsNow = emiLoadSlabs();
+      const labels2 = rows.map(r => `#${r.period}`);
+      const datasets2 = [
+        { type:'bar', label:'Principal repaid', data:rows.map(r=>r.principalPaid), backgroundColor:chartPrincipal, stack:'amort' }
+      ];
+      slabsNow.forEach((slab,i)=>{
+        datasets2.push({
+          type:'bar',
+          label:`Slab ${i+1} interest @ ${Number(slab.rate).toFixed(2)}%`,
+          data:rows.map(r=>{
+            let prev=0,total=0,b=Math.max(0,Number(r.opening)||0);
+            for(let j=0;j<=i;j++){
+              const upper=slabsNow[j].to===null?Infinity:slabsNow[j].to;
+              const portion=Math.max(0,Math.min(b,upper)-prev);
+              if(j===i) total=portion*slabsNow[j].rate/100*(freqMonths/12);
+              if(isFinite(upper)) prev=upper;
+            }
+            return total;
+          }),
+          backgroundColor: isDark ? ['#E0A43A','#8EC7B7','#F07A69','#B8A1D9','#7FB6D8'][i%5] : ['#C98A2C','#2F8F78','#B5493B','#7A5C9E','#467C9E'][i%5],
+          stack:'amort'
+        });
+      });
+      datasets2.push({type:'line',label:'Closing balance',data:rows.map(r=>r.closing),borderColor:chartBalance,borderWidth:3,pointRadius:0,yAxisID:'y2'});
+      if (slabAmortChart) slabAmortChart.destroy();
+      try {
+        slabAmortChart = new Chart(slabCanvas.getContext('2d'),{
+          data:{labels:labels2,datasets:datasets2},
+          options:{
+            responsive:true,
+            interaction:{mode:'index',intersect:false},
+            scales:{
+              x:{ticks:{autoSkip:false,maxRotation:0,minRotation:0,callback:(v,i)=>i%Math.max(1,Math.ceil(labels2.length/18))===0?labels2[i]:'',font:{size:10},color:chartText},grid:{display:false}},
+              y:{stacked:true,ticks:{font:{size:10},color:chartText,callback:v=>(v/1000).toFixed(0)+'k'},grid:{color:chartGrid}},
+              y2:{position:'right',beginAtZero:true,ticks:{font:{size:10},color:chartText,callback:v=>(v/1000).toFixed(0)+'k'},grid:{drawOnChartArea:false}}
+            },
+            plugins:{
+              legend:{labels:{font:{size:11,family:"'IBM Plex Sans', sans-serif"},color:chartText}},
+              tooltip:{titleFont:{family:"'IBM Plex Mono', monospace"},bodyFont:{family:"'IBM Plex Mono', monospace"},
+                callbacks:{label:ctx=>`${ctx.dataset.label}: ₹ ${fmtINR(ctx.parsed.y)}`}}
+            }
+          }
+        });
+        document.getElementById('slabAmortisationSub').textContent =
+          `${rows.length} instalments across the full selected term · principal repayment + interest by slab + closing balance`;
+      } catch(e) {
+        console.warn('Slab amortisation chart skipped:',e.message);
+      }
+    } else {
+      slabCard.style.display='none';
+      if (slabAmortChart) { slabAmortChart.destroy(); slabAmortChart=null; }
+    }
   }
 
   const byYear = new Map();
@@ -1395,7 +1468,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.5 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.8 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
