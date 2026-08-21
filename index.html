@@ -407,7 +407,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v5.1</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v5.2</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -962,7 +962,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v5.1</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v5.2</strong>
   </footer>
 </div>
 
@@ -1834,38 +1834,37 @@ async function parseStatementFile(file) {
   const ext=file.name.split('.').pop().toLowerCase();
   if(ext==='csv'||ext==='xlsx'||ext==='xls'){
     const data=await file.arrayBuffer();
-
-    // First parse without dense mode. nodim tells SheetJS not to trust a
-    // broken worksheet dimension such as !ref="A1".
     const wb=XLSX.read(data,{
       type:'array',
       cellDates:true,
       nodim:true,
-      WTF:true
+      WTF:false
     });
     const sheet=wb.Sheets[wb.SheetNames[0]];
     if(!sheet)throw new Error('The first worksheet could not be read.');
 
-    let rows=stmtWorksheetCellsToRows(sheet);
+    // IMPORTANT: several bank-generated XLSX files incorrectly declare
+    // !ref="A1" although their XML contains hundreds of real cells.
+    // Force SheetJS to inspect a generous range so those cells are included.
+    const forcedRange={s:{r:0,c:0},e:{r:2000,c:80}};
+    let rows=XLSX.utils.sheet_to_json(sheet,{
+      header:1,
+      raw:true,
+      defval:'',
+      blankrows:true,
+      range:forcedRange
+    });
 
-    // If SheetJS exposes the worksheet cells but sheet_to_json gives a shorter
-    // result, use the cell matrix directly. This is important for bank files
-    // with blank leading columns and an incorrect !ref.
-    if(!rows.length || rows.length<20){
-      const jsonRows=XLSX.utils.sheet_to_json(sheet,{
-        header:1,
-        raw:true,
-        defval:'',
-        blankrows:true
+    // If the worksheet is a normal file, the forced range still returns only
+    // its actual populated rows. Keep a second extraction as a fallback.
+    if(!rows.length || rows.every(r=>(r||[]).every(v=>v===''||v===null||v===undefined))){
+      rows=XLSX.utils.sheet_to_json(sheet,{
+        header:1,raw:true,defval:'',blankrows:true
       });
-      if(jsonRows.length>rows.length)rows=jsonRows;
     }
 
     rows=stmtNormaliseRows(rows);
-    if(!rows.length)throw new Error('The workbook contains no readable worksheet cells.');
-
-    // If there are real transaction cells, they should normally produce more
-    // than one row. Keep every row so the statement header can be located.
+    if(!rows.length)throw new Error('The workbook contains no readable worksheet rows.');
     return rows;
   }
   if(ext==='json'){
@@ -2039,23 +2038,54 @@ function stmtRowsFromIDFCFormat(){
 }
 
 function stmtRowsFromKnownBankFormat(){
-  const idfc=stmtRowsFromIDFCFormat();
-  if(idfc.length)return idfc;
   const raw=stmtRawRows||[];
   if(!raw.length)return [];
-  let header=-1, dateCol=-1, debitCol=-1, creditCol=-1, balanceCol=-1;
 
-  for(let i=0;i<Math.min(raw.length,100);i++){
-    const cells=(raw[i]||[]).map(x=>String(x??'').replace(/[\r\n]+/g,' ').trim().toLowerCase());
-    const find=(name)=>cells.findIndex(x=>x===name||x.includes(name));
-    const d=find('post date')>=0?find('post date'):find('date');
-    const db=find('debit')>=0?find('debit'):find('withdrawal');
-    const cr=find('credit')>=0?find('credit'):find('deposit');
-    const ba=find('balance')>=0?find('balance'):find('closing balance');
+  let header=-1,dateCol=-1,debitCol=-1,creditCol=-1,balanceCol=-1;
+
+  const norm=v=>String(v??'')
+    .replace(/[\r\n]+/g,' ')
+    .replace(/[‐‑–—]/g,'-')
+    .replace(/\s+/g,' ')
+    .trim()
+    .toLowerCase();
+
+  const match=(cell,aliases)=>{
+    const x=norm(cell);
+    return aliases.some(a=>x===a||x.includes(a));
+  };
+
+  // Search all rows for a transaction header. This handles Central Bank,
+  // IDFC FIRST and other standard bank exports without bank-specific code.
+  for(let i=0;i<Math.min(raw.length,250);i++){
+    const cells=raw[i]||[];
+    let d=-1,db=-1,cr=-1,ba=-1;
+    cells.forEach((v,c)=>{
+      if(d<0&&match(v,['transaction date','post date','txn date','posting date','date']))d=c;
+      if(db<0&&match(v,['debit','withdrawal','dr amount','dr amt','debit amount']))db=c;
+      if(cr<0&&match(v,['credit','deposit','cr amount','cr amt','credit amount']))cr=c;
+      if(ba<0&&match(v,['balance','closing balance','running balance']))ba=c;
+    });
     if(d>=0&&db>=0&&cr>=0&&ba>=0){
-      header=i; dateCol=d; debitCol=db; creditCol=cr; balanceCol=ba; break;
+      header=i;dateCol=d;debitCol=db;creditCol=cr;balanceCol=ba;break;
     }
   }
+
+  // Fallback: if the header contains Date/Debit/Credit/Balance split over
+  // merged or abbreviated cells, identify columns by positional patterns.
+  if(header<0){
+    for(let i=0;i<Math.min(raw.length,250);i++){
+      const cells=(raw[i]||[]).map(norm);
+      const d=cells.findIndex(x=>/^(transaction\s*)?date$|^post\s*date$/.test(x));
+      const db=cells.findIndex(x=>/^(debit|withdrawal|dr|dr amount)/.test(x));
+      const cr=cells.findIndex(x=>/^(credit|deposit|cr|cr amount)/.test(x));
+      const ba=cells.findIndex(x=>/^((closing|running)\s*)?balance$/.test(x));
+      if(d>=0&&db>=0&&cr>=0&&ba>=0){
+        header=i;dateCol=d;debitCol=db;creditCol=cr;balanceCol=ba;break;
+      }
+    }
+  }
+
   if(header<0)return [];
 
   const result=[];
@@ -2064,22 +2094,35 @@ function stmtRowsFromKnownBankFormat(){
     const date=parseDateFlexible(r[dateCol]);
     if(!date)continue;
 
-    const debit=Math.abs(parseNumberFlexible(r[debitCol]));
-    const credit=Math.abs(parseNumberFlexible(r[creditCol]));
-    const balText=String(r[balanceCol]??'').trim();
-    const balance=balText!==''?parseNumberFlexible(balText):null;
+    const debitRaw=r[debitCol];
+    const creditRaw=r[creditCol];
+    const balRaw=r[balanceCol];
 
+    const debit=Math.abs(parseNumberFlexible(debitRaw));
+    const credit=Math.abs(parseNumberFlexible(creditRaw));
+    const balanceText=String(balRaw??'').trim();
+    const balance=balanceText!==''?parseNumberFlexible(balRaw):null;
+
+    // A real statement row must have a date and either a balance or a debit/
+    // credit value. Ignore totals, footers and blank rows.
     if(balance===null && debit===0 && credit===0)continue;
+
     result.push({
-      date,debit,credit,balance,
+      date,
+      debit,
+      credit,
+      balance,
       narration:r.map(x=>String(x??'')).join(' ').trim(),
       sourceRow:i+1
     });
   }
+
   result.sort((a,b)=>a.date-b.date);
 
-  // Keep the actual detected columns visible in the mapping controls.
-  const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=String(val);};
+  const set=(id,val)=>{
+    const el=document.getElementById(id);
+    if(el)el.value=String(val);
+  };
   set('mapHeaderRow','auto');
   set('mapDate',dateCol);
   set('mapDebit',debitCol);
@@ -2587,8 +2630,7 @@ function stmtShowDaily(){
 function stmtRunCalculation(){
   // Re-run the known-format detector every time so a changed mapping or
   // newly uploaded statement cannot leave stale column selections behind.
-  const detected=stmtRowsFromIDFCFormat();
-  const known=detected.length?detected:stmtRowsFromKnownBankFormat();
+  const known=stmtRowsFromKnownBankFormat();
   const rows=known.length?known:stmtRowsFromMapping();
   const mapStatus=document.getElementById('stmtStatus');
   if(mapStatus){
@@ -2963,7 +3005,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v5.1 ---------- */
+/* ---------- Simple Calculator v5.2 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
