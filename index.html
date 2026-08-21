@@ -404,7 +404,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v3.9</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.0</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -837,7 +837,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
 
       <div class="card ledger">
         <div class="stub">
-          <div class="stub-title">Month-wise interest comparison</div>
+          <div class="stub-title">Month-wise interest — complete months only</div>
           <div class="stub-sub" id="stmtLedgerSub"></div>
         </div>
         <div class="table-scroll"><table id="stmtTable"></table></div>
@@ -845,7 +845,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
 
       <div class="card" id="stmtDailyCard" style="display:none;">
         <div class="stub-title">Daily product calculation</div>
-        <div class="stub-sub" style="margin:4px 0 10px;color:var(--muted)">Every displayed day, closing balance, slab allocation, rate and daily interest are shown below.</div>
+        <div class="stub-sub" style="margin:4px 0 10px;color:var(--muted)">For each included complete calendar month, every day, closing balance, slab allocation, rate and daily interest are shown below.</div>
         <div class="table-scroll"><table id="stmtDailyTable"></table></div>
         <div id="stmtBalanceSchedule" class="tblwrap" style="margin-top:12px"></div>
 <div id="stmtDailyTotals"></div>
@@ -943,7 +943,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v3.9</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.0</strong>
   </footer>
 </div>
 
@@ -2122,31 +2122,102 @@ function stmtResetSlabs(){
 
 function stmtCalculate(rows,slabs,manualBankInterest){
   const daily=stmtBuildDaily(rows);
-  if(!daily.days.length)return {...daily,monthly:[],total:0};
-  const out=[];let total=0;
+  if(!daily.days.length)return {...daily,monthly:[],total:0,fullMonthKeys:[],excludedMonths:[]};
+
+  // Interest is calculated month-by-month only where the statement covers the
+  // complete calendar month: the available daily schedule must contain the
+  // 1st through the actual last day of that month. Partial first/last months
+  // are excluded from the interest total.
+  const groups={};
   daily.days.forEach(d=>{
+    (groups[d.month]??=[]).push(d);
+  });
+
+  const fullMonthKeys=[];
+  const excludedMonths=[];
+  Object.entries(groups).forEach(([key,ds])=>{
+    const firstDay=ds[0].date.getDate();
+    const lastDay=ds[ds.length-1].date.getDate();
+    const expected=ds[0].daysInMonth;
+    const complete=firstDay===1 && lastDay===expected && ds.length===expected;
+    if(complete)fullMonthKeys.push(key);
+    else excludedMonths.push({month:key,availableDays:ds.length,expectedDays:expected});
+  });
+
+  const fullSet=new Set(fullMonthKeys);
+  const out=[];
+  let total=0;
+
+  daily.days.forEach(d=>{
+    if(!fullSet.has(d.month))return;
     const parts=stmtAllocate(d.balance,slabs);
     let interest=0;
     parts.forEach(p=>interest+=p.portion*p.rate/100/365);
-    total+=interest;out.push({...d,parts,interest});
+    total+=interest;
+    out.push({...d,parts,interest});
   });
+
   const by={};
   out.forEach(d=>{
-    const m=by[d.month]??={month:d.month,days:d.daysInMonth,calculatedDays:0,dailyProduct:0,interest:0,slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),actualInterest:0};
-    m.dailyProduct+=d.balance;m.calculatedDays++;m.interest+=d.interest;
-    d.parts.forEach((p,i)=>{m.slabProducts[i]+=p.portion;m.slabInterest[i]+=p.portion*p.rate/100/365;});
+    const m=by[d.month]??={
+      month:d.month,
+      days:d.daysInMonth,
+      calculatedDays:0,
+      dailyProduct:0,
+      interest:0,
+      slabProducts:slabs.map(()=>0),
+      slabInterest:slabs.map(()=>0),
+      actualInterest:0
+    };
+    m.dailyProduct+=d.balance;
+    m.calculatedDays++;
+    m.interest+=d.interest;
+    d.parts.forEach((p,i)=>{
+      m.slabProducts[i]+=p.portion;
+      m.slabInterest[i]+=p.portion*p.rate/100/365;
+    });
   });
+
+  // Compare bank interest credits only for the full months included in the
+  // calculation. Credits in excluded partial months are not included in totals.
   rows.forEach(r=>{
     if(r.credit>0&&/monthly interest credit|interest credit|\binterest\b|\bint\.?\s*credit/i.test(r.narration||'')){
       const k=stmtMonthKey(r.date);
-      const m=by[k]??={month:k,days:new Date(r.date.getFullYear(),r.date.getMonth()+1,0).getDate(),calculatedDays:0,dailyProduct:0,interest:0,slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),actualInterest:0};
+      if(!fullSet.has(k))return;
+      const m=by[k]??={
+        month:k,
+        days:new Date(r.date.getFullYear(),r.date.getMonth()+1,0).getDate(),
+        calculatedDays:0,
+        dailyProduct:0,
+        interest:0,
+        slabProducts:slabs.map(()=>0),
+        slabInterest:slabs.map(()=>0),
+        actualInterest:0
+      };
       m.actualInterest+=r.credit;
     }
   });
+
   const monthly=Object.values(by).sort((a,b)=>a.month.localeCompare(b.month));
   const autoBank=monthly.reduce((a,m)=>a+(m.actualInterest||0),0);
-  const bankInterest=manualBankInterest!==null&&!isNaN(manualBankInterest)?manualBankInterest:(autoBank>0?autoBank:null);
-  return {...daily,daily:out,monthly,total,autoBankInterest:autoBank,bankInterest,overallDifference:bankInterest!==null?total-bankInterest:null};
+  const bankInterest=manualBankInterest!==null&&!isNaN(manualBankInterest)
+    ?manualBankInterest
+    :(autoBank>0?autoBank:null);
+
+  const calculatedDays=out.length;
+  return {
+    ...daily,
+    daily:out,
+    monthly,
+    total,
+    autoBankInterest:autoBank,
+    bankInterest,
+    overallDifference:bankInterest!==null?total-bankInterest:null,
+    fullMonthKeys,
+    excludedMonths,
+    calculatedDays,
+    partial:excludedMonths.length>0
+  };
 }
 
 function stmtRenderResults(result,slabs){
@@ -2165,10 +2236,10 @@ function stmtRenderResults(result,slabs){
     {label:'Calculated interest',value:'₹ '+stmtMoney(result.total),cls:''},
     {label:'Bank interest credited',value:bankAvailable?'₹ '+stmtMoney(totalBank):'Not detected',cls:''},
     {label:'Difference',value:bankAvailable?((diff>=0?'+':'−')+'₹ '+stmtMoney(Math.abs(diff||0))):'—',cls:bankAvailable?(Math.abs(diff||0)<0.01?'stmt-good':'stmt-review'):''},
-    {label:'Days calculated',value:String(result.days.length),cls:''}
+    {label:'Days calculated',value:String((result.calculatedDays??(result.daily||[]).length)),cls:''}
   ].map(s=>`<div class="stat"><div class="stat-label">${s.label}</div><div class="stat-value ${s.cls}">${s.value}</div></div>`).join('');
   document.getElementById('stmtLedgerSub').textContent=
-    `${months.length} calendar month(s) · ${result.days.length} day(s) · bank figure: ${bankSource}`;
+    `${months.length} complete calendar month(s) · ${(result.calculatedDays??(result.daily||[]).length)} day(s) calculated · bank figure: ${bankSource}`;
   let h='<thead><tr><th style="text-align:left">Month</th><th>Calendar days</th><th>Calculated days</th><th>Daily product</th><th>Calculated interest</th><th>Bank interest credited</th><th>Difference</th><th>Status</th></tr></thead><tbody>';
   months.forEach(m=>{
     const b=Number(m.actualInterest||0);
@@ -2177,19 +2248,26 @@ function stmtRenderResults(result,slabs){
     h+=`<tr><td style="text-align:left">${stmtMonthLabel(m.month)}</td><td>${m.days}</td><td>${m.calculatedDays}</td><td>₹${stmtMoney(m.dailyProduct)}</td><td>₹${stmtMoney(m.interest)}</td><td>${b?'₹'+stmtMoney(b):'—'}</td><td>${d===null?'—':(d>=0?'+':'−')+'₹'+stmtMoney(Math.abs(d))}</td><td>${status}</td></tr>`;
   });
   h+=`</tbody><tfoot><tr><th style="text-align:left">TOTAL</th><th></th><th>${months.reduce((a,m)=>a+m.calculatedDays,0)}</th><th>₹${stmtMoney(months.reduce((a,m)=>a+m.dailyProduct,0))}</th><th>₹${stmtMoney(result.total)}</th><th>${bankAvailable?'₹'+stmtMoney(totalBank):'—'}</th><th>${bankAvailable?((diff>=0?'+':'−')+'₹'+stmtMoney(Math.abs(diff||0))):'—'}</th><th></th></tr></tfoot>`;
-  document.getElementById('stmtTable').innerHTML=h;
-  let note='Daily product × annual rate ÷ 365. Daily product is the applicable balance/slab portion for that date.';
+  let excludedHtml='';
+  if(result.excludedMonths?.length){
+    excludedHtml='<div class="note" style="margin:12px 20px 0"><b>Excluded partial month(s):</b> '+
+      result.excludedMonths.map(x=>stmtMonthLabel(x.month)+' — '+x.availableDays+' of '+x.expectedDays+' days available').join('; ')+
+      '. These months are not included in the calculated interest total.</div>';
+  }
+  document.getElementById('stmtTable').insertAdjacentHTML('afterend',excludedHtml);
+  let note='Daily product × annual rate ÷ 365. Daily product is the applicable balance/slab portion for that date. Monthly product is the sum of daily balances for each complete calendar month.';
   if(result.opening!==null && result.opening!==undefined){
     note += ' Opening / brought-forward balance used for the first day: ₹'+stmtMoney(result.opening)+'.';
   }
-  if(result.partial){
-    if(result.firstMonthMode==='from-first-transaction'){
-      note += ' No brought-forward balance was available, so the first month starts on '+stmtDate(result.startDate)+' using the first transaction day closing balance; later months start on the 1st.';
-    }else if(result.firstMonthMode==='from-first-day-closing-balance'){
-      note += ' The first transaction is on the 1st and no separate brought-forward balance was available, so its supplied closing balance is used as the 1st-day balance; the day\'s debit/credit is not reversed.';
-    }else{
-      note += ' An opening / brought-forward balance is available, so the first month starts on the 1st; the balance is carried forward until the first transaction changes it.';
-    }
+  if(result.firstMonthMode==='from-first-transaction'){
+    note += ' No brought-forward balance was available, so the first available month starts on '+stmtDate(result.startDate)+' using the first transaction day closing balance.';
+  }else if(result.firstMonthMode==='from-first-day-closing-balance'){
+    note += ' The first transaction is on the 1st and no separate brought-forward balance was available, so its supplied closing balance is used as the 1st-day balance; the day\'s debit/credit is not reversed.';
+  }else if(result.firstMonthMode==='from-opening-balance'){
+    note += ' An opening / brought-forward balance is available, so the first month starts on the 1st.';
+  }
+  if(result.excludedMonths?.length){
+    note += ' Partial calendar months are excluded from the interest total because a complete 1st-to-last-day statement is required.';
   }
   document.getElementById('stmtLedgerSub').insertAdjacentHTML('afterend',`<div class="note" style="margin:10px 20px">${stmtEsc(note)}</div>`);
   document.getElementById('stmtResults').style.display='block';
@@ -2232,7 +2310,7 @@ function stmtShowDaily(){
   document.getElementById('stmtDailyTable').innerHTML=h;
   const exampleInterest=(300000*5/100/365)+(200000*6/100/365)+(200000*7/100/365);
   document.getElementById('stmtDailyTotals').innerHTML=
-    `<div class="summary" style="margin-top:16px"><div class="stat"><div class="stat-label">Total daily product</div><div class="stat-value">₹${stmtMoney(totalProduct)}</div></div><div class="stat"><div class="stat-label">Total daily interest</div><div class="stat-value">₹${stmtMoney(totalInterest)}</div></div><div class="stat"><div class="stat-label">Days displayed</div><div class="stat-value">${days.length}</div></div></div>
+    `<div class="summary" style="margin-top:16px"><div class="stat"><div class="stat-label">Total daily product</div><div class="stat-value">₹${stmtMoney(totalProduct)}</div></div><div class="stat"><div class="stat-label">Total daily interest</div><div class="stat-value">₹${stmtMoney(totalInterest)}</div></div><div class="stat"><div class="stat-label">Days in complete months</div><div class="stat-value">${days.length}</div></div></div>
      <div class="note" style="margin-top:14px"><b>Slab example:</b> If daily product is ₹7,00,000 and slabs are ₹3,00,000 @ 5%, next ₹2,00,000 @ 6%, and balance @ 7%, daily interest = ₹3,00,000 × 5% ÷ 365 + ₹2,00,000 × 6% ÷ 365 + ₹2,00,000 × 7% ÷ 365 = <b>₹${stmtMoney(exampleInterest)}</b>.</div>`;
   box.style.display='block';
   document.getElementById('stmtShowDailyBtn').textContent='Hide daily calculation';
@@ -2317,7 +2395,7 @@ function runHealthCheck(){
   add('Interest Settings',!!document.getElementById('stmtSlabs')&&!!document.getElementById('stmtAddSlabBtn'),'Slab/rate settings are present');
   add('Slab persistence',!!localStorage.getItem('financial_stmt_interest_slabs_v11'),'Saved slab configuration exists');
   add('Dark mode',document.body.classList.contains('dark'),'Dark mode is currently '+(document.body.classList.contains('dark')?'ON':'OFF'));
-  add('Daily interest engine',typeof stmtCalculate==='function'&&typeof stmtBuildDaily==='function'&&typeof stmtAllocate==='function','Calculation functions are available');
+  add('Daily interest engine',typeof stmtCalculate==='function'&&typeof stmtBuildDaily==='function'&&typeof stmtAllocate==='function','Calculation functions are available; partial calendar months are excluded from totals');
   let rows=[];
   try{rows=stmtRowsFromMapping();}catch(e){}
   add('Statement rows',rows.length>0,rows.length?rows.length+' transaction rows mapped':'Upload a statement and confirm mapping to test transaction rows');
@@ -2521,7 +2599,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v3.9 ---------- */
+/* ---------- Simple Calculator v4.0 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
