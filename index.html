@@ -326,6 +326,46 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
 @media(max-width:700px){#askMeModal .ask-result-grid{grid-template-columns:1fr!important}#askMeModal .ask-main-result b{font-size:22px!important}}
 </style>
 
+
+<style id="askMeVoiceV32">
+#askMeModal .askme-voice-row{
+  display:flex!important;
+  align-items:center!important;
+  gap:8px!important;
+  margin-top:9px!important;
+}
+#askMeModal .askme-mic{
+  width:46px!important;
+  height:42px!important;
+  min-width:46px!important;
+  padding:0!important;
+  border-radius:10px!important;
+  font-size:20px!important;
+}
+#askMeModal .askme-mic.listening{
+  animation:askMePulse 1s infinite!important;
+}
+@keyframes askMePulse{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.06)}
+}
+#askMeModal .askme-voice-status{
+  font-size:12px!important;
+  color:var(--muted,#5B6B63)!important;
+  line-height:1.35!important;
+}
+#askMeModal .askme-speak{
+  margin-top:12px!important;
+  padding:8px 12px!important;
+  font-size:12px!important;
+}
+#askMeModal .askme-voice-note{
+  margin:6px 0 0!important;
+  font-size:11px!important;
+  color:var(--muted,#5B6B63)!important;
+}
+</style>
+
 </head>
 <body>
 <div class="wrap">
@@ -333,7 +373,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v3.1</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v3.2</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -810,7 +850,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v3.1</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v3.2</strong>
   </footer>
 </div>
 
@@ -2401,6 +2441,11 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
     <div class="askme-body">
       <label class="askme-label" for="askMeInput">Your question</label>
       <textarea id="askMeInput" rows="4" placeholder="Example: What is the EMI of ₹1,00,000 for 60 months at 5%?"></textarea>
+      <div class="askme-voice-row">
+        <button id="askMeMicBtn" class="btn askme-mic" type="button" onclick="toggleAskMeVoice()" aria-label="Speak your question">🎙️</button>
+        <span id="askMeVoiceStatus" class="askme-voice-status">Tap the microphone and speak your question.</span>
+      </div>
+      <p class="askme-voice-note">After you speak, tap Ask. The answer can also be read aloud.</p>
       <div class="askme-actions">
         <button class="btn primary askme-ask" type="button" onclick="answerAskMe()">Ask</button>
         <p class="askme-example">I can calculate standard EMI from amount, rate and tenure.</p>
@@ -2422,10 +2467,15 @@ function openAskMe(){
   const modal=document.getElementById('askMeModal'),input=document.getElementById('askMeInput'),answer=document.getElementById('askMeAnswer');
   if(answer){answer.classList.remove('show');answer.innerHTML='';}
   if(modal)modal.classList.add('open');
+  if(!askMeRecognition)initAskMeVoice();
   setTimeout(()=>input?.focus(),120);
 }
 function closeAppModal(id){
   const el=document.getElementById(id);
+  if(id==='askMeModal'){
+    try{if(askMeRecognition&&askMeListening)askMeRecognition.stop();}catch(e){}
+    try{if('speechSynthesis' in window)window.speechSynthesis.cancel();}catch(e){}
+  }
   if(el)el.classList.remove('open');
 }
 function askMeMoney(q){
@@ -2460,6 +2510,96 @@ function askMeEMI(principal,months,annualRate){
   const r=annualRate/100/12,f=Math.pow(1+r,months);
   return principal*r*f/(f-1);
 }
+let askMeRecognition=null;
+let askMeListening=false;
+
+function askMeSetVoiceStatus(message){
+  const el=document.getElementById('askMeVoiceStatus');
+  if(el)el.textContent=message;
+}
+function askMeVoiceSupported(){
+  return !!(window.SpeechRecognition||window.webkitSpeechRecognition);
+}
+function initAskMeVoice(){
+  if(!askMeVoiceSupported()){
+    askMeSetVoiceStatus('Voice input is not supported by this browser. You can type instead.');
+    return false;
+  }
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  askMeRecognition=new SR();
+  askMeRecognition.lang=(navigator.language||'en-IN');
+  askMeRecognition.interimResults=true;
+  askMeRecognition.continuous=false;
+  askMeRecognition.maxAlternatives=1;
+
+  askMeRecognition.onstart=()=>{
+    askMeListening=true;
+    const b=document.getElementById('askMeMicBtn');
+    if(b){b.classList.add('listening');b.textContent='⏹️';}
+    askMeSetVoiceStatus('Listening… speak your question.');
+  };
+  askMeRecognition.onresult=(event)=>{
+    let finalText='', interim='';
+    for(let i=event.resultIndex;i<event.results.length;i++){
+      const t=event.results[i][0].transcript;
+      if(event.results[i].isFinal)finalText+=t;
+      else interim+=t;
+    }
+    const input=document.getElementById('askMeInput');
+    if(input){
+      if(finalText)input.value=finalText.trim();
+      else if(interim)input.value=interim.trim();
+    }
+  };
+  askMeRecognition.onerror=(event)=>{
+    askMeListening=false;
+    const b=document.getElementById('askMeMicBtn');
+    if(b){b.classList.remove('listening');b.textContent='🎙️';}
+    const msg=event.error==='not-allowed'
+      ? 'Microphone permission was denied. Allow microphone access and try again.'
+      : event.error==='no-speech'
+        ? 'No speech detected. Tap the microphone and try again.'
+        : 'Voice input could not be started. You can type the question instead.';
+    askMeSetVoiceStatus(msg);
+  };
+  askMeRecognition.onend=()=>{
+    askMeListening=false;
+    const b=document.getElementById('askMeMicBtn');
+    if(b){b.classList.remove('listening');b.textContent='🎙️';}
+    const input=document.getElementById('askMeInput');
+    if(input && input.value.trim())askMeSetVoiceStatus('Question captured. Tap Ask for the answer.');
+    else askMeSetVoiceStatus('Tap the microphone and speak your question.');
+  };
+  return true;
+}
+function toggleAskMeVoice(){
+  if(!askMeRecognition && !initAskMeVoice())return;
+  if(askMeListening){
+    try{askMeRecognition.stop();}catch(e){}
+  }else{
+    try{askMeRecognition.start();}
+    catch(e){askMeSetVoiceStatus('Voice input is already starting. Please wait a moment.');}
+  }
+}
+function speakAskMeAnswer(){
+  if(!('speechSynthesis' in window)){
+    askMeSetVoiceStatus('Voice output is not supported by this browser.');
+    return;
+  }
+  const answer=document.getElementById('askMeAnswer');
+  if(!answer)return;
+  const text=answer.innerText
+    .replace(/🔊 Read answer aloud/g,'')
+    .replace(/₹/g,' rupees ')
+    .replace(/%/g,' percent ');
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang=(navigator.language||'en-IN');
+  u.rate=.95;
+  u.pitch=1;
+  window.speechSynthesis.speak(u);
+}
+
 function answerAskMe(){
   const input=document.getElementById('askMeInput'),a=document.getElementById('askMeAnswer');
   const q=(input?.value||'').trim(),ql=q.toLowerCase();
@@ -2481,7 +2621,8 @@ function answerAskMe(){
         '</div>'+
         '<div class="ask-main-result"><span>Monthly EMI</span><b>'+askMeINR(emi)+'</b></div>'+
         '<div class="ask-result-row"><span>Total interest</span><b>'+askMeINR(interest)+'</b></div>'+
-        '<div class="ask-note">Standard reducing-balance EMI using one annual interest rate.</div>';
+        '<div class="ask-note">Standard reducing-balance EMI using one annual interest rate.</div>'+
+        '<button class="btn askme-speak" type="button" onclick="speakAskMeAnswer()">🔊 Read answer aloud</button>';
       a.classList.add('show');return;
     }
     if(/slab|progressive/.test(ql))
