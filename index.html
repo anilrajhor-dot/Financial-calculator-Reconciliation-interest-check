@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v5.4</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v5.5</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -978,7 +978,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v5.4</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v5.5</strong>
   </footer>
 </div>
 
@@ -1797,8 +1797,16 @@ function parseDateFlexible(val) {
     const d2=parseDateFlexible(dateOnly);
     if(d2)return d2;
   }
+  // Handle ISO timestamps and common bank-export date/time strings.
   const f=new Date(s);
-  return isNaN(f)?null:f;
+  if(!isNaN(f))return f;
+  const m2=s.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  if(m2){
+    let y=Number(m2[3]); if(y<100)y+=y>70?1900:2000;
+    const d=new Date(y,Number(m2[2])-1,Number(m2[1]));
+    if(!isNaN(d))return d;
+  }
+  return null;
 }
 
 function parseNumberFlexible(val) {
@@ -1964,14 +1972,31 @@ async function parseStatementFile(file) {
 
     const data=await file.arrayBuffer();
     const wb=XLSX.read(data,{type:'array',cellDates:true,nodim:true,WTF:false});
-    const sheet=wb.Sheets[wb.SheetNames[0]];
-    if(!sheet)throw new Error('The first worksheet could not be read.');
-    const rows=XLSX.utils.sheet_to_json(sheet,{
-      header:1,raw:true,defval:'',blankrows:true,
-      range:{s:{r:0,c:0},e:{r:2000,c:80}}
-    });
-    if(!rows.length)throw new Error('The workbook contains no readable worksheet rows.');
-    return stmtNormaliseRows(rows);
+
+    // Do NOT use sheet_to_json(range:...) here. Some bank-generated XLSX
+    // files advertise their used range as A1 even though their real cells
+    // exist throughout the worksheet. Read the sparse worksheet cells
+    // directly and inspect every worksheet.
+    let bestRows=[];
+    let bestScore=-1;
+    for(const name of wb.SheetNames){
+      const sheet=wb.Sheets[name];
+      if(!sheet)continue;
+      const rows=stmtWorksheetCellsToRows(sheet);
+      const text=rows.slice(0,250).map(r=>(r||[]).join(' | ')).join(' | ').toLowerCase();
+      const score=
+        (text.includes('post date')?4:0)+
+        (text.includes('transaction date')?4:0)+
+        (text.includes('debit')?2:0)+
+        (text.includes('credit')?2:0)+
+        (text.includes('balance')?2:0);
+      if(score>bestScore){
+        bestScore=score;
+        bestRows=rows;
+      }
+    }
+    if(!bestRows.length)throw new Error('The workbook contains no readable worksheet cells.');
+    return stmtNormaliseRows(bestRows);
   }
 
   if(ext==='xls'||ext==='csv'){
@@ -2859,6 +2884,16 @@ document.getElementById('stmtFile').addEventListener('change',async e=>{
       const s=document.getElementById('stmtStatus');
       if(s)s.textContent=`Statement ready: ${mapped.length} transactions detected (Date / Debit / Credit / Balance).`;
     }else{
+      // Show a useful diagnostic instead of the generic "no transactions"
+      // message. This makes file-reading failures immediately identifiable.
+      const info=stmtHeaderInfo(stmtRawRows);
+      const sample=(stmtRawRows||[]).slice(0,30).map(r=>(r||[]).join(' | ')).filter(Boolean).join(' || ');
+      console.warn('Statement diagnostic', {
+        sheetRows:stmtRawRows.length,
+        maxColumns:stmtRawRows.reduce((m,r)=>Math.max(m,r.length),0),
+        headerIndex:info.headerIndex,
+        sample
+      });
       const s=document.getElementById('stmtStatus');
       if(s)s.textContent='Statement loaded, but the transaction columns were not yet mapped. Use Auto-detect or select Date, Debit, Credit and Balance.';
     }
@@ -3138,7 +3173,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v5.4 ---------- */
+/* ---------- Simple Calculator v5.5 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
