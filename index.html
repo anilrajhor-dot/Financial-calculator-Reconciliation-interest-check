@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v5.5</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v5.7</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -978,7 +978,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v5.5</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v5.7</strong>
   </footer>
 </div>
 
@@ -1857,100 +1857,95 @@ function stmtNormaliseRows(rows){
 
 async function stmtParseXlsxDirect(file){
   if(typeof JSZip==='undefined') throw new Error('Direct XLSX reader unavailable.');
-  const buf=await file.arrayBuffer();
-  const zip=await JSZip.loadAsync(buf);
+  const zip=await JSZip.loadAsync(await file.arrayBuffer());
 
-  // Read shared strings once. Some bank files store headers and values there;
-  // others use inlineStr. We support both.
+  // Browser-independent XLSX XML reader. We deliberately use XML text
+  // parsing/regex here instead of DOM namespace APIs because some mobile
+  // browsers handle spreadsheet namespaces inconsistently.
+  const xmlText=async name=>{
+    const f=zip.file(name);
+    return f?await f.async('text'):null;
+  };
+
+  const decodeXml=s=>String(s||'')
+    .replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+    .replace(/&quot;/g,'"').replace(/&apos;/g,"'")
+    .replace(/&amp;/g,'&');
+
+  // Shared strings: <si><t>...</t></si>
   const shared=[];
-  const ssFile=zip.file('xl/sharedStrings.xml');
-  if(ssFile){
-    const ssXml=await ssFile.async('text');
-    const ssDoc=new DOMParser().parseFromString(ssXml,'application/xml');
-    const sis=ssDoc.getElementsByTagNameNS('*','si');
-    for(let i=0;i<sis.length;i++){
-      const ts=sis[i].getElementsByTagNameNS('*','t');
-      let s='';
-      for(let j=0;j<ts.length;j++)s+=ts[j].textContent||'';
-      shared.push(s);
+  const ss=await xmlText('xl/sharedStrings.xml');
+  if(ss){
+    const sis=ss.match(/<si\b[^>]*>[\s\S]*?<\/si>/gi)||[];
+    for(const si of sis){
+      const ts=si.match(/<t\b[^>]*>[\s\S]*?<\/t>/gi)||[];
+      shared.push(ts.map(x=>decodeXml(x.replace(/^<t\b[^>]*>|<\/t>$/gi,''))).join(''));
     }
   }
 
-  const sheetFiles=Object.keys(zip.files)
-    .filter(n=>/^xl\/worksheets\/sheet\d+\.xml$/i.test(n))
-    .sort((a,b)=>{
-      const na=Number((a.match(/sheet(\d+)/i)||[])[1]||0);
-      const nb=Number((b.match(/sheet(\d+)/i)||[])[1]||0);
-      return na-nb;
-    });
-
-  const cellToCol=ref=>{
-    const m=String(ref||'').match(/^([A-Z]+)(\d+)$/i);
-    if(!m)return null;
+  const colIndex=ref=>{
+    const m=String(ref||'').match(/^([A-Z]+)\d+$/i);
+    if(!m)return -1;
     let n=0;
     for(const ch of m[1].toUpperCase())n=n*26+(ch.charCodeAt(0)-64);
     return n-1;
   };
 
-  const parseSheet=xml=>{
-    const doc=new DOMParser().parseFromString(xml,'application/xml');
-    if(doc.getElementsByTagName('parsererror').length)throw new Error('Invalid worksheet XML.');
-    const rowEls=doc.getElementsByTagNameNS('*','row');
+  const readSheet=xml=>{
     const rows=[];
-    for(let ri=0;ri<rowEls.length;ri++){
-      const rowEl=rowEls[ri];
-      const rr=Math.max(0,Number(rowEl.getAttribute('r')||ri+1)-1);
+    const rowMatches=xml.match(/<row\b[^>]*>[\s\S]*?<\/row>/gi)||[];
+    for(const rowXml of rowMatches){
+      const rm=rowXml.match(/<row\b[^>]*\br="(\d+)"/i);
+      const rowNo=rm?Number(rm[1])-1:rows.length;
       const row=[];
-      const cellEls=rowEl.getElementsByTagNameNS('*','c');
-      for(let ci=0;ci<cellEls.length;ci++){
-        const c=cellEls[ci];
-        const col=cellToCol(c.getAttribute('r'));
-        if(col===null)continue;
-        const type=c.getAttribute('t')||'';
+      const cells=rowXml.match(/<c\b[^>]*>[\s\S]*?<\/c>/gi)||[];
+      for(const cell of cells){
+        const ref=(cell.match(/\br="([A-Z]+\d+)"/i)||[])[1];
+        const c=colIndex(ref);
+        if(c<0)continue;
+        const type=(cell.match(/\bt="([^"]+)"/i)||[])[1]||'';
         let value='';
         if(type==='inlineStr'){
-          const ts=c.getElementsByTagNameNS('*','t');
-          for(let j=0;j<ts.length;j++)value+=ts[j].textContent||'';
+          const ts=cell.match(/<t\b[^>]*>[\s\S]*?<\/t>/gi)||[];
+          value=ts.map(x=>decodeXml(x.replace(/^<t\b[^>]*>|<\/t>$/gi,''))).join('');
         }else if(type==='s'){
-          const v=c.getElementsByTagNameNS('*','v')[0]?.textContent||'';
+          const v=(cell.match(/<v\b[^>]*>([\s\S]*?)<\/v>/i)||[])[1]||'';
           const idx=Number(v);
           value=Number.isFinite(idx)&&shared[idx]!==undefined?shared[idx]:'';
         }else{
-          value=c.getElementsByTagNameNS('*','v')[0]?.textContent||'';
+          value=(cell.match(/<v\b[^>]*>([\s\S]*?)<\/v>/i)||[])[1]||'';
         }
-        row[col]=value;
+        row[c]=value;
       }
-      rows[rr]=row;
+      rows[rowNo]=row;
     }
     return rows;
   };
 
-  // Try every worksheet, not just sheet1. Choose the worksheet containing
-  // transaction headers. This is essential for IDFC/other bank workbooks
-  // whose first sheet may be a cover or summary sheet.
+  const sheetFiles=Object.keys(zip.files)
+    .filter(n=>/^xl\/worksheets\/sheet\d+\.xml$/i.test(n))
+    .sort((a,b)=>Number(a.match(/sheet(\d+)/i)[1])-Number(b.match(/sheet(\d+)/i)[1]));
+
   let best=[];
+  let bestScore=-1;
   for(const name of sheetFiles){
-    try{
-      const xml=await zip.file(name).async('text');
-      const rows=parseSheet(xml);
-      const text=rows.slice(0,250).map(r=>(r||[]).join(' | ')).join(' | ').toLowerCase();
-      const score=
-        (/\bpost\s*date\b/.test(text)?4:0)+
-        (/\btransaction\s*date\b/.test(text)?4:0)+
-        (/\bdebit\b/.test(text)?2:0)+
-        (/\bcredit\b/.test(text)?2:0)+
-        (/\bbalance\b/.test(text)?2:0);
-      const bestText=best.slice(0,250).map(r=>(r||[]).join(' | ')).join(' | ').toLowerCase();
-      const bestScore=
-        (/\bpost\s*date\b/.test(bestText)?4:0)+
-        (/\btransaction\s*date\b/.test(bestText)?4:0)+
-        (/\bdebit\b/.test(bestText)?2:0)+
-        (/\bcredit\b/.test(bestText)?2:0)+
-        (/\bbalance\b/.test(bestText)?2:0);
-      if(score>bestScore || (!best.length&&rows.length>best.length))best=rows;
-    }catch(e){}
+    const xml=await xmlText(name);
+    if(!xml)continue;
+    const rows=readSheet(xml);
+    const text=rows.slice(0,250).map(r=>(r||[]).join(' | ')).join(' | ').toLowerCase();
+    const score=
+      (/\bpost\s+date\b/.test(text)?5:0)+
+      (/\btransaction\s+date\b/.test(text)?5:0)+
+      (/\bdebit\b/.test(text)?3:0)+
+      (/\bcredit\b/.test(text)?3:0)+
+      (/\bbalance\b/.test(text)?3:0);
+    if(score>bestScore){
+      bestScore=score;
+      best=rows;
+    }
   }
-  if(!best.length)throw new Error('No worksheet rows could be read from the XLSX file.');
+
+  if(!best.length)throw new Error('No worksheet transaction data could be read.');
   return best.filter(r=>Array.isArray(r));
 }
 
@@ -2175,6 +2170,62 @@ function stmtRowsFromIDFCFormat(){
   const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=String(val);};
   set('mapHeaderRow','auto'); set('mapDate',dateCol); set('mapDebit',debitCol);
   set('mapCredit',creditCol); set('mapBalance',balanceCol);
+  return result;
+}
+
+function stmtExtractTransactionsUniversal(raw){
+  if(!Array.isArray(raw)||!raw.length)return [];
+  const norm=v=>String(v??'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
+
+  let header=-1,dateCol=-1,debitCol=-1,creditCol=-1,balanceCol=-1;
+
+  for(let i=0;i<Math.min(raw.length,300);i++){
+    const cells=raw[i]||[];
+    let d=-1,db=-1,cr=-1,ba=-1;
+    cells.forEach((v,c)=>{
+      const x=norm(v);
+      if(d<0&&(/^(post|transaction|txn|posting)\s*date$/.test(x)||x==='date'))d=c;
+      if(db<0&&/^(debit|withdrawal|debit amount|dr amount|dr)$/.test(x))db=c;
+      if(cr<0&&/^(credit|deposit|credit amount|cr amount|cr)$/.test(x))cr=c;
+      if(ba<0&&/^(balance|closing balance|running balance)$/.test(x))ba=c;
+    });
+    if(d>=0&&db>=0&&cr>=0&&ba>=0){
+      header=i;dateCol=d;debitCol=db;creditCol=cr;balanceCol=ba;break;
+    }
+  }
+
+  // Fallback for headers with merged/newline formatting.
+  if(header<0){
+    for(let i=0;i<Math.min(raw.length,300);i++){
+      const cells=(raw[i]||[]).map(norm);
+      const d=cells.findIndex(x=>x.includes('post date')||x.includes('transaction date')||x==='date');
+      const db=cells.findIndex(x=>x.includes('debit')||x.includes('withdrawal'));
+      const cr=cells.findIndex(x=>x.includes('credit')||x.includes('deposit'));
+      const ba=cells.findIndex(x=>x==='balance'||x.includes('closing balance')||x.includes('running balance'));
+      if(d>=0&&db>=0&&cr>=0&&ba>=0){
+        header=i;dateCol=d;debitCol=db;creditCol=cr;balanceCol=ba;break;
+      }
+    }
+  }
+  if(header<0)return [];
+
+  const result=[];
+  for(let i=header+1;i<raw.length;i++){
+    const r=raw[i]||[];
+    const date=parseDateFlexible(r[dateCol]);
+    if(!date)continue;
+    const debit=Math.abs(parseNumberFlexible(r[debitCol]));
+    const credit=Math.abs(parseNumberFlexible(r[creditCol]));
+    const btxt=String(r[balanceCol]??'').trim();
+    const balance=btxt===''?null:parseNumberFlexible(btxt);
+    if(balance===null&&debit===0&&credit===0)continue;
+    result.push({date,debit,credit,balance,narration:r.map(v=>String(v??'')).join(' ').trim(),sourceRow:i+1});
+  }
+  result.sort((a,b)=>a.date-b.date);
+
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=String(v);};
+  set('mapHeaderRow','auto');set('mapDate',dateCol);set('mapDebit',debitCol);
+  set('mapCredit',creditCol);set('mapBalance',balanceCol);
   return result;
 }
 
@@ -2403,79 +2454,69 @@ function stmtExtractOpening(rows){
   return null;
 }
 function stmtBuildDaily(rows){
-  if(!rows.length)return {days:[],error:'No dated transactions could be read from the mapped statement.'};
+  if(!rows.length)return {days:[],partial:true,from:null,to:null,error:'No dated transactions could be read from the mapped statement.'};
 
-  const first=new Date(rows[0].date.getFullYear(),rows[0].date.getMonth(),rows[0].date.getDate());
-  const last=new Date(rows[rows.length-1].date.getFullYear(),rows[rows.length-1].date.getMonth(),rows[rows.length-1].date.getDate());
+  const sorted=[...rows].filter(r=>r.date instanceof Date&&!isNaN(r.date)).sort((a,b)=>a.date-b.date);
+  if(!sorted.length)return {days:[],partial:true,from:null,to:null,error:'No dated transactions could be read from the mapped statement.'};
+
+  const first=new Date(sorted[0].date.getFullYear(),sorted[0].date.getMonth(),sorted[0].date.getDate());
+  const last=new Date(sorted[sorted.length-1].date.getFullYear(),sorted[sorted.length-1].date.getMonth(),sorted[sorted.length-1].date.getDate());
   const byDay={};
-  rows.forEach(r=>{(byDay[stmtDayKey(r.date)]??=[]).push(r);});
+  sorted.forEach(r=>{(byDay[stmtDayKey(r.date)]??=[]).push(r);});
 
-  let opening=stmtExtractOpening(rows);
+  // Use an explicit opening/brought-forward balance when the statement contains one.
+  // Otherwise, if the statement starts after the 1st, use that first day's closing
+  // balance and calculate from that date. If it starts on the 1st, derive opening
+  // balance from the first day's closing balance less that day's net movement.
+  let opening=stmtExtractOpening(sorted);
   let startDate;
   let firstMonthMode='full';
-  const firstRows=byDay[stmtDayKey(first)]||[];
-  const firstWithBalance=firstRows.filter(r=>r.balance!==null&&isFinite(r.balance));
 
-  /*
-    Starting-balance rules:
-    A. Explicit brought-forward/opening balance -> start on the 1st.
-    B. No brought-forward balance and first transaction is on the 1st:
-       use the supplied closing balance on the 1st as the day's balance.
-       Do NOT reverse the day's debit/credit movement.
-    C. No brought-forward balance and first transaction is after the 1st:
-       start on the first transaction date using that day's closing balance.
-  */
-  if(opening!==null && isFinite(opening)){
-    startDate=new Date(first.getFullYear(),first.getMonth(),1);
-    firstMonthMode='from-opening-balance';
-  }else if(first.getDate()===1){
-    if(firstWithBalance.length){
-      opening=firstWithBalance[firstWithBalance.length-1].balance;
-      startDate=first;
-      firstMonthMode='from-first-day-closing-balance';
-    }else{
-      return {
-        days:[],
-        error:'The first transaction is on the 1st, but no closing/opening balance is available for that day. Please map the Balance column or provide the first-day closing balance.',
-        missingOpening:true
-      };
+  if(opening===null && first.getDate()>1){
+    const firstDayRows=byDay[stmtDayKey(first)]||[];
+    const firstWithBal=firstDayRows.filter(r=>r.balance!==null&&isFinite(Number(r.balance)));
+    if(!firstWithBal.length){
+      return {days:[],partial:true,from:first,to:last,missingOpening:true,
+        error:'No brought-forward balance is shown and the first transaction is after the 1st. A closing balance on the first transaction day is required to calculate interest from that date.'};
     }
-  }else{
-    if(!firstWithBalance.length){
-      return {
-        days:[],
-        error:'No brought-forward balance is shown and the first transaction is after the 1st. A closing balance on the first transaction day is required to calculate interest from that date.',
-        missingOpening:true
-      };
-    }
-    opening=firstWithBalance[firstWithBalance.length-1].balance;
+    opening=Number(firstWithBal[firstWithBal.length-1].balance);
     startDate=first;
     firstMonthMode='from-first-transaction';
+  }else{
+    if(opening===null){
+      const firstDayRows=byDay[stmtDayKey(first)]||[];
+      const firstWithBal=firstDayRows.filter(r=>r.balance!==null&&isFinite(Number(r.balance)));
+      if(firstWithBal.length){
+        const net=firstDayRows.reduce((a,r)=>a+Number(r.credit||0)-Number(r.debit||0),0);
+        opening=Number(firstWithBal[firstWithBal.length-1].balance)-net;
+      }
+    }
+    if(opening===null||!isFinite(opening)){
+      return {days:[],partial:true,from:first,to:last,missingOpening:true,
+        error:'Opening/brought-forward balance could not be established from the statement.'};
+    }
+    startDate=new Date(first.getFullYear(),first.getMonth(),1);
   }
 
-  const end=new Date(last.getFullYear(),last.getMonth()+1,0);
   const days=[];
   let balance=opening;
-
+  const end=new Date(last.getFullYear(),last.getMonth()+1,0);
   for(let d=new Date(startDate);d<=end;d.setDate(d.getDate()+1)){
     const tx=byDay[stmtDayKey(d)]||[];
     if(tx.length){
-      const withBal=tx.filter(r=>r.balance!==null&&isFinite(r.balance));
+      const withBal=tx.filter(r=>r.balance!==null&&isFinite(Number(r.balance)));
       if(withBal.length){
-        // Use the closing balance immediately BEFORE a same-day interest
-        // credit. Interest credited at month-end should not itself earn
-        // interest on that same day.
-        const interestCredits=tx.filter(r=>r.credit>0 && /monthly\s+interest\s+credit|interest\s+credit|\bint\.?\s*credit/i.test(r.narration||''));
-        if(interestCredits.length && withBal.length>=2){
+        // Do not let a same-day interest-credit transaction itself earn interest
+        // on that same day. Use the closing balance immediately before that credit.
+        const interestCredits=tx.filter(r=>r.credit>0&&/monthly\s+interest\s+credit|interest\s+credit|\bint\.?\s*credit/i.test(r.narration||''));
+        if(interestCredits.length&&withBal.length>=2){
           const candidate=withBal[withBal.length-2].balance;
-          balance=isFinite(candidate)?candidate:withBal[withBal.length-1].balance;
+          balance=isFinite(candidate)?Number(candidate):Number(withBal[withBal.length-1].balance);
         }else{
-          balance=withBal[withBal.length-1].balance;
+          balance=Number(withBal[withBal.length-1].balance);
         }
-      }else if(d.getTime()!==startDate.getTime()){
-        // For later transaction days without a supplied balance, roll forward
-        // from the previous day using that day's net movement.
-        tx.forEach(r=>balance+=r.credit-r.debit);
+      }else{
+        tx.forEach(r=>{balance+=Number(r.credit||0)-Number(r.debit||0);});
       }
     }
     days.push({
@@ -2491,13 +2532,9 @@ function stmtBuildDaily(rows){
   const completeLast=last.getDate()===end.getDate();
   return {
     days,
-    from:first,
-    to:last,
-    opening,
-    closing:balance,
-    startDate,
-    firstMonthMode,
-    partial:!(first.getDate()===1&&completeLast)||firstMonthMode!=='full'
+    partial:!(first.getDate()===1&&completeLast)||firstMonthMode!=='full',
+    from:first,to:last,opening,closing:balance,
+    startDate:new Date(startDate),firstMonthMode
   };
 }
 
@@ -2591,89 +2628,54 @@ function stmtResetSlabs(){
 
 function stmtCalculate(rows,slabs,manualBankInterest){
   const daily=stmtBuildDaily(rows);
-  if(!daily.days.length)return {...daily,monthly:[],total:0,fullMonthKeys:[],excludedMonths:[]};
+  if(!daily.days.length)return {...daily,monthly:[],total:0};
 
-  // Interest is calculated month-by-month only where the statement covers the
-  // complete calendar month: the available daily schedule must contain the
-  // 1st through the actual last day of that month. Partial first/last months
-  // are excluded from the interest total.
-  const groups={};
-  daily.days.forEach(d=>{
-    (groups[d.month]??=[]).push(d);
-  });
-
-  const fullMonthKeys=[];
-  const excludedMonths=[];
-  Object.entries(groups).forEach(([key,ds])=>{
-    const firstDay=ds[0].date.getDate();
-    const lastDay=ds[ds.length-1].date.getDate();
-    const expected=ds[0].daysInMonth;
-    const complete=firstDay===1 && lastDay===expected && ds.length===expected;
-    if(complete)fullMonthKeys.push(key);
-    else excludedMonths.push({month:key,availableDays:ds.length,expectedDays:expected});
-  });
-
-  const fullSet=new Set(fullMonthKeys);
   const out=[];
   let total=0;
-
-  daily.days.forEach(d=>{
-    if(!fullSet.has(d.month))return;
-    const parts=stmtAllocate(d.balance,slabs);
+  daily.days.forEach(x=>{
+    const parts=stmtAllocate(x.balance,slabs);
     let interest=0;
-    parts.forEach(p=>interest+=p.portion*p.rate/100/365);
+    // IMPORTANT: divide the annual slab rate by the actual number of days in
+    // that calendar month (28/29/30/31), matching StatementIQ's calculator.
+    parts.forEach(p=>interest += p.portion*p.rate/100/x.daysInMonth);
     total+=interest;
-    out.push({...d,parts,interest});
+    out.push({...x,parts,interest});
   });
 
   const by={};
-  out.forEach(d=>{
-    const m=by[d.month]??={
-      month:d.month,
-      days:d.daysInMonth,
-      calculatedDays:0,
-      dailyProduct:0,
-      interest:0,
-      slabProducts:slabs.map(()=>0),
-      slabInterest:slabs.map(()=>0),
-      actualInterest:0
+  out.forEach(x=>{
+    const m=by[x.month]??={
+      month:x.month,days:x.daysInMonth,calculatedDays:0,dailyProduct:0,interest:0,
+      slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),actualInterest:0
     };
-    m.dailyProduct+=d.balance;
+    m.dailyProduct+=x.balance;
     m.calculatedDays++;
-    m.interest+=d.interest;
-    d.parts.forEach((p,i)=>{
+    m.interest+=x.interest;
+    x.parts.forEach((p,i)=>{
       m.slabProducts[i]+=p.portion;
-      m.slabInterest[i]+=p.portion*p.rate/100/365;
+      m.slabInterest[i]+=p.portion*p.rate/100/x.daysInMonth;
     });
   });
 
-  // Compare bank interest credits only for the full months included in the
-  // calculation. Credits in excluded partial months are not included in totals.
+  // Pick up interest actually credited by the bank from the statement.
   rows.forEach(r=>{
     if(r.credit>0&&/monthly interest credit|interest credit|\binterest\b|\bint\.?\s*credit/i.test(r.narration||'')){
       const k=stmtMonthKey(r.date);
-      if(!fullSet.has(k))return;
       const m=by[k]??={
         month:k,
         days:new Date(r.date.getFullYear(),r.date.getMonth()+1,0).getDate(),
-        calculatedDays:0,
-        dailyProduct:0,
-        interest:0,
-        slabProducts:slabs.map(()=>0),
-        slabInterest:slabs.map(()=>0),
-        actualInterest:0
+        calculatedDays:0,dailyProduct:0,interest:0,
+        slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),actualInterest:0
       };
-      m.actualInterest+=r.credit;
+      m.actualInterest+=Number(r.credit||0);
     }
   });
 
   const monthly=Object.values(by).sort((a,b)=>a.month.localeCompare(b.month));
   const autoBank=monthly.reduce((a,m)=>a+(m.actualInterest||0),0);
   const bankInterest=manualBankInterest!==null&&!isNaN(manualBankInterest)
-    ?manualBankInterest
-    :(autoBank>0?autoBank:null);
+    ?manualBankInterest:(autoBank>0?autoBank:null);
 
-  const calculatedDays=out.length;
   return {
     ...daily,
     daily:out,
@@ -2682,10 +2684,8 @@ function stmtCalculate(rows,slabs,manualBankInterest){
     autoBankInterest:autoBank,
     bankInterest,
     overallDifference:bankInterest!==null?total-bankInterest:null,
-    fullMonthKeys,
-    excludedMonths,
-    calculatedDays,
-    partial:excludedMonths.length>0
+    calculatedDays:out.length,
+    partial:daily.partial
   };
 }
 
@@ -2788,8 +2788,8 @@ function stmtShowDaily(){
 function stmtRunCalculation(){
   // Re-run the known-format detector every time so a changed mapping or
   // newly uploaded statement cannot leave stale column selections behind.
-  const known=stmtRowsFromKnownBankFormat();
-  const rows=known.length?known:stmtRowsFromMapping();
+  const universal=stmtExtractTransactionsUniversal(stmtRawRows);
+  const rows=universal.length?universal:stmtRowsFromMapping();
   const mapStatus=document.getElementById('stmtStatus');
   if(mapStatus){
     mapStatus.style.display='block';
@@ -2799,7 +2799,7 @@ function stmtRunCalculation(){
   }
   if(!rows.length){
     const info=stmtHeaderInfo(stmtRawRows);
-    alert('No valid transactions were found.\n\nThe workbook was read, but no transaction rows were mapped. The app supports standard bank layouts including Transaction Date/Post Date, Debit, Credit and Balance. Please check the preview and column mapping. The reader now reads the XLSX worksheet XML directly when the bank reports an incorrect used range.\n\nHeader row: '+(info.headerIndex>=0?(info.headerIndex+1):'not detected')+'\nDate column: '+document.getElementById('mapDate').value+'\nDebit column: '+document.getElementById('mapDebit').value+'\nCredit column: '+document.getElementById('mapCredit').value+'\nBalance column: '+document.getElementById('mapBalance').value);
+    alert('No valid transactions were found.\n\nThe workbook was read, but no transaction rows were mapped. The app supports standard bank layouts including Transaction Date/Post Date, Debit, Credit and Balance. Please check the preview and column mapping. The app read the XLSX worksheet cells but could not identify transaction rows. The file may use a different header arrangement; the preview and mapping controls remain available.\n\nHeader row: '+(info.headerIndex>=0?(info.headerIndex+1):'not detected')+'\nDate column: '+document.getElementById('mapDate').value+'\nDebit column: '+document.getElementById('mapDebit').value+'\nCredit column: '+document.getElementById('mapCredit').value+'\nBalance column: '+document.getElementById('mapBalance').value);
     return;
   }
   const slabs=stmtNormaliseSlabs(stmtSlabRows());
@@ -2876,7 +2876,7 @@ document.getElementById('stmtFile').addEventListener('change',async e=>{
     const rows=await parseStatementFile(file);
     if(!rows.length)throw new Error('No rows detected in the file.');
     populateStatementPreview(rows);
-    const mapped=stmtRowsFromKnownBankFormat();
+    const mapped=stmtExtractTransactionsUniversal(stmtRawRows);
     status.textContent=mapped.length
       ? `Loaded "${file.name}" — ${rows.length} rows. Detected ${mapped.length} transaction rows.`
       : `Loaded "${file.name}" — ${rows.length} rows. Review the column mapping before calculating.`;
@@ -3173,7 +3173,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v5.5 ---------- */
+/* ---------- Simple Calculator v5.7 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
