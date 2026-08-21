@@ -404,7 +404,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.4</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.5</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -951,7 +951,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.4</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.5</strong>
   </footer>
 </div>
 
@@ -1818,7 +1818,8 @@ async function parseStatementFile(file) {
   if(ext==='pdf'){
     if(!window.pdfjsLib)throw new Error('PDF reader failed to load.');
     const data=await file.arrayBuffer();
-    const pdf=await pdfjsLib.
+    const pdf=await stmtPdfGetDocument(data).promise;
+
 let stmtPdfPasswordPending=false;
 function stmtShowPdfPasswordBox(show=true){
   const box=document.getElementById('stmtPdfPasswordBox');
@@ -1828,15 +1829,16 @@ function stmtSetPdfPasswordStatus(msg,error=false){
   const el=document.getElementById('stmtPdfPasswordStatus');
   if(el){el.textContent=msg;el.style.color=error?'var(--clay)':'';}
 }
-function stmtPdfPasswordCallback(resolve,reject){
+function stmtPdfPasswordCallback(updatePassword,reason){
   stmtShowPdfPasswordBox(true);
   const input=document.getElementById('stmtPdfPassword');
   const btn=document.getElementById('stmtPdfUnlockBtn');
+  stmtSetPdfPasswordStatus(reason===1 ? 'Incorrect PDF password. Please try again.' : 'This PDF is password protected. Enter the password and tap Unlock PDF.', reason===1);
   const submit=()=>{
     const pw=input?.value||'';
     if(!pw){stmtSetPdfPasswordStatus('Please enter the PDF password.',true);return;}
     stmtSetPdfPasswordStatus('Password supplied. Unlocking PDF…');
-    try{resolve(pw);}catch(e){reject(e);}
+    try{updatePassword(pw);}catch(e){stmtSetPdfPasswordStatus('Could not unlock the PDF.',true);}
   };
   if(btn)btn.onclick=submit;
   if(input){
@@ -1848,8 +1850,6 @@ function stmtPdfGetDocument(data){
   if(!window.pdfjsLib)throw new Error('PDF reader is not available.');
   return window.pdfjsLib.getDocument({data:data,password:stmtPdfPasswordCallback});
 }
-
-getDocument({data}).promise;
     const rows=[];
     for(let p=1;p<=pdf.numPages;p++){
       const page=await pdf.getPage(p), content=await page.getTextContent();
@@ -2658,7 +2658,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v4.4 ---------- */
+/* ---------- Simple Calculator v4.5 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
