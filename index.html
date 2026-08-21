@@ -407,7 +407,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.9</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v5.0</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -962,7 +962,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.9</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v5.0</strong>
   </footer>
 </div>
 
@@ -1775,6 +1775,12 @@ function parseDateFlexible(val) {
     const mi=months[m[2].slice(0,3).toLowerCase()];
     if(mi!==undefined){const d=new Date(y,mi,Number(m[1]));return isNaN(d)?null:d;}
   }
+  // Handle common bank exports such as "01/01/2026 00:00:00".
+  const dateOnly=s.split(/\s+/)[0];
+  if(dateOnly!==s){
+    const d2=parseDateFlexible(dateOnly);
+    if(d2)return d2;
+  }
   const f=new Date(s);
   return isNaN(f)?null:f;
 }
@@ -1791,31 +1797,75 @@ function parseNumberFlexible(val) {
   return isNaN(n)?0:(neg?-Math.abs(n):n);
 }
 
+
+function stmtWorksheetCellsToRows(sheet){
+  // Works with both normal SheetJS sparse sheets and dense sheets. It ignores
+  // the worksheet's advertised !ref because some bank XLSX files incorrectly
+  // report A1 even when real cells exist much farther down the sheet.
+  if(Array.isArray(sheet)){
+    return sheet.map(r=>Array.isArray(r)?r.slice():[]);
+  }
+
+  let maxR=-1,maxC=-1;
+  const cells=[];
+  Object.keys(sheet||{}).forEach(addr=>{
+    if(addr[0]==='!')return;
+    try{
+      const p=XLSX.utils.decode_cell(addr);
+      if(p.r>maxR)maxR=p.r;
+      if(p.c>maxC)maxC=p.c;
+      cells.push([p.r,p.c,sheet[addr]?.v!==undefined?sheet[addr].v:'']);
+    }catch(e){}
+  });
+  if(maxR<0||maxC<0)return [];
+  const rows=Array.from({length:maxR+1},()=>Array(maxC+1).fill(''));
+  cells.forEach(([r,c,v])=>{rows[r][c]=v;});
+  return rows;
+}
+
+function stmtNormaliseRows(rows){
+  return (rows||[]).map(r=>(r||[]).map(v=>{
+    if(v===null||v===undefined)return '';
+    return v;
+  }));
+}
+
 async function parseStatementFile(file) {
   const ext=file.name.split('.').pop().toLowerCase();
   if(ext==='csv'||ext==='xlsx'||ext==='xls'){
     const data=await file.arrayBuffer();
-    // The uploaded Central Bank of India XLSX reports !ref="A1" even though
-    // the real transaction cells run through the worksheet. SheetJS provides
-    // the `nodim` option specifically for third-party XLSX files with an
-    // incorrect self-reported dimension. It forces the parser to use the
-    // actual worksheet cells instead of the bogus A1 range.
+
+    // First parse without dense mode. nodim tells SheetJS not to trust a
+    // broken worksheet dimension such as !ref="A1".
     const wb=XLSX.read(data,{
       type:'array',
       cellDates:true,
       nodim:true,
-      dense:true,
       WTF:true
     });
     const sheet=wb.Sheets[wb.SheetNames[0]];
     if(!sheet)throw new Error('The first worksheet could not be read.');
-    const rows=XLSX.utils.sheet_to_json(sheet,{
-      header:1,
-      raw:false,
-      defval:'',
-      blankrows:true
-    });
-    if(!rows.length)throw new Error('The workbook contains no readable worksheet rows.');
+
+    let rows=stmtWorksheetCellsToRows(sheet);
+
+    // If SheetJS exposes the worksheet cells but sheet_to_json gives a shorter
+    // result, use the cell matrix directly. This is important for bank files
+    // with blank leading columns and an incorrect !ref.
+    if(!rows.length || rows.length<20){
+      const jsonRows=XLSX.utils.sheet_to_json(sheet,{
+        header:1,
+        raw:true,
+        defval:'',
+        blankrows:true
+      });
+      if(jsonRows.length>rows.length)rows=jsonRows;
+    }
+
+    rows=stmtNormaliseRows(rows);
+    if(!rows.length)throw new Error('The workbook contains no readable worksheet cells.');
+
+    // If there are real transaction cells, they should normally produce more
+    // than one row. Keep every row so the statement header can be located.
     return rows;
   }
   if(ext==='json'){
@@ -1960,9 +2010,9 @@ function stmtRowsFromKnownBankFormat(){
     const cells=(raw[i]||[]).map(x=>String(x??'').replace(/[\r\n]+/g,' ').trim().toLowerCase());
     const find=(name)=>cells.findIndex(x=>x===name||x.includes(name));
     const d=find('post date')>=0?find('post date'):find('date');
-    const db=find('debit');
-    const cr=find('credit');
-    const ba=find('balance');
+    const db=find('debit')>=0?find('debit'):find('withdrawal');
+    const cr=find('credit')>=0?find('credit'):find('deposit');
+    const ba=find('balance')>=0?find('balance'):find('closing balance');
     if(d>=0&&db>=0&&cr>=0&&ba>=0){
       header=i; dateCol=d; debitCol=db; creditCol=cr; balanceCol=ba; break;
     }
@@ -2488,7 +2538,10 @@ function stmtShowDaily(){
 }
 
 function stmtRunCalculation(){
-  const rows=stmtRowsFromMapping();
+  // Re-run the known-format detector every time so a changed mapping or
+  // newly uploaded statement cannot leave stale column selections behind.
+  const detected=stmtRowsFromKnownBankFormat();
+  const rows=detected.length?detected:stmtRowsFromMapping();
   const mapStatus=document.getElementById('stmtStatus');
   if(mapStatus){
     mapStatus.style.display='block';
@@ -2498,7 +2551,7 @@ function stmtRunCalculation(){
   }
   if(!rows.length){
     const info=stmtHeaderInfo(stmtRawRows);
-    alert('No valid transactions were found.\n\nThe workbook was read, but no transaction rows were mapped. For the Central Bank of India format the app expects Post Date, Debit, Credit and Balance. Please check the preview and column mapping.\n\nHeader row: '+(info.headerIndex>=0?(info.headerIndex+1):'not detected')+'\nDate column: '+document.getElementById('mapDate').value+'\nDebit column: '+document.getElementById('mapDebit').value+'\nCredit column: '+document.getElementById('mapCredit').value+'\nBalance column: '+document.getElementById('mapBalance').value);
+    alert('No valid transactions were found.\n\nThe workbook was read, but no transaction rows were mapped. For the Central Bank of India format the app expects Post Date, Debit, Credit and Balance. Please check the preview and column mapping. The reader now scans the actual worksheet cells even when Excel reports an incorrect used range.\n\nHeader row: '+(info.headerIndex>=0?(info.headerIndex+1):'not detected')+'\nDate column: '+document.getElementById('mapDate').value+'\nDebit column: '+document.getElementById('mapDebit').value+'\nCredit column: '+document.getElementById('mapCredit').value+'\nBalance column: '+document.getElementById('mapBalance').value);
     return;
   }
   const slabs=stmtNormaliseSlabs(stmtSlabRows());
@@ -2582,6 +2635,9 @@ document.getElementById('stmtFile').addEventListener('change',async e=>{
     if(mapped.length){
       const s=document.getElementById('stmtStatus');
       if(s)s.textContent=`Statement ready: ${mapped.length} transactions detected (Post Date / Debit / Credit / Balance).`;
+    }else{
+      const s=document.getElementById('stmtStatus');
+      if(s)s.textContent='Statement loaded, but the transaction columns were not yet mapped. Use Auto-detect or select Date, Debit, Credit and Balance.';
     }
 
   }catch(err){
@@ -2859,7 +2915,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v4.9 ---------- */
+/* ---------- Simple Calculator v5.0 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
