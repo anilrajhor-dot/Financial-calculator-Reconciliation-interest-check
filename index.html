@@ -407,7 +407,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v5.0</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v5.1</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -962,7 +962,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v5.0</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v5.1</strong>
   </footer>
 </div>
 
@@ -2001,7 +2001,46 @@ function populateStatementPreview(rows){
 }
 
 
+
+function stmtRowsFromIDFCFormat(){
+  const raw=stmtRawRows||[];
+  if(!raw.length)return [];
+  let header=-1,dateCol=-1,debitCol=-1,creditCol=-1,balanceCol=-1;
+  for(let i=0;i<raw.length;i++){
+    const cells=(raw[i]||[]).map(x=>String(x??'').replace(/[\r\n]+/g,' ').trim().toLowerCase());
+    const idx=(tests)=>tests.reduce((found,test)=>found>=0?found:cells.findIndex(x=>x===test||x.includes(test)),-1);
+    const d=idx(['transaction date','post date','date']);
+    const db=idx(['debit']);
+    const cr=idx(['credit']);
+    const ba=idx(['balance']);
+    if(d>=0&&db>=0&&cr>=0&&ba>=0){
+      header=i;dateCol=d;debitCol=db;creditCol=cr;balanceCol=ba;break;
+    }
+  }
+  if(header<0)return [];
+  const result=[];
+  for(let i=header+1;i<raw.length;i++){
+    const r=raw[i]||[];
+    const date=parseDateFlexible(r[dateCol]);
+    if(!date)continue;
+    const debit=Math.abs(parseNumberFlexible(r[debitCol]));
+    const credit=Math.abs(parseNumberFlexible(r[creditCol]));
+    const balanceText=String(r[balanceCol]??'').trim();
+    const balance=balanceText!==''?parseNumberFlexible(balanceText):null;
+    if(balance===null && debit===0 && credit===0)continue;
+    const narration=r.map(x=>String(x??'')).join(' ').trim();
+    result.push({date,debit,credit,balance,narration,sourceRow:i+1});
+  }
+  result.sort((a,b)=>a.date-b.date);
+  const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=String(val);};
+  set('mapHeaderRow','auto'); set('mapDate',dateCol); set('mapDebit',debitCol);
+  set('mapCredit',creditCol); set('mapBalance',balanceCol);
+  return result;
+}
+
 function stmtRowsFromKnownBankFormat(){
+  const idfc=stmtRowsFromIDFCFormat();
+  if(idfc.length)return idfc;
   const raw=stmtRawRows||[];
   if(!raw.length)return [];
   let header=-1, dateCol=-1, debitCol=-1, creditCol=-1, balanceCol=-1;
@@ -2222,8 +2261,16 @@ function stmtBuildDaily(rows){
     if(tx.length){
       const withBal=tx.filter(r=>r.balance!==null&&isFinite(r.balance));
       if(withBal.length){
-        // The statement's closing balance for the date is the day's balance.
-        balance=withBal[withBal.length-1].balance;
+        // Use the closing balance immediately BEFORE a same-day interest
+        // credit. Interest credited at month-end should not itself earn
+        // interest on that same day.
+        const interestCredits=tx.filter(r=>r.credit>0 && /monthly\s+interest\s+credit|interest\s+credit|\bint\.?\s*credit/i.test(r.narration||''));
+        if(interestCredits.length && withBal.length>=2){
+          const candidate=withBal[withBal.length-2].balance;
+          balance=isFinite(candidate)?candidate:withBal[withBal.length-1].balance;
+        }else{
+          balance=withBal[withBal.length-1].balance;
+        }
       }else if(d.getTime()!==startDate.getTime()){
         // For later transaction days without a supplied balance, roll forward
         // from the previous day using that day's net movement.
@@ -2540,8 +2587,9 @@ function stmtShowDaily(){
 function stmtRunCalculation(){
   // Re-run the known-format detector every time so a changed mapping or
   // newly uploaded statement cannot leave stale column selections behind.
-  const detected=stmtRowsFromKnownBankFormat();
-  const rows=detected.length?detected:stmtRowsFromMapping();
+  const detected=stmtRowsFromIDFCFormat();
+  const known=detected.length?detected:stmtRowsFromKnownBankFormat();
+  const rows=known.length?known:stmtRowsFromMapping();
   const mapStatus=document.getElementById('stmtStatus');
   if(mapStatus){
     mapStatus.style.display='block';
@@ -2551,7 +2599,7 @@ function stmtRunCalculation(){
   }
   if(!rows.length){
     const info=stmtHeaderInfo(stmtRawRows);
-    alert('No valid transactions were found.\n\nThe workbook was read, but no transaction rows were mapped. For the Central Bank of India format the app expects Post Date, Debit, Credit and Balance. Please check the preview and column mapping. The reader now scans the actual worksheet cells even when Excel reports an incorrect used range.\n\nHeader row: '+(info.headerIndex>=0?(info.headerIndex+1):'not detected')+'\nDate column: '+document.getElementById('mapDate').value+'\nDebit column: '+document.getElementById('mapDebit').value+'\nCredit column: '+document.getElementById('mapCredit').value+'\nBalance column: '+document.getElementById('mapBalance').value);
+    alert('No valid transactions were found.\n\nThe workbook was read, but no transaction rows were mapped. The app supports standard bank layouts including Transaction Date/Post Date, Debit, Credit and Balance. Please check the preview and column mapping. The reader now scans the actual worksheet cells even when Excel reports an incorrect used range.\n\nHeader row: '+(info.headerIndex>=0?(info.headerIndex+1):'not detected')+'\nDate column: '+document.getElementById('mapDate').value+'\nDebit column: '+document.getElementById('mapDebit').value+'\nCredit column: '+document.getElementById('mapCredit').value+'\nBalance column: '+document.getElementById('mapBalance').value);
     return;
   }
   const slabs=stmtNormaliseSlabs(stmtSlabRows());
@@ -2634,7 +2682,7 @@ document.getElementById('stmtFile').addEventListener('change',async e=>{
       : `Loaded "${file.name}" — ${rows.length} rows. Review the column mapping before calculating.`;
     if(mapped.length){
       const s=document.getElementById('stmtStatus');
-      if(s)s.textContent=`Statement ready: ${mapped.length} transactions detected (Post Date / Debit / Credit / Balance).`;
+      if(s)s.textContent=`Statement ready: ${mapped.length} transactions detected (Date / Debit / Credit / Balance).`;
     }else{
       const s=document.getElementById('stmtStatus');
       if(s)s.textContent='Statement loaded, but the transaction columns were not yet mapped. Use Auto-detect or select Date, Debit, Credit and Balance.';
@@ -2915,7 +2963,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v5.0 ---------- */
+/* ---------- Simple Calculator v5.1 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
