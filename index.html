@@ -404,7 +404,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.2</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.4</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -779,6 +779,14 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
         <div>
           <label for="stmtFile">Statement file (CSV / XLSX / XLS / PDF / JSON)</label>
           <input type="file" id="stmtFile" accept=".csv,.xlsx,.xls,.pdf,.json" />
+<div id="stmtPdfPasswordBox" style="display:none;margin-top:12px">
+  <label for="stmtPdfPassword"><b>🔐 PDF password</b></label>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <input id="stmtPdfPassword" type="password" autocomplete="off" placeholder="Enter PDF password">
+    <button id="stmtPdfUnlockBtn" class="btn" type="button">Unlock PDF</button>
+  </div>
+  <div id="stmtPdfPasswordStatus" class="hint">Password is used locally in this browser.</div><div class="hint">Password-protected PDFs are processed in the browser; the password is not sent to a server.</div>
+</div>
         </div>
         <div>
           <label for="stmtManualRate">Default annual rate (%)</label>
@@ -943,7 +951,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.2</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.4</strong>
   </footer>
 </div>
 
@@ -1778,7 +1786,26 @@ async function parseStatementFile(file) {
     const data=await file.arrayBuffer();
     const wb=XLSX.read(data,{type:'array',cellDates:true});
     const sheet=wb.Sheets[wb.SheetNames[0]];
-    return XLSX.utils.sheet_to_json(sheet,{header:1,raw:false,defval:''});
+
+    // Some bank-generated XLSX files incorrectly declare the worksheet
+    // dimension as A1 even though the actual transaction cells extend many
+    // rows/columns. Do not trust !ref alone. Determine the real used range
+    // from the worksheet cell addresses.
+    let maxR=0,maxC=0,foundCell=false;
+    Object.keys(sheet).forEach(addr=>{
+      if(addr[0]==='!')return;
+      try{
+        const p=XLSX.utils.decode_cell(addr);
+        if(p.r>=0&&p.c>=0){
+          maxR=Math.max(maxR,p.r);
+          maxC=Math.max(maxC,p.c);
+          foundCell=true;
+        }
+      }catch(e){}
+    });
+    if(!foundCell)throw new Error('The workbook contains no readable worksheet cells.');
+    const range={s:{r:0,c:0},e:{r:maxR,c:maxC}};
+    return XLSX.utils.sheet_to_json(sheet,{header:1,raw:false,defval:'',range});
   }
   if(ext==='json'){
     const text=await file.text();
@@ -1791,7 +1818,38 @@ async function parseStatementFile(file) {
   if(ext==='pdf'){
     if(!window.pdfjsLib)throw new Error('PDF reader failed to load.');
     const data=await file.arrayBuffer();
-    const pdf=await pdfjsLib.getDocument({data}).promise;
+    const pdf=await pdfjsLib.
+let stmtPdfPasswordPending=false;
+function stmtShowPdfPasswordBox(show=true){
+  const box=document.getElementById('stmtPdfPasswordBox');
+  if(box)box.style.display=show?'block':'none';
+}
+function stmtSetPdfPasswordStatus(msg,error=false){
+  const el=document.getElementById('stmtPdfPasswordStatus');
+  if(el){el.textContent=msg;el.style.color=error?'var(--clay)':'';}
+}
+function stmtPdfPasswordCallback(resolve,reject){
+  stmtShowPdfPasswordBox(true);
+  const input=document.getElementById('stmtPdfPassword');
+  const btn=document.getElementById('stmtPdfUnlockBtn');
+  const submit=()=>{
+    const pw=input?.value||'';
+    if(!pw){stmtSetPdfPasswordStatus('Please enter the PDF password.',true);return;}
+    stmtSetPdfPasswordStatus('Password supplied. Unlocking PDF…');
+    try{resolve(pw);}catch(e){reject(e);}
+  };
+  if(btn)btn.onclick=submit;
+  if(input){
+    input.onkeydown=e=>{if(e.key==='Enter')submit();};
+    input.focus();
+  }
+}
+function stmtPdfGetDocument(data){
+  if(!window.pdfjsLib)throw new Error('PDF reader is not available.');
+  return window.pdfjsLib.getDocument({data:data,password:stmtPdfPasswordCallback});
+}
+
+getDocument({data}).promise;
     const rows=[];
     for(let p=1;p<=pdf.numPages;p++){
       const page=await pdf.getPage(p), content=await page.getTextContent();
@@ -1817,14 +1875,14 @@ async function parseStatementFile(file) {
 
 function stmtGuessColumn(headers,keywords){
   for(let i=0;i<headers.length;i++){
-    const h=String(headers[i]||'').toLowerCase();
+    const h=String(headers[i]||'').toLowerCase().replace(/[\r\n]+/g,' ').trim();
     if(keywords.some(k=>h.includes(k)))return i;
   }
   return -1;
 }
 
 function stmtFindHeaderRow(rows){
-  const max=Math.min(rows.length,30);let best=-1,bestScore=-1;
+  const max=Math.min(rows.length,80);let best=-1,bestScore=-1;
   for(let i=0;i<max;i++){const cells=(rows[i]||[]).map(x=>String(x??'').trim().toLowerCase()),j=cells.join(' | ');const date=/\bdate\b|transaction date|txn date|posting date/.test(j),bal=/\bbalance\b|closing balance|running balance/.test(j),flow=/debit|withdrawal|credit|deposit|\bdr\b|\bcr\b/.test(j),nar=/narration|description|particulars|transaction details/.test(j);if(date&&bal&&(flow||nar)){let score=20+(flow?5:0)+(nar?4:0)+(cells.length>=5?3:0)+(/transaction date/.test(j)?5:0);if(/opening balance|total debit|total credit|closing balance/.test(j)&&!date)score-=20;if(score>bestScore){bestScore=score;best=i;}}}return best;
 }
 function stmtHeaderInfo(rows){
@@ -1856,7 +1914,7 @@ function populateStatementPreview(rows){
   });
 
   if(headers){
-    const dc=stmtGuessColumn(headers,['date','txn date','transaction date','posting date','value date']);
+    const dc=stmtGuessColumn(headers,['date','post date','txn date','transaction date','posting date','value date']);
     const db=stmtGuessColumn(headers,['debit','withdrawal','dr amount','dr amt','debit amount']);
     const cr=stmtGuessColumn(headers,['credit','deposit','cr amount','cr amt','credit amount']);
     const ba=stmtGuessColumn(headers,['balance','closing balance','running balance']);
@@ -2320,7 +2378,7 @@ function stmtRunCalculation(){
   const rows=stmtRowsFromMapping();
   if(!rows.length){
     const info=stmtHeaderInfo(stmtRawRows);
-    alert('No valid transactions were found.\n\nHeader row: '+(info.headerIndex>=0?(info.headerIndex+1):'not detected')+'\nDate column: '+document.getElementById('mapDate').value+'\nDebit column: '+document.getElementById('mapDebit').value+'\nCredit column: '+document.getElementById('mapCredit').value+'\nBalance column: '+document.getElementById('mapBalance').value+'\n\nPlease confirm the column mapping and try again.');
+    alert('No valid transactions were found.\n\nThe statement may use a non-standard Excel worksheet range or column layout. The app now reads the actual worksheet cells rather than relying on the workbook dimension. Please check Date, Debit, Credit and Balance mapping before calculating.\n\nHeader row: '+(info.headerIndex>=0?(info.headerIndex+1):'not detected')+'\nDate column: '+document.getElementById('mapDate').value+'\nDebit column: '+document.getElementById('mapDebit').value+'\nCredit column: '+document.getElementById('mapCredit').value+'\nBalance column: '+document.getElementById('mapBalance').value);
     return;
   }
   const slabs=stmtNormaliseSlabs(stmtSlabRows());
@@ -2334,6 +2392,7 @@ function stmtRunCalculation(){
 }
 
 document.getElementById('stmtFile').addEventListener('change',async e=>{
+  stmtShowPdfPasswordBox(/\.pdf$/i.test((this.files&&this.files[0]&&this.files[0].name)||''));
   const file=e.target.files[0]; if(!file)return;
   const status=document.getElementById('stmtStatus');
   status.style.display='block';status.textContent='Reading file…';
@@ -2599,7 +2658,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v4.2 ---------- */
+/* ---------- Simple Calculator v4.4 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
