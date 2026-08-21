@@ -407,7 +407,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.8</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.9</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -962,7 +962,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.8</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.9</strong>
   </footer>
 </div>
 
@@ -1795,28 +1795,28 @@ async function parseStatementFile(file) {
   const ext=file.name.split('.').pop().toLowerCase();
   if(ext==='csv'||ext==='xlsx'||ext==='xls'){
     const data=await file.arrayBuffer();
-    const wb=XLSX.read(data,{type:'array',cellDates:true});
-    const sheet=wb.Sheets[wb.SheetNames[0]];
-
-    // Some bank-generated XLSX files incorrectly declare the worksheet
-    // dimension as A1 even though the actual transaction cells extend many
-    // rows/columns. Do not trust !ref alone. Determine the real used range
-    // from the worksheet cell addresses.
-    let maxR=0,maxC=0,foundCell=false;
-    Object.keys(sheet).forEach(addr=>{
-      if(addr[0]==='!')return;
-      try{
-        const p=XLSX.utils.decode_cell(addr);
-        if(p.r>=0&&p.c>=0){
-          maxR=Math.max(maxR,p.r);
-          maxC=Math.max(maxC,p.c);
-          foundCell=true;
-        }
-      }catch(e){}
+    // The uploaded Central Bank of India XLSX reports !ref="A1" even though
+    // the real transaction cells run through the worksheet. SheetJS provides
+    // the `nodim` option specifically for third-party XLSX files with an
+    // incorrect self-reported dimension. It forces the parser to use the
+    // actual worksheet cells instead of the bogus A1 range.
+    const wb=XLSX.read(data,{
+      type:'array',
+      cellDates:true,
+      nodim:true,
+      dense:true,
+      WTF:true
     });
-    if(!foundCell)throw new Error('The workbook contains no readable worksheet cells.');
-    const range={s:{r:0,c:0},e:{r:maxR,c:maxC}};
-    return XLSX.utils.sheet_to_json(sheet,{header:1,raw:false,defval:'',range});
+    const sheet=wb.Sheets[wb.SheetNames[0]];
+    if(!sheet)throw new Error('The first worksheet could not be read.');
+    const rows=XLSX.utils.sheet_to_json(sheet,{
+      header:1,
+      raw:false,
+      defval:'',
+      blankrows:true
+    });
+    if(!rows.length)throw new Error('The workbook contains no readable worksheet rows.');
+    return rows;
   }
   if(ext==='json'){
     const text=await file.text();
@@ -2498,7 +2498,7 @@ function stmtRunCalculation(){
   }
   if(!rows.length){
     const info=stmtHeaderInfo(stmtRawRows);
-    alert('No valid transactions were found.\n\nThe statement may use a non-standard Excel worksheet range or column layout. The app now reads the actual worksheet cells rather than relying on the workbook dimension. Please check Date, Debit, Credit and Balance mapping before calculating.\n\nHeader row: '+(info.headerIndex>=0?(info.headerIndex+1):'not detected')+'\nDate column: '+document.getElementById('mapDate').value+'\nDebit column: '+document.getElementById('mapDebit').value+'\nCredit column: '+document.getElementById('mapCredit').value+'\nBalance column: '+document.getElementById('mapBalance').value);
+    alert('No valid transactions were found.\n\nThe workbook was read, but no transaction rows were mapped. For the Central Bank of India format the app expects Post Date, Debit, Credit and Balance. Please check the preview and column mapping.\n\nHeader row: '+(info.headerIndex>=0?(info.headerIndex+1):'not detected')+'\nDate column: '+document.getElementById('mapDate').value+'\nDebit column: '+document.getElementById('mapDebit').value+'\nCredit column: '+document.getElementById('mapCredit').value+'\nBalance column: '+document.getElementById('mapBalance').value);
     return;
   }
   const slabs=stmtNormaliseSlabs(stmtSlabRows());
@@ -2579,6 +2579,10 @@ document.getElementById('stmtFile').addEventListener('change',async e=>{
     status.textContent=mapped.length
       ? `Loaded "${file.name}" — ${rows.length} rows. Detected ${mapped.length} transaction rows.`
       : `Loaded "${file.name}" — ${rows.length} rows. Review the column mapping before calculating.`;
+    if(mapped.length){
+      const s=document.getElementById('stmtStatus');
+      if(s)s.textContent=`Statement ready: ${mapped.length} transactions detected (Post Date / Debit / Credit / Balance).`;
+    }
 
   }catch(err){
     status.textContent='Could not read this file: '+err.message;
@@ -2855,7 +2859,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v4.8 ---------- */
+/* ---------- Simple Calculator v4.9 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
