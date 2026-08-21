@@ -404,7 +404,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v3.5</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v3.6</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -943,7 +943,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v3.5</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v3.6</strong>
   </footer>
 </div>
 
@@ -2521,7 +2521,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v3.5 ---------- */
+/* ---------- Simple Calculator v3.6 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
@@ -2732,6 +2732,7 @@ simpleCalcRenderHistory();
       <textarea id="askMeInput" rows="4" placeholder="Example: What is the EMI of ₹1,00,000 for 60 months at 5%?"></textarea>
       <div class="askme-voice-row">
         <button id="askMeMicBtn" class="btn askme-mic" type="button" onclick="toggleAskMeVoice()" aria-label="Speak your question">🎙️</button>
+        <button id="askMeAutoVoiceBtn" class="btn" type="button" onclick="toggleAskMeAutoVoice()" aria-pressed="false">🔊 Auto reply: Off</button>
         <span id="askMeVoiceStatus" class="askme-voice-status">Tap the microphone and speak your question — e.g. “10 plus 20”.</span>
       </div>
       <p class="askme-voice-note">After you speak, tap Ask. The answer can also be read aloud.</p>
@@ -2757,6 +2758,8 @@ function openAskMe(){
   if(answer){answer.classList.remove('show');answer.innerHTML='';}
   if(modal)modal.classList.add('open');
   if(!askMeRecognition)initAskMeVoice();
+  askMeAutoVoice=askMeLoadAutoVoice();
+  updateAskMeAutoVoiceButton();
   setTimeout(()=>input?.focus(),120);
 }
 function closeAppModal(id){
@@ -2931,6 +2934,32 @@ function askMeArithmeticAnswer(original,value){
     '<button class="btn askme-speak" type="button" onclick="speakAskMeAnswer()">🔊 Read answer aloud</button>';
 }
 
+
+let askMeAutoVoice=false;
+function askMeLoadAutoVoice(){try{return localStorage.getItem('askme_auto_voice_v1')==='1';}catch(e){return false;}}
+function askMeSaveAutoVoice(){try{localStorage.setItem('askme_auto_voice_v1',askMeAutoVoice?'1':'0');}catch(e){}}
+function updateAskMeAutoVoiceButton(){
+  const b=document.getElementById('askMeAutoVoiceBtn'); if(!b)return;
+  b.textContent=askMeAutoVoice?'🔊 Auto reply: On':'🔊 Auto reply: Off';
+  b.setAttribute('aria-pressed',askMeAutoVoice?'true':'false');
+}
+function toggleAskMeAutoVoice(){
+  askMeAutoVoice=!askMeAutoVoice; askMeSaveAutoVoice(); updateAskMeAutoVoiceButton();
+  askMeSetVoiceStatus(askMeAutoVoice
+    ? 'Auto voice reply is ON. After you tap Ask, I will speak the answer.'
+    : 'Auto voice reply is OFF. Tap Read answer aloud when required.');
+}
+function askMeSpeakText(text){
+  if(!askMeAutoVoice||!('speechSynthesis' in window))return;
+  window.speechSynthesis.cancel();
+  const clean=String(text||'').replace(/🔊 Read answer aloud/g,'')
+    .replace(/₹/g,' rupees ').replace(/%/g,' percent ')
+    .replace(/×/g,' times ').replace(/÷/g,' divided by ');
+  const u=new SpeechSynthesisUtterance(clean);
+  u.lang=navigator.language||'en-IN'; u.rate=.95; u.pitch=1;
+  window.speechSynthesis.speak(u);
+}
+
 function answerAskMe(){
   const input=document.getElementById('askMeInput'),a=document.getElementById('askMeAnswer');
   const q=(input?.value||'').trim(),ql=q.toLowerCase();
@@ -2942,6 +2971,7 @@ function answerAskMe(){
   if(arithmetic!==null){
     a.innerHTML=askMeArithmeticAnswer(q,arithmetic);
     a.classList.add('show');
+    askMeSpeakText(a.innerText);
     return;
   }
 
@@ -2979,6 +3009,7 @@ function answerAskMe(){
   else
     a.innerHTML='<div class="ask-result-title">I can calculate that</div><div>Try <b>10 + 20</b>, <b>100 × 5</b>, <b>200 ÷ 4</b>, or speak: <b>“125 plus 75 divided by 5”</b>.</div>';
   a.classList.add('show');
+  askMeSpeakText(a.innerText);
 }
 </script>
 <script>
