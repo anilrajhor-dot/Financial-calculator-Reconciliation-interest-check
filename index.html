@@ -404,7 +404,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v3.7</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v3.9</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -943,7 +943,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v3.7</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v3.9</strong>
   </footer>
 </div>
 
@@ -2521,7 +2521,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v3.7 ---------- */
+/* ---------- Simple Calculator v3.9 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
@@ -2744,7 +2744,7 @@ simpleCalcRenderHistory();
       <p class="askme-voice-note">With Auto reply ON, I answer automatically after you finish typing or speaking. No need to press Ask.</p>
       <div class="askme-actions">
         <button class="btn primary askme-ask" type="button" onclick="answerAskMe()">Ask</button>
-        <p class="askme-example">Ask me anything from 10 + 20 to EMI, interest and other financial calculations.</p>
+        <p class="askme-example">Ask me anything from 10 + 20 to EMI, slab EMI, interest and other financial calculations.</p>
       </div>
       <div id="askMeAnswer" class="ask-answer" aria-live="polite"></div>
     </div>
@@ -2777,24 +2777,65 @@ function closeAppModal(id){
   }
   if(el)el.classList.remove('open');
 }
-function askMeMoney(q){
-  const m=q.match(/(?:₹|rs\.?|inr)?\s*([\d,]+(?:\.\d+)?)\s*(lakh|lac|lacs|crore|cr)?/i);
-  if(!m)return null;
-  let n=parseFloat(String(m[1]).replace(/,/g,''));
-  if(!isFinite(n))return null;
-  const unit=(m[2]||'').toLowerCase();
-  if(unit==='lakh'||unit==='lac'||unit==='lacs')n*=100000;
-  if(unit==='crore'||unit==='cr')n*=10000000;
-  return n;
+function askMeNumberPhrase(s){
+  s=String(s||'').toLowerCase().replace(/,/g,' ').trim();
+  if(!s)return null;
+  const direct=s.match(/^\s*([0-9]+(?:\.[0-9]+)?)\s*(lakh|lac|lacs|lakhs|crore|crores|cr)?\s*$/i);
+  if(direct){
+    let n=parseFloat(direct[1]);
+    const u=(direct[2]||'').toLowerCase();
+    if(u==='lakh'||u==='lac'||u==='lacs'||u==='lakhs')n*=100000;
+    if(u==='crore'||u==='crores'||u==='cr')n*=10000000;
+    return isFinite(n)?n:null;
+  }
+  const ones={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,
+    eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,
+    eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,
+    eighty:80,ninety:90};
+  const tokens=s.split(/\s+/).filter(Boolean);
+  let total=0,current=0,has=false;
+  for(const tok of tokens){
+    if(tok==='and')continue;
+    if(Object.prototype.hasOwnProperty.call(ones,tok)){current+=ones[tok];has=true;continue;}
+    if(tok==='hundred'){current=(current||1)*100;has=true;continue;}
+    if(tok==='thousand'){total+=(current||1)*1000;current=0;has=true;continue;}
+    if(tok==='lakh'||tok==='lac'||tok==='lacs'||tok==='lakhs'){
+      total+=(current||1)*100000;current=0;has=true;continue;
+    }
+    if(tok==='crore'||tok==='crores'||tok==='cr'){
+      total+=(current||1)*10000000;current=0;has=true;continue;
+    }
+    return null;
+  }
+  return has ? total+current : null;
 }
-function askMeRate(q){
-  const p=[
-    /(?:at|@|rate(?:\s+of)?|interest(?:\s+rate)?(?:\s+of)?)\s*([0-9]+(?:\.[0-9]+)?)\s*%/i,
-    /([0-9]+(?:\.[0-9]+)?)\s*%\s*(?:p\.?a\.?|per\s+annum|annual|interest|rate)?/i
-  ];
-  for(const x of p){const m=q.match(x);if(m)return parseFloat(m[1]);}
+function askMeMoney(q){
+  const s=String(q||'').toLowerCase();
+  // Prefer the phrase after "loan amount" and before the interest/rate wording.
+  const labelled=s.match(/(?:loan\s+amount|principal|amount)\s+(.*?)(?=\s+(?:at|@|rate|interest|period|tenure|for)\b|$)/i);
+  if(labelled){
+    const n=askMeNumberPhrase(labelled[1].replace(/\b(?:rupees?|rs\.?|inr)\b/g,'').trim());
+    if(n!==null)return n;
+  }
+  // Explicit numeric amount with lakh/crore.
+  const m=s.match(/(?:₹|rs\.?|inr)?\s*([0-9]+(?:\.[0-9]+)?)\s*(lakh|lac|lacs|lakhs|crore|crores|cr)\b/i);
+  if(m){
+    return askMeNumberPhrase(m[1]+' '+m[2]);
+  }
+  // Plain rupee amount only when it is not immediately followed by %.
+  const p=s.match(/(?:loan\s+amount|principal|amount)\s+(?:₹|rs\.?|inr)?\s*([0-9][0-9,]*(?:\.[0-9]+)?)(?!\s*%)/i);
+  if(p)return parseFloat(p[1].replace(/,/g,''));
   return null;
 }
+
+function askMeRate(q){
+  const s=String(q||'');
+  const explicit=s.match(/([0-9]+(?:\.[0-9]+)?)\s*%/i);
+  if(explicit)return parseFloat(explicit[1]);
+  const m=s.match(/(?:rate|interest)\s*(?:of|at)?\s*([0-9]+(?:\.[0-9]+)?)/i);
+  return m?parseFloat(m[1]):null;
+}
+
 function askMeMonths(q){
   let m=q.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:months?|mos?)\b/i);
   if(m)return Math.round(parseFloat(m[1]));
@@ -2850,7 +2891,7 @@ function initAskMeVoice(){
         input.value=finalText.trim();
         if(askMeAutoVoice){
           askMeLastAutoQuestion='';
-          setTimeout(()=>askMeAutoAnswer(),150);
+          setTimeout(()=>askMeAutoAnswer(),80);
         }
       }else if(interim){
         input.value=interim.trim();
@@ -2874,7 +2915,7 @@ function initAskMeVoice(){
     if(b){b.classList.remove('listening');b.textContent='🎙️';}
     const input=document.getElementById('askMeInput');
     if(input && input.value.trim())askMeSetVoiceStatus(askMeAutoVoice
-      ? 'Question captured. Replying automatically…'
+      ? 'Question captured. Calculating and speaking automatically…'
       : 'Question captured. Tap Ask for the answer.');
     else askMeSetVoiceStatus('Tap the microphone and speak your question — e.g. “10 plus 20”.');
   };
@@ -2979,9 +3020,17 @@ function askMeSpeakText(text){
   const clean=String(text||'').replace(/🔊 Read answer aloud/g,'')
     .replace(/₹/g,' rupees ').replace(/%/g,' percent ')
     .replace(/×/g,' times ').replace(/÷/g,' divided by ');
-  const u=new SpeechSynthesisUtterance(clean);
-  u.lang=navigator.language||'en-IN'; u.rate=.95; u.pitch=1;
-  window.speechSynthesis.speak(u);
+  const speakNow=()=>{
+    try{
+      const u=new SpeechSynthesisUtterance(clean);
+      u.lang=navigator.language||'en-IN'; u.rate=.95; u.pitch=1;
+      window.speechSynthesis.speak(u);
+    }catch(e){}
+  };
+  speakNow();
+  setTimeout(()=>{
+    if(window.speechSynthesis&&!window.speechSynthesis.speaking&&!window.speechSynthesis.pending)speakNow();
+  },500);
 }
 
 
@@ -3003,6 +3052,98 @@ function askMeScheduleAutoAnswer(){
   askMeAutoReplyTimer=setTimeout(()=>askMeAutoAnswer(),1200);
 }
 
+
+function askMeParseSlabAmount(s){
+  return askMeNumberPhrase(String(s||'').replace(/\b(?:rupees?|rs\.?|inr)\b/gi,'').trim());
+}
+function askMeParseSlabs(q){
+  const s=String(q||'').toLowerCase().replace(/,/g,' ');
+  const slabs=[];
+
+  // "up to 3 lakh at 5%" / "upto 3 lakh rate 5%"
+  const upTo=/\bup\s*to\s+([0-9.]+(?:\s+(?:lakh|lac|lacs|lakhs|crore|crores|cr))?|(?:one|two|three|four|five|six|seven|eight|nine|ten|twenty|thirty|forty|fifty|hundred)\s+(?:lakh|lac|lacs|lakhs|crore|crores|thousand))\s*(?:at|rate(?:\s+of)?|@)?\s*([0-9.]+)\s*%/gi;
+  let m;
+  while((m=upTo.exec(s))){
+    const limit=askMeParseSlabAmount(m[1]);
+    const rate=parseFloat(m[2]);
+    if(limit!==null&&isFinite(rate))slabs.push({to:limit,rate});
+  }
+
+  // "3 lakh at 5%" / "3 lakh @ 5%" when used as progressive slab limits.
+  const limitRate=/\b([0-9.]+(?:\s+(?:lakh|lac|lacs|lakhs|crore|crores|cr))|(?:one|two|three|four|five|six|seven|eight|nine|ten|twenty|thirty|forty|fifty)\s+(?:lakh|lac|lacs|lakhs|crore|crores|thousand))\s*(?:at|@|rate(?:\s+of)?)\s*([0-9.]+)\s*%/gi;
+  while((m=limitRate.exec(s))){
+    const limit=askMeParseSlabAmount(m[1]);
+    const rate=parseFloat(m[2]);
+    if(limit!==null&&isFinite(rate)&&!slabs.some(x=>Math.abs(x.to-limit)<0.01&&Math.abs(x.rate-rate)<0.0001))
+      slabs.push({to:limit,rate});
+  }
+
+  // "balance/rest/above 5 lakh at 7%" means no-limit final slab.
+  const balanceRate=/\b(?:balance|remaining|rest|above)\b(?:\s+the)?(?:\s+amount|\s+balance)?(?:\s+above\s+([0-9.]+(?:\s+(?:lakh|lac|lacs|lakhs|crore|crores|cr))?))?\s*(?:at|@|rate(?:\s+of)?)\s*([0-9.]+)\s*%/i.exec(s);
+  if(balanceRate){
+    const rate=parseFloat(balanceRate[2]);
+    if(isFinite(rate))slabs.push({to:null,rate});
+  }else{
+    const noLimit=/\b(?:balance|remaining|rest)\b\s*(?:at|@|rate(?:\s+of)?)\s*([0-9.]+)\s*%/i.exec(s);
+    if(noLimit){
+      const rate=parseFloat(noLimit[1]);
+      if(isFinite(rate))slabs.push({to:null,rate});
+    }
+  }
+
+  // "first 3 lakh at 5%, next 2 lakh at 6%, balance at 7%"
+  // Convert next-portion amounts into cumulative slab limits.
+  const firstNext=/\b(?:first|next)\s+([0-9.]+(?:\s+(?:lakh|lac|lacs|lakhs|crore|crores|cr))?)\s*(?:at|@|rate(?:\s+of)?)\s*([0-9.]+)\s*%/gi;
+  const portions=[];
+  while((m=firstNext.exec(s))){
+    const amt=askMeParseSlabAmount(m[1]),rate=parseFloat(m[2]);
+    if(amt!==null&&isFinite(rate))portions.push({amt,rate});
+  }
+  if(portions.length>=1){
+    let cumulative=0;
+    const converted=portions.map(p=>{cumulative+=p.amt;return {to:cumulative,rate:p.rate};});
+    // Keep the converted list unless explicit cumulative limits already exist.
+    if(converted.length && converted.some(x=>!slabs.some(y=>Math.abs((y.to??-1)-x.to)<0.01&&Math.abs(y.rate-x.rate)<0.0001))){
+      converted.forEach(x=>slabs.push(x));
+    }
+  }
+
+  // Sort finite limits and keep only one no-limit slab at the end.
+  const finite=slabs.filter(x=>x.to!==null).sort((a,b)=>a.to-b.to);
+  const noLimit=slabs.find(x=>x.to===null);
+  const result=[];
+  finite.forEach(x=>{
+    if(x.to>0&&!result.some(y=>Math.abs(y.to-x.to)<0.01))result.push(x);
+  });
+  if(noLimit)result.push({to:null,rate:noLimit.rate});
+  return result;
+}
+function askMeSlabEmiAnswer(principal,months,slabs,calc){
+  const rows=slabs.map((s,i)=>{
+    const lower=i===0?0:slabs[i-1].to;
+    const label=s.to===null
+      ? 'Above '+askMeINR(lower)
+      : 'Up to '+askMeINR(s.to);
+    return '<div class="ask-result-row"><span>'+label+'</span><b>'+Number(s.rate).toFixed(2)+'% p.a.</b></div>';
+  }).join('');
+  const totalInterest=calc.rows.reduce((sum,r)=>sum+r.interest,0);
+  const totalRepayment=calc.rows.reduce((sum,r)=>sum+r.installment,0);
+  return '<div class="ask-result-title">Slab-wise EMI Calculation</div>'+
+    '<div class="ask-result-grid">'+
+    '<div class="ask-result-row"><span>Loan amount</span><b>'+askMeINR(principal)+'</b></div>'+
+    '<div class="ask-result-row"><span>Tenure</span><b>'+months+' months</b></div>'+
+    '</div>'+
+    '<div class="ask-note"><b>Progressive slabs used</b></div>'+
+    rows+
+    '<div class="ask-main-result"><span>Monthly EMI</span><b>'+askMeINR(calc.installment)+'</b></div>'+
+    '<div class="ask-result-grid">'+
+    '<div class="ask-result-row"><span>Total repayment</span><b>'+askMeINR(totalRepayment)+'</b></div>'+
+    '<div class="ask-result-row"><span>Total interest</span><b>'+askMeINR(totalInterest)+'</b></div>'+
+    '</div>'+
+    '<div class="ask-note">The rate is applied progressively to the outstanding balance: each slab earns its own rate, and the fixed EMI is solved so the balance reaches zero over the selected tenure.</div>'+
+    '<button class="btn askme-speak" type="button" onclick="speakAskMeAnswer()">🔊 Read answer aloud</button>';
+}
+
 function answerAskMe(isAutoReply=false){
   const input=document.getElementById('askMeInput'),a=document.getElementById('askMeAnswer');
   const q=(input?.value||'').trim(),ql=q.toLowerCase();
@@ -3018,7 +3159,26 @@ function answerAskMe(isAutoReply=false){
     return;
   }
 
-  if(/emi|installment|instalment|monthly payment/.test(ql)){
+  if(/slab\s*(?:-|wise)?\s*emi|progressive\s+slab|slab\s+rates/.test(ql) && /emi|e\.?m\.?i|installment|instalment|loan/.test(ql)){
+    const principal=askMeMoney(q),months=askMeMonths(q),slabs=askMeParseSlabs(q);
+    if(principal!==null&&months!==null&&slabs.length>=2){
+      const clean=slabs.map(x=>({to:x.to===null?null:Number(x.to),rate:Number(x.rate)}));
+      if(clean[clean.length-1].to!==null)clean.push({to:null,rate:clean[clean.length-1].rate});
+      const calc=emiSlabSchedule({
+        principal,count:months,freqMonths:1,startDate:new Date(),
+        repaymentType:'equal-installment',moratoriumMonths:0,moratoriumMode:'paid',
+        slabs:clean
+      });
+      a.innerHTML=askMeSlabEmiAnswer(principal,months,clean,calc);
+      a.classList.add('show');
+      askMeSpeakText(a.innerText);
+      return;
+    }
+    a.innerHTML='<div class="ask-result-title">Slab-wise EMI</div><div>Please give the <b>loan amount, tenure and slab rates</b>.<br><br>Example: <b>Calculate slab EMI for ₹7 lakh for 60 months: first ₹3 lakh at 5%, next ₹2 lakh at 6%, balance at 7%.</b></div>';
+    a.classList.add('show');askMeSpeakText(a.innerText);return;
+  }
+
+  if(/emi|e\.?m\.?i|installment|instalment|monthly payment|loan amount/.test(ql)){
     const principal=askMeMoney(q),rate=askMeRate(q),months=askMeMonths(q);
     if(principal!==null&&rate!==null&&months!==null){
       const emi=askMeEMI(principal,months,rate),total=emi*months,interest=total-principal;
