@@ -366,6 +366,37 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
 }
 </style>
 
+
+<style id="simpleCalcV33">
+#module-simplecalc .simple-calc-card{max-width:720px;margin:0 auto}
+.simple-calc-display{display:flex;gap:8px;align-items:center}
+#simpleCalcDisplay{width:100%;box-sizing:border-box;font:700 30px/1.2 'IBM Plex Mono',monospace;text-align:right;padding:16px;border:2px solid var(--line);border-radius:14px;background:var(--bg);color:var(--text)}
+.simple-calc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:12px}
+.simple-calc-grid button{min-height:56px;font-size:20px;font-weight:800;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--text)}
+.simple-calc-grid button:hover{border-color:var(--brass)}
+.simple-calc-grid .op{background:var(--brass);color:#111}
+.simple-calc-grid .danger{background:#8b3f32;color:#fff}
+.simple-calc-grid .equals{background:#0F6E5C;color:#fff}
+.simple-calc-grid .wide{grid-column:span 2}
+.simple-calc-voice{display:flex;gap:9px;align-items:center;margin-top:12px;flex-wrap:wrap}
+.simple-calc-voice button{min-height:46px}
+#simpleCalcMic.listening{animation:simpleCalcPulse 1s infinite}
+@keyframes simpleCalcPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+#simpleCalcVoiceStatus{font-size:12px;color:var(--muted)}
+.simple-calc-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+#simpleCalcResult{margin-top:14px;padding:15px;border-radius:14px;background:var(--bg);border:1px solid var(--line);font-size:16px}
+#simpleCalcResult strong{font:800 22px 'IBM Plex Mono',monospace}
+.simple-calc-history{margin-top:14px}
+.simple-calc-history table{width:100%;border-collapse:collapse}
+.simple-calc-history td{padding:7px 8px;border-bottom:1px solid var(--line)}
+.simple-calc-history td:last-child{text-align:right;font-family:'IBM Plex Mono',monospace}
+@media(max-width:700px){
+  #simpleCalcDisplay{font-size:25px}
+  .simple-calc-grid{gap:7px}
+  .simple-calc-grid button{min-height:54px;font-size:18px}
+}
+</style>
+
 </head>
 <body>
 <div class="wrap">
@@ -373,7 +404,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v3.2</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v3.3</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -387,6 +418,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="tabs" id="tabs">
     <button class="tab active" data-module="emi">Loan / EMI</button>
     <button class="tab" data-module="deposits">Deposits</button>
+    <button class="tab" data-module="simplecalc">🧮 Simple Calculator</button>
     <button class="tab" data-module="age">Age Calculator</button>
     <button class="tab" data-module="statement">Bank Statement Interest</button>
     <button class="tab" data-module="recon">Reconciliation</button>
@@ -645,6 +677,67 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
     </div>
   </div>
 
+
+  <!-- SIMPLE CALCULATOR MODULE -->
+  <div class="module" id="module-simplecalc">
+    <div class="eyebrow">UTILITY · 03 SIMPLE CALCULATOR</div>
+    <h1 class="page-title">Simple Calculator</h1>
+    <p class="lede">Calculate quickly with the keypad or speak a calculation. The calculator can also read the result aloud.</p>
+
+    <div class="card input-card simple-calc-card">
+      <div class="simple-calc-display">
+        <input id="simpleCalcDisplay" type="text" inputmode="decimal" autocomplete="off"
+               aria-label="Calculator display" placeholder="0" />
+      </div>
+
+      <div class="simple-calc-grid" aria-label="Calculator keypad">
+        <button type="button" class="danger" onclick="simpleCalcClear()">C</button>
+        <button type="button" onclick="simpleCalcBackspace()">⌫</button>
+        <button type="button" onclick="simpleCalcInput('(')">(</button>
+        <button type="button" onclick="simpleCalcInput(')')">)</button>
+
+        <button type="button" onclick="simpleCalcInput('7')">7</button>
+        <button type="button" onclick="simpleCalcInput('8')">8</button>
+        <button type="button" onclick="simpleCalcInput('9')">9</button>
+        <button type="button" class="op" onclick="simpleCalcInput('÷')">÷</button>
+
+        <button type="button" onclick="simpleCalcInput('4')">4</button>
+        <button type="button" onclick="simpleCalcInput('5')">5</button>
+        <button type="button" onclick="simpleCalcInput('6')">6</button>
+        <button type="button" class="op" onclick="simpleCalcInput('×')">×</button>
+
+        <button type="button" onclick="simpleCalcInput('1')">1</button>
+        <button type="button" onclick="simpleCalcInput('2')">2</button>
+        <button type="button" onclick="simpleCalcInput('3')">3</button>
+        <button type="button" class="op" onclick="simpleCalcInput('-')">−</button>
+
+        <button type="button" class="wide" onclick="simpleCalcInput('0')">0</button>
+        <button type="button" onclick="simpleCalcInput('.')">.</button>
+        <button type="button" class="op" onclick="simpleCalcInput('+')">+</button>
+
+        <button type="button" onclick="simpleCalcInput('%')">%</button>
+        <button type="button" class="equals wide" onclick="simpleCalcEquals()">=</button>
+      </div>
+
+      <div class="simple-calc-voice">
+        <button id="simpleCalcMic" class="btn primary" type="button" onclick="toggleSimpleCalcVoice()">🎙️ Speak</button>
+        <span id="simpleCalcVoiceStatus">Example: “125 plus 75 divided by 5”.</span>
+      </div>
+
+      <div class="simple-calc-actions">
+        <button class="btn" type="button" onclick="simpleCalcSpeakResult()">🔊 Read result aloud</button>
+        <button class="btn" type="button" onclick="simpleCalcClearHistory()">Clear history</button>
+      </div>
+
+      <div id="simpleCalcResult" aria-live="polite">Enter a calculation and press <b>=</b>.</div>
+
+      <div class="simple-calc-history">
+        <div class="stub-title">Calculation history</div>
+        <div class="table-scroll"><table><tbody id="simpleCalcHistory"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
   <!-- AGE MODULE -->
   <div class="module" id="module-age">
     <div class="eyebrow">LEDGER &middot; 03 AGE</div>
@@ -850,7 +943,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v3.2</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v3.3</strong>
   </footer>
 </div>
 
@@ -2216,6 +2309,7 @@ stmtRenderSlabs(stmtLoadSlabs());
 function runHealthCheck(){
   const tests=[];
   const add=(name,ok,detail)=>tests.push({name,ok,detail});
+  add('Simple Calculator menu',!!document.querySelector('[data-module="simplecalc"]')&&!!document.getElementById('module-simplecalc'),'Simple calculator is present');
   add('Bank Statement Interest menu',!!document.querySelector('[data-module="statement"]'),'Highlighted menu is present');
   add('Health Check menu',!!document.querySelector('[data-module="health"]'),'Health Check tab is present');
   add('Statement upload',!!document.getElementById('stmtFile'),'Upload control is present');
@@ -2425,11 +2519,206 @@ document.getElementById('reconRunBtn').addEventListener('click', () => {
 
 try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:',e);}
 </script>
+
+<script>
+/* ---------- Simple Calculator v3.3 ---------- */
+let simpleCalcRecognition=null;
+let simpleCalcListening=false;
+let simpleCalcLastResult=null;
+let simpleCalcHistory=[];
+
+function simpleCalcInput(v){
+  const el=document.getElementById('simpleCalcDisplay');
+  if(!el)return;
+  if(el.value==='0'&&/[0-9.]/.test(v))el.value='';
+  el.value+=v;
+  el.focus();
+}
+function simpleCalcClear(){
+  const el=document.getElementById('simpleCalcDisplay');
+  if(el)el.value='';
+  const r=document.getElementById('simpleCalcResult');
+  if(r)r.innerHTML='Enter a calculation and press <b>=</b>.';
+}
+function simpleCalcBackspace(){
+  const el=document.getElementById('simpleCalcDisplay');
+  if(el)el.value=el.value.slice(0,-1);
+}
+function simpleCalcFormat(n){
+  if(!isFinite(n))return 'Error';
+  const rounded=Math.abs(n)<1e-12?0:n;
+  return Number(rounded).toLocaleString('en-IN',{maximumFractionDigits:10});
+}
+function simpleCalcSpokenExpression(q){
+  let s=String(q||'').toLowerCase().trim();
+  s=s.replace(/[₹,]/g,'');
+  const wordNumbers={
+    'zero':'0','one':'1','two':'2','three':'3','four':'4','five':'5',
+    'six':'6','seven':'7','eight':'8','nine':'9','ten':'10',
+    'eleven':'11','twelve':'12','thirteen':'13','fourteen':'14',
+    'fifteen':'15','sixteen':'16','seventeen':'17','eighteen':'18',
+    'nineteen':'19','twenty':'20','thirty':'30','forty':'40',
+    'fifty':'50','sixty':'60','seventy':'70','eighty':'80','ninety':'90',
+    'hundred':'100','thousand':'1000','lakh':'100000','lac':'100000',
+    'crore':'10000000'
+  };
+  // Common spoken arithmetic words.
+  s=s.replace(/\bdivided\s+by\b/g,' / ')
+       .replace(/\bover\b/g,' / ')
+       .replace(/\bmultiplied\s+by\b/g,' * ')
+       .replace(/\btimes\b/g,' * ')
+       .replace(/\bplus\b/g,' + ')
+       .replace(/\bminus\b/g,' - ')
+       .replace(/\bsubtract\b/g,' - ')
+       .replace(/\badd\b/g,' + ')
+       .replace(/\bmodulo\b/g,' % ')
+       .replace(/\bmod\b/g,' % ')
+       .replace(/\bopen\s+parenthesis\b/g,' ( ')
+       .replace(/\bclose\s+parenthesis\b/g,' ) ');
+
+  // Handle simple "X percent of Y" spoken phrasing.
+  let m=s.match(/^(.+?)\s+percent\s+of\s+(.+)$/);
+  if(m){
+    s='('+m[1]+')/100*('+m[2]+')';
+  }else{
+    s=s.replace(/\bpercent\b/g,'%');
+  }
+
+  // Replace standalone number words. For common/simple speech this is enough
+  // and preserves normal digit recognition from iPhone speech input.
+  Object.keys(wordNumbers).sort((a,b)=>b.length-a.length).forEach(w=>{
+    s=s.replace(new RegExp('\\b'+w+'\\b','g'),wordNumbers[w]);
+  });
+
+  s=s.replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-');
+  s=s.replace(/[^0-9+\-*/%.() ]/g,'');
+  s=s.replace(/(\d+(?:\.\d+)?)\s*%/g,'($1/100)');
+  return s.replace(/\s+/g,'').trim();
+}
+function simpleCalcEvaluate(expr){
+  let s=String(expr||'').trim();
+  if(!s)return null;
+  s=s.replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-');
+  s=s.replace(/(\d+(?:\.\d+)?)\s*%/g,'($1/100)');
+  if(!/^[0-9+\-*/().\s]+$/.test(s))throw new Error('Invalid characters');
+  if(/[*/+\-]{3,}/.test(s))throw new Error('Invalid expression');
+  const value=Function('"use strict";return ('+s+')')();
+  if(typeof value!=='number'||!isFinite(value))throw new Error('Cannot calculate');
+  return value;
+}
+function simpleCalcEquals(fromVoice=false){
+  const el=document.getElementById('simpleCalcDisplay');
+  const result=document.getElementById('simpleCalcResult');
+  if(!el||!result)return;
+  const original=el.value.trim();
+  if(!original){result.innerHTML='Please enter a calculation.';return;}
+  try{
+    const value=simpleCalcEvaluate(original);
+    simpleCalcLastResult=value;
+    const formatted=simpleCalcFormat(value);
+    result.innerHTML='<div><b>'+original.replace(/</g,'&lt;')+'</b> = <strong>'+formatted+'</strong></div>'+
+      (fromVoice?'<div class="hint" style="margin-top:6px">Voice calculation recognised.</div>':'');
+    simpleCalcHistory.unshift({expression:original,value:formatted});
+    simpleCalcHistory=simpleCalcHistory.slice(0,10);
+    simpleCalcRenderHistory();
+  }catch(e){
+    simpleCalcLastResult=null;
+    result.innerHTML='<span style="color:var(--clay)">Please check the calculation.</span>';
+  }
+}
+function simpleCalcRenderHistory(){
+  const el=document.getElementById('simpleCalcHistory');
+  if(!el)return;
+  el.innerHTML=simpleCalcHistory.map(x=>'<tr><td>'+x.expression.replace(/</g,'&lt;')+'</td><td>'+x.value+'</td></tr>').join('')||
+    '<tr><td colspan="2" class="hint">No calculations yet.</td></tr>';
+}
+function simpleCalcClearHistory(){
+  simpleCalcHistory=[];
+  simpleCalcRenderHistory();
+}
+function simpleCalcSpeakResult(){
+  if(!('speechSynthesis' in window)){
+    document.getElementById('simpleCalcVoiceStatus').textContent='Voice output is not supported by this browser.';
+    return;
+  }
+  if(simpleCalcLastResult===null){
+    document.getElementById('simpleCalcVoiceStatus').textContent='Calculate something first.';
+    return;
+  }
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance('The answer is '+simpleCalcLastResult);
+  u.lang=navigator.language||'en-IN';
+  u.rate=.95;
+  window.speechSynthesis.speak(u);
+}
+function initSimpleCalcVoice(){
+  if(!(window.SpeechRecognition||window.webkitSpeechRecognition)){
+    document.getElementById('simpleCalcVoiceStatus').textContent='Voice input is not supported here. You can use the keypad.';
+    return false;
+  }
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  simpleCalcRecognition=new SR();
+  simpleCalcRecognition.lang=navigator.language||'en-IN';
+  simpleCalcRecognition.interimResults=true;
+  simpleCalcRecognition.continuous=false;
+  simpleCalcRecognition.maxAlternatives=1;
+  simpleCalcRecognition.onstart=()=>{
+    simpleCalcListening=true;
+    const b=document.getElementById('simpleCalcMic');
+    if(b){b.classList.add('listening');b.textContent='⏹️ Stop';}
+    document.getElementById('simpleCalcVoiceStatus').textContent='Listening… speak the calculation.';
+  };
+  simpleCalcRecognition.onresult=(event)=>{
+    let finalText='',interim='';
+    for(let i=event.resultIndex;i<event.results.length;i++){
+      const t=event.results[i][0].transcript;
+      if(event.results[i].isFinal)finalText+=t; else interim+=t;
+    }
+    const spoken=(finalText||interim).trim();
+    if(spoken){
+      const display=document.getElementById('simpleCalcDisplay');
+      if(display)display.value=simpleCalcSpokenExpression(spoken);
+    }
+  };
+  simpleCalcRecognition.onerror=(event)=>{
+    simpleCalcListening=false;
+    const b=document.getElementById('simpleCalcMic');
+    if(b){b.classList.remove('listening');b.textContent='🎙️ Speak';}
+    document.getElementById('simpleCalcVoiceStatus').textContent=
+      event.error==='not-allowed'?'Microphone permission was denied.':
+      event.error==='no-speech'?'No speech detected. Try again.':
+      'Voice input could not be started.';
+  };
+  simpleCalcRecognition.onend=()=>{
+    simpleCalcListening=false;
+    const b=document.getElementById('simpleCalcMic');
+    if(b){b.classList.remove('listening');b.textContent='🎙️ Speak';}
+    const display=document.getElementById('simpleCalcDisplay');
+    document.getElementById('simpleCalcVoiceStatus').textContent=
+      display&&display.value?'Calculation captured. Tap = for the answer.':'Tap Speak and try again.';
+  };
+  return true;
+}
+function toggleSimpleCalcVoice(){
+  if(!simpleCalcRecognition&&!initSimpleCalcVoice())return;
+  if(simpleCalcListening){
+    try{simpleCalcRecognition.stop();}catch(e){}
+  }else{
+    try{simpleCalcRecognition.start();}catch(e){}
+  }
+}
+document.getElementById('simpleCalcDisplay')?.addEventListener('keydown',e=>{
+  if(e.key==='Enter')simpleCalcEquals();
+});
+simpleCalcRenderHistory();
+</script>
+
 <div id="calculatorHelpModal" class="app-modal"><div class="app-modal-card"><div class="app-modal-head"><h2>❔ How to Use</h2><button onclick="closeAppModal('calculatorHelpModal')">×</button></div><div class="help-grid">
 <div><b>1. EMI Calculator</b><p>Use one annual interest rate for the entire loan.</p></div>
 <div><b>2. Slab-wise Term Loan EMI</b><p>Use the separate menu, then enter each outstanding-balance slab and its annual rate.</p></div>
 <div><b>3. Bank Statement Interest</b><p>Load the statement, confirm Date/Debit/Credit/Balance, set saved interest slabs and calculate.</p></div>
-<div><b>4. Review</b><p>Check the daily/account statement, total interest and financial-year summary.</p></div>
+<div><b>4. Simple Calculator</b><p>Use the keypad or tap Speak to dictate an arithmetic calculation. Tap Read result aloud to hear the answer.</p></div>
+<div><b>5. Review</b><p>Check the daily/account statement, total interest and financial-year summary.</p></div>
 <div><b>Important</b><p>Verify applicable bank terms, opening balance, rates and rounding before relying on a result.</p></div>
 </div></div></div>
 <div id="askMeModal" class="app-modal" role="dialog" aria-modal="true" aria-labelledby="askMeTitle">
