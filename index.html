@@ -333,7 +333,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v3.0</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v3.1</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -810,7 +810,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v3.0</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v3.1</strong>
   </footer>
 </div>
 
@@ -1568,9 +1568,9 @@ let stmtRawRows = [];
 let stmtLastResult = null;
 
 const STMT_DEFAULT_SLABS = [
-  {to:300000, rate:4},
-  {to:500000, rate:5},
-  {to:null, rate:6}
+  {to:300000, rate:5},
+  {to:500000, rate:6},
+  {to:null, rate:7}
 ];
 
 function stmtEsc(s){
@@ -1810,6 +1810,7 @@ function stmtExtractOpening(rows){
 }
 function stmtBuildDaily(rows){
   if(!rows.length)return {days:[],error:'No dated transactions could be read from the mapped statement.'};
+
   const first=new Date(rows[0].date.getFullYear(),rows[0].date.getMonth(),rows[0].date.getDate());
   const last=new Date(rows[rows.length-1].date.getFullYear(),rows[rows.length-1].date.getMonth(),rows[rows.length-1].date.getDate());
   const byDay={};
@@ -1818,48 +1819,84 @@ function stmtBuildDaily(rows){
   let opening=stmtExtractOpening(rows);
   let startDate;
   let firstMonthMode='full';
+  const firstRows=byDay[stmtDayKey(first)]||[];
+  const firstWithBalance=firstRows.filter(r=>r.balance!==null&&isFinite(r.balance));
 
-  if(opening===null && first.getDate()>1){
-    const firstRows=byDay[stmtDayKey(first)]||[];
-    const withBal=firstRows.filter(r=>r.balance!==null&&isFinite(r.balance));
-    if(!withBal.length){
-      return {days:[],error:'No brought-forward balance is shown and the first transaction is after the 1st. A closing balance on the first transaction day is required to calculate interest from that date.',missingOpening:true};
-    }
-    opening=withBal[withBal.length-1].balance;
-    startDate=first;
-    firstMonthMode='from-first-transaction';
-  }else{
-    if(opening===null){
-      const firstRows=byDay[stmtDayKey(first)]||[];
-      const withBal=firstRows.filter(r=>r.balance!==null&&isFinite(r.balance));
-      if(withBal.length){
-        const net=firstRows.reduce((a,r)=>a+r.credit-r.debit,0);
-        opening=withBal[withBal.length-1].balance-net;
-      }
-    }
-    if(opening===null||!isFinite(opening)){
-      return {days:[],error:'Opening / brought-forward balance could not be established from the statement.',missingOpening:true};
-    }
-    // An explicit brought-forward/opening balance means the interest period starts
-    // on the 1st of that calendar month, even when the first transaction is later.
+  /*
+    Starting-balance rules:
+    A. Explicit brought-forward/opening balance -> start on the 1st.
+    B. No brought-forward balance and first transaction is on the 1st:
+       use the supplied closing balance on the 1st as the day's balance.
+       Do NOT reverse the day's debit/credit movement.
+    C. No brought-forward balance and first transaction is after the 1st:
+       start on the first transaction date using that day's closing balance.
+  */
+  if(opening!==null && isFinite(opening)){
     startDate=new Date(first.getFullYear(),first.getMonth(),1);
     firstMonthMode='from-opening-balance';
+  }else if(first.getDate()===1){
+    if(firstWithBalance.length){
+      opening=firstWithBalance[firstWithBalance.length-1].balance;
+      startDate=first;
+      firstMonthMode='from-first-day-closing-balance';
+    }else{
+      return {
+        days:[],
+        error:'The first transaction is on the 1st, but no closing/opening balance is available for that day. Please map the Balance column or provide the first-day closing balance.',
+        missingOpening:true
+      };
+    }
+  }else{
+    if(!firstWithBalance.length){
+      return {
+        days:[],
+        error:'No brought-forward balance is shown and the first transaction is after the 1st. A closing balance on the first transaction day is required to calculate interest from that date.',
+        missingOpening:true
+      };
+    }
+    opening=firstWithBalance[firstWithBalance.length-1].balance;
+    startDate=first;
+    firstMonthMode='from-first-transaction';
   }
 
   const end=new Date(last.getFullYear(),last.getMonth()+1,0);
   const days=[];
   let balance=opening;
+
   for(let d=new Date(startDate);d<=end;d.setDate(d.getDate()+1)){
     const tx=byDay[stmtDayKey(d)]||[];
     if(tx.length){
       const withBal=tx.filter(r=>r.balance!==null&&isFinite(r.balance));
-      if(withBal.length)balance=withBal[withBal.length-1].balance;
-      else tx.forEach(r=>balance+=r.credit-r.debit);
+      if(withBal.length){
+        // The statement's closing balance for the date is the day's balance.
+        balance=withBal[withBal.length-1].balance;
+      }else if(d.getTime()!==startDate.getTime()){
+        // For later transaction days without a supplied balance, roll forward
+        // from the previous day using that day's net movement.
+        tx.forEach(r=>balance+=r.credit-r.debit);
+      }
     }
-    days.push({date:new Date(d),month:stmtMonthKey(d),daysInMonth:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),balance,hasTransaction:tx.length>0,txCount:tx.length});
+    days.push({
+      date:new Date(d),
+      month:stmtMonthKey(d),
+      daysInMonth:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),
+      balance,
+      hasTransaction:tx.length>0,
+      txCount:tx.length
+    });
   }
+
   const completeLast=last.getDate()===end.getDate();
-  return {days,from:first,to:last,opening,closing:balance,startDate,firstMonthMode,partial:!(first.getDate()===1&&completeLast)||firstMonthMode!=='full'};
+  return {
+    days,
+    from:first,
+    to:last,
+    opening,
+    closing:balance,
+    startDate,
+    firstMonthMode,
+    partial:!(first.getDate()===1&&completeLast)||firstMonthMode!=='full'
+  };
 }
 
 function stmtSlabRows(){
@@ -1918,6 +1955,7 @@ function stmtRenderSlabs(slabs){
     </div>`).join('');
   const finite=slabs.reduce((a,s)=>a+(s.to===null?0:Number(s.to||0)),0);
   document.getElementById('stmtSlabTotal').innerHTML=`<b>Finite slab limits:</b> ₹${stmtMoney(finite)} <span class="hint">(no-limit slab excluded)</span>`;
+  el.querySelectorAll('input').forEach(inp=>inp.addEventListener('change',stmtPersistSlabs));
 }
 function stmtPersistSlabs(){
   const slabs=stmtNormaliseSlabs(stmtSlabRows());
@@ -2012,9 +2050,13 @@ function stmtRenderResults(result,slabs){
     note += ' Opening / brought-forward balance used for the first day: ₹'+stmtMoney(result.opening)+'.';
   }
   if(result.partial){
-    note += result.firstMonthMode==='from-first-transaction'
-      ? ' No brought-forward balance was available, so the first month starts on '+stmtDate(result.startDate)+'; later months start on the 1st.'
-      : ' An opening / brought-forward balance is available, so the first month starts on the 1st; the balance is carried forward until the first transaction changes it.';
+    if(result.firstMonthMode==='from-first-transaction'){
+      note += ' No brought-forward balance was available, so the first month starts on '+stmtDate(result.startDate)+' using the first transaction day closing balance; later months start on the 1st.';
+    }else if(result.firstMonthMode==='from-first-day-closing-balance'){
+      note += ' The first transaction is on the 1st and no separate brought-forward balance was available, so its supplied closing balance is used as the 1st-day balance; the day\'s debit/credit is not reversed.';
+    }else{
+      note += ' An opening / brought-forward balance is available, so the first month starts on the 1st; the balance is carried forward until the first transaction changes it.';
+    }
   }
   document.getElementById('stmtLedgerSub').insertAdjacentHTML('afterend',`<div class="note" style="margin:10px 20px">${stmtEsc(note)}</div>`);
   document.getElementById('stmtResults').style.display='block';
@@ -2055,8 +2097,10 @@ function stmtShowDaily(){
   });
   h+=`<th>₹${stmtMoney(totalInterest)}</th></tr></tfoot>`;
   document.getElementById('stmtDailyTable').innerHTML=h;
+  const exampleInterest=(300000*5/100/365)+(200000*6/100/365)+(200000*7/100/365);
   document.getElementById('stmtDailyTotals').innerHTML=
-    `<div class="summary" style="margin-top:16px"><div class="stat"><div class="stat-label">Total daily product</div><div class="stat-value">₹${stmtMoney(totalProduct)}</div></div><div class="stat"><div class="stat-label">Total daily interest</div><div class="stat-value">₹${stmtMoney(totalInterest)}</div></div><div class="stat"><div class="stat-label">Days displayed</div><div class="stat-value">${days.length}</div></div></div>`;
+    `<div class="summary" style="margin-top:16px"><div class="stat"><div class="stat-label">Total daily product</div><div class="stat-value">₹${stmtMoney(totalProduct)}</div></div><div class="stat"><div class="stat-label">Total daily interest</div><div class="stat-value">₹${stmtMoney(totalInterest)}</div></div><div class="stat"><div class="stat-label">Days displayed</div><div class="stat-value">${days.length}</div></div></div>
+     <div class="note" style="margin-top:14px"><b>Slab example:</b> If daily product is ₹7,00,000 and slabs are ₹3,00,000 @ 5%, next ₹2,00,000 @ 6%, and balance @ 7%, daily interest = ₹3,00,000 × 5% ÷ 365 + ₹2,00,000 × 6% ÷ 365 + ₹2,00,000 × 7% ÷ 365 = <b>₹${stmtMoney(exampleInterest)}</b>.</div>`;
   box.style.display='block';
   document.getElementById('stmtShowDailyBtn').textContent='Hide daily calculation';
 }
