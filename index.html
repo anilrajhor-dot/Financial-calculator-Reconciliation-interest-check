@@ -154,7 +154,10 @@
 
 #loanCalculatorMenus .loan-menu-btn{min-height:48px;font-weight:800}
 #loanCalculatorMenus .loan-menu-btn.active{background:var(--accent)!important;color:#0E0E10!important;border-color:var(--accent)!important;box-shadow:0 0 0 2px rgba(201,138,44,.18)}
-''</style>
+''  #statementSubMenu{position:sticky;top:8px;z-index:5;padding:8px 0;background:var(--bg);border-bottom:1px solid var(--rule)}
+  #statementSubMenu .btn{min-height:42px}
+  @media(max-width:700px){#statementSubMenu{overflow-x:auto;flex-wrap:nowrap;white-space:nowrap}#statementSubMenu .btn{flex:0 0 auto;font-size:13px;padding:9px 12px}}
+</style>
 <style>
 .premium-menu{border:2px solid var(--line);background:linear-gradient(145deg,var(--card),var(--bg));margin-bottom:12px}.premium-kicker{font-size:.78rem;letter-spacing:.14em;font-weight:900;color:var(--brass)}.premium-menu-head h2{font-size:1.65rem;margin:4px 0;font-weight:900}.premium-menu-head p{margin:0;color:var(--muted)}.premium-menu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}.premium-menu-item{display:flex;align-items:center;gap:12px;text-align:left;padding:15px;border:2px solid var(--line);border-radius:16px;background:var(--card);cursor:pointer}.premium-menu-item b{display:block;font-size:1rem;font-weight:900}.premium-menu-item small{display:block;color:var(--muted);margin-top:3px}.premium-menu-item.active{border-color:var(--brass);box-shadow:0 0 0 2px rgba(180,130,30,.18)}.premium-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--brass);color:#111;font-weight:900;font-size:1.2rem;flex:0 0 auto}.premium-actions{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}.app-modal{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:9999;display:none;padding:20px;align-items:center;justify-content:center}.app-modal.open{display:flex}.app-modal-card{width:min(720px,96vw);max-height:88vh;overflow:auto;background:var(--card);color:var(--text);border:2px solid var(--line);border-radius:22px;padding:20px}.app-modal-head{display:flex;justify-content:space-between;align-items:center}.app-modal-head button{font-size:1.8rem;border:0;background:transparent;color:inherit}.help-grid{display:grid;gap:12px;margin-top:16px}.help-grid>div{padding:14px;border:1px solid var(--line);border-radius:14px}.help-grid p{margin:6px 0 0;color:var(--muted)}#askMeInput{width:100%;box-sizing:border-box;margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--text);font:inherit}.ask-answer{margin-top:12px;padding:14px;border-radius:14px;background:var(--bg)}.floating-ask{position:fixed;right:18px;bottom:18px;z-index:5000;border:2px solid var(--brass);background:var(--brass);color:#111;border-radius:999px;padding:13px 18px;font-weight:900;box-shadow:0 8px 24px rgba(0,0,0,.25)}@media(max-width:700px){.premium-menu-grid{grid-template-columns:1fr}.premium-menu-head h2{font-size:1.35rem}}
 </style><style id="contrastFixV25">
@@ -404,7 +407,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.5</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.6</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -773,6 +776,13 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
     <div class="eyebrow">LEDGER &middot; 04 STATEMENT INTEREST</div>
     <h1 class="page-title">Bank Statement Interest Calculator</h1>
     <p class="lede">Upload a bank statement, map its columns, then compare the bank's interest credit with independently calculated daily-product interest using progressive slabs and the actual calendar days of each month.</p>
+<div id="statementSubMenu" class="row" style="margin:14px 0 18px;gap:8px;flex-wrap:wrap">
+  <button id="stmtMenuCalculate" class="btn primary" type="button">🧮 Calculate Interest</button>
+  <button id="stmtMenuMonthly" class="btn" type="button" disabled>📊 Month-wise Interest</button>
+  <button id="stmtMenuDaily" class="btn" type="button" disabled>📅 Daily Product</button>
+  <button id="stmtMenuSettings" class="btn" type="button">⚙ Interest Settings</button>
+  <button id="stmtMenuReset" class="btn" type="button">↺ Reset</button>
+</div>
 
     <div class="card input-card">
       <div class="grid">
@@ -951,7 +961,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.5</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.6</strong>
   </footer>
 </div>
 
@@ -2389,10 +2399,65 @@ function stmtRunCalculation(){
   const manualVal=manual===''?null:Number(manual);
   const result=stmtCalculate(rows,slabs,manualVal);
   stmtRenderResults(result,slabs);
+  document.getElementById('stmtMenuMonthly')?.removeAttribute('disabled');
+  document.getElementById('stmtMenuDaily')?.removeAttribute('disabled');
 }
 
+
+function stmtScrollTo(id){
+  const el=document.getElementById(id);
+  if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function stmtMenuCalculate(){
+  const map=document.getElementById('stmtMappingCard');
+  const file=document.getElementById('stmtFile');
+  if(!file?.files?.length){
+    stmtScrollTo('stmtFile');
+    document.getElementById('stmtStatus').style.display='block';
+    document.getElementById('stmtStatus').textContent='Please upload a bank statement first.';
+    return;
+  }
+  if(map?.style.display!=='none'){
+    stmtScrollTo('stmtMappingCard');
+    return;
+  }
+  if(stmtLastResult){
+    stmtScrollTo('stmtResults');
+    return;
+  }
+  stmtScrollTo('stmtPreviewCard');
+}
+document.getElementById('stmtMenuCalculate')?.addEventListener('click',stmtMenuCalculate);
+document.getElementById('stmtMenuMonthly')?.addEventListener('click',()=>{
+  if(!stmtLastResult){
+    stmtMenuCalculate();
+    return;
+  }
+  stmtScrollTo('stmtResults');
+});
+document.getElementById('stmtMenuDaily')?.addEventListener('click',()=>{
+  if(!stmtLastResult){
+    stmtMenuCalculate();
+    return;
+  }
+  const card=document.getElementById('stmtDailyCard');
+  if(card)card.style.display='block';
+  const btn=document.getElementById('stmtShowDailyBtn');
+  if(btn)btn.textContent='Hide daily calculation';
+  stmtScrollTo('stmtDailyCard');
+});
+document.getElementById('stmtMenuSettings')?.addEventListener('click',()=>{
+  const card=document.getElementById('stmtSlabCard');
+  if(card)card.style.display='block';
+  stmtScrollTo('stmtSlabCard');
+});
+document.getElementById('stmtMenuReset')?.addEventListener('click',()=>{
+  document.getElementById('stmtResetBtn')?.click();
+  stmtScrollTo('module-statement');
+});
+
 document.getElementById('stmtFile').addEventListener('change',async e=>{
-  stmtShowPdfPasswordBox(/\.pdf$/i.test((this.files&&this.files[0]&&this.files[0].name)||''));
+  stmtShowPdfPasswordBox(/\.pdf$/i.test((e.target.files&&e.target.files[0]&&e.target.files[0].name)||''));
   const file=e.target.files[0]; if(!file)return;
   const status=document.getElementById('stmtStatus');
   status.style.display='block';status.textContent='Reading file…';
@@ -2413,6 +2478,11 @@ document.getElementById('mapHeaderRow').addEventListener('change',()=>{
   if(stmtRawRows.length)populateStatementPreview(stmtRawRows);
 });
 document.getElementById('stmtCalcBtn').addEventListener('click',stmtRunCalculation);
+document.getElementById('stmtSettingsBtn')?.addEventListener('click',()=>{
+  const card=document.getElementById('stmtSlabCard');
+  if(card)card.style.display='block';
+  stmtScrollTo('stmtSlabCard');
+});
 document.getElementById('stmtAddSlabBtn').addEventListener('click',stmtAddSlab);
 document.getElementById('stmtResetSlabBtn').addEventListener('click',stmtResetSlabs);
 document.getElementById('stmtShowDailyBtn').addEventListener('click',stmtShowDaily);
@@ -2424,6 +2494,8 @@ document.getElementById('stmtResetBtn').addEventListener('click',()=>{
   ['stmtMappingCard','stmtPreviewCard','stmtSlabCard','stmtResults'].forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById('stmtStatus').style.display='none';
   document.getElementById('stmtBankInterest').value='';
+  document.getElementById('stmtMenuMonthly')?.setAttribute('disabled','disabled');
+  document.getElementById('stmtMenuDaily')?.setAttribute('disabled','disabled');
 });
 stmtRenderSlabs(stmtLoadSlabs());
 
@@ -2658,7 +2730,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v4.5 ---------- */
+/* ---------- Simple Calculator v4.6 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
