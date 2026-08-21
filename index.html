@@ -407,7 +407,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.6</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.7</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -823,6 +823,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
         If a brought-forward / opening balance exists, the calculation starts on the 1st of the first month. If there is no brought-forward balance and the first transaction is after the 1st, the first transaction day's closing balance is required; later months start on the 1st with the previous closing balance carried forward.
       </div>
       <div class="row" style="margin-top:18px">
+        <button id="stmtAutoMapBtn" class="btn" type="button">🔎 Auto-detect columns</button>
         <button id="stmtCalcBtn" class="btn" type="button">Calculate interest comparison</button><button id="stmtSettingsBtn" class="btn primary" type="button">⚙ Interest Settings</button>
         <button id="stmtResetBtn" class="btn" type="button">Reset</button>
       </div>
@@ -961,7 +962,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.6</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.7</strong>
   </footer>
 </div>
 
@@ -1951,21 +1952,67 @@ function populateStatementPreview(rows){
 
 function stmtRowsFromMapping(){
   const info=stmtHeaderInfo(stmtRawRows);
-  const dateCol=Number(document.getElementById('mapDate').value);
-  const debitCol=Number(document.getElementById('mapDebit').value);
-  const creditCol=Number(document.getElementById('mapCredit').value);
-  const balCol=Number(document.getElementById('mapBalance').value);
+  let dateCol=Number(document.getElementById('mapDate').value);
+  let debitCol=Number(document.getElementById('mapDebit').value);
+  let creditCol=Number(document.getElementById('mapCredit').value);
+  let balCol=Number(document.getElementById('mapBalance').value);
+
+  // Robust fallback: bank statements can have multi-row/merged headers.
+  // If any mapping is missing, identify the columns from the detected header,
+  // then from the first rows containing dates/numbers.
+  const headers=info.headers||[];
+  if(dateCol<0)dateCol=stmtGuessColumn(headers,['post date','date','txn date','transaction date','posting date','value date']);
+  if(debitCol<0)debitCol=stmtGuessColumn(headers,['debit','withdrawal','dr amount','dr amt','debit amount']);
+  if(creditCol<0)creditCol=stmtGuessColumn(headers,['credit','deposit','cr amount','cr amt','credit amount']);
+  if(balCol<0)balCol=stmtGuessColumn(headers,['balance','closing balance','running balance']);
+
+  if(dateCol<0||balCol<0){
+    const scanStart=Math.max(0,info.start||0);
+    const scan=stmtRawRows.slice(scanStart,Math.min(stmtRawRows.length,scanStart+25));
+    const maxCols=stmtRawRows.reduce((m,r)=>Math.max(m,r.length),0);
+    for(let c=0;c<maxCols;c++){
+      let dateHits=0,balanceHits=0;
+      for(const r of scan){
+        if(parseDateFlexible(r?.[c]))dateHits++;
+        const txt=String(r?.[c]??'');
+        if(/(?:cr|dr)\s*$/i.test(txt)||/[₹$]?\s*[\d,]+\.\d+/.test(txt))balanceHits++;
+      }
+      if(dateCol<0&&dateHits>=2)dateCol=c;
+      if(balCol<0&&balanceHits>=2&&c!==dateCol)balCol=c;
+    }
+  }
+
+  // Keep the UI mapping in sync with what the calculation actually uses.
+  if(dateCol>=0)document.getElementById('mapDate').value=String(dateCol);
+  if(debitCol>=0)document.getElementById('mapDebit').value=String(debitCol);
+  if(creditCol>=0)document.getElementById('mapCredit').value=String(creditCol);
+  if(balCol>=0)document.getElementById('mapBalance').value=String(balCol);
+
   const start=info.start;
   const rows=[];
   for(let i=start;i<stmtRawRows.length;i++){
     const r=stmtRawRows[i]||[];
-    const date=parseDateFlexible(r[dateCol]);
+    const date=dateCol>=0?parseDateFlexible(r[dateCol]):null;
     if(!date)continue;
+
     const debit=debitCol>=0?Math.abs(parseNumberFlexible(r[debitCol])):0;
     const credit=creditCol>=0?Math.abs(parseNumberFlexible(r[creditCol])):0;
-    const balance=balCol>=0 && String(r[balCol]??'').trim()!=='' ? parseNumberFlexible(r[balCol]) : null;
+    const balText=balCol>=0?String(r[balCol]??'').trim():'';
+    const balance=balCol>=0&&balText!==''?parseNumberFlexible(balText):null;
+
+    // Accept a transaction row when it has a valid date and either a
+    // transaction amount or a balance. This is important for days where
+    // the bank statement carries a closing balance but blank debit/credit.
     if(!debit&&!credit&&balance===null)continue;
-    rows.push({date,debit,credit,balance,narration:r.map(x=>String(x??'')).join(' ').trim(),sourceRow:i+1});
+
+    rows.push({
+      date,
+      debit,
+      credit,
+      balance,
+      narration:r.map(x=>String(x??'')).join(' ').trim(),
+      sourceRow:i+1
+    });
   }
   rows.sort((a,b)=>a.date-b.date);
   return rows;
@@ -2386,6 +2433,13 @@ function stmtShowDaily(){
 
 function stmtRunCalculation(){
   const rows=stmtRowsFromMapping();
+  const mapStatus=document.getElementById('stmtStatus');
+  if(mapStatus){
+    mapStatus.style.display='block';
+    mapStatus.textContent=rows.length
+      ? `Mapped ${rows.length} transaction rows. Calculating interest…`
+      : 'No transaction rows could be mapped. Please check Date and Balance columns.';
+  }
   if(!rows.length){
     const info=stmtHeaderInfo(stmtRawRows);
     alert('No valid transactions were found.\n\nThe statement may use a non-standard Excel worksheet range or column layout. The app now reads the actual worksheet cells rather than relying on the workbook dimension. Please check Date, Debit, Credit and Balance mapping before calculating.\n\nHeader row: '+(info.headerIndex>=0?(info.headerIndex+1):'not detected')+'\nDate column: '+document.getElementById('mapDate').value+'\nDebit column: '+document.getElementById('mapDebit').value+'\nCredit column: '+document.getElementById('mapCredit').value+'\nBalance column: '+document.getElementById('mapBalance').value);
@@ -2399,6 +2453,9 @@ function stmtRunCalculation(){
   const manualVal=manual===''?null:Number(manual);
   const result=stmtCalculate(rows,slabs,manualVal);
   stmtRenderResults(result,slabs);
+  if(mapStatus)mapStatus.textContent=result.error
+    ? 'Calculation needs attention: '+result.error
+    : `Interest calculated for ${(result.monthly||[]).length} complete month(s).`;
   document.getElementById('stmtMenuMonthly')?.removeAttribute('disabled');
   document.getElementById('stmtMenuDaily')?.removeAttribute('disabled');
 }
@@ -2476,6 +2533,18 @@ document.getElementById('stmtFile').addEventListener('change',async e=>{
 });
 document.getElementById('mapHeaderRow').addEventListener('change',()=>{
   if(stmtRawRows.length)populateStatementPreview(stmtRawRows);
+});
+
+document.getElementById('stmtAutoMapBtn')?.addEventListener('click',()=>{
+  if(!stmtRawRows.length){alert('Please upload the bank statement first.');return;}
+  populateStatementPreview(stmtRawRows);
+  const info=stmtHeaderInfo(stmtRawRows);
+  const d=document.getElementById('mapDate').value;
+  const b=document.getElementById('mapBalance').value;
+  document.getElementById('stmtStatus').style.display='block';
+  document.getElementById('stmtStatus').textContent=(Number(d)>=0&&Number(b)>=0)
+    ? 'Columns detected automatically. Review them and tap Calculate interest comparison.'
+    : 'Could not confidently detect Date and Balance. Please select them manually.';
 });
 document.getElementById('stmtCalcBtn').addEventListener('click',stmtRunCalculation);
 document.getElementById('stmtSettingsBtn')?.addEventListener('click',()=>{
@@ -2730,7 +2799,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v4.6 ---------- */
+/* ---------- Simple Calculator v4.7 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
