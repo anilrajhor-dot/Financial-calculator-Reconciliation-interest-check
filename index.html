@@ -407,7 +407,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.7</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.8</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -871,7 +871,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
       </div>
 
       <div class="row" style="margin-bottom:24px">
-        <button id="stmtShowDailyBtn" class="btn" type="button">Show daily calculation</button>
+        <button id="stmtShowDailyBtn" class="btn" type="button">Show daily product & interest calculation</button>
         <button id="stmtPrintBtn" class="btn" type="button">Print / Save report</button>
       </div>
     </div>
@@ -962,7 +962,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.7</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.8</strong>
   </footer>
 </div>
 
@@ -1950,7 +1950,63 @@ function populateStatementPreview(rows){
   document.getElementById('stmtResults').style.display='none';
 }
 
+
+function stmtRowsFromKnownBankFormat(){
+  const raw=stmtRawRows||[];
+  if(!raw.length)return [];
+  let header=-1, dateCol=-1, debitCol=-1, creditCol=-1, balanceCol=-1;
+
+  for(let i=0;i<Math.min(raw.length,100);i++){
+    const cells=(raw[i]||[]).map(x=>String(x??'').replace(/[\r\n]+/g,' ').trim().toLowerCase());
+    const find=(name)=>cells.findIndex(x=>x===name||x.includes(name));
+    const d=find('post date')>=0?find('post date'):find('date');
+    const db=find('debit');
+    const cr=find('credit');
+    const ba=find('balance');
+    if(d>=0&&db>=0&&cr>=0&&ba>=0){
+      header=i; dateCol=d; debitCol=db; creditCol=cr; balanceCol=ba; break;
+    }
+  }
+  if(header<0)return [];
+
+  const result=[];
+  for(let i=header+1;i<raw.length;i++){
+    const r=raw[i]||[];
+    const date=parseDateFlexible(r[dateCol]);
+    if(!date)continue;
+
+    const debit=Math.abs(parseNumberFlexible(r[debitCol]));
+    const credit=Math.abs(parseNumberFlexible(r[creditCol]));
+    const balText=String(r[balanceCol]??'').trim();
+    const balance=balText!==''?parseNumberFlexible(balText):null;
+
+    if(balance===null && debit===0 && credit===0)continue;
+    result.push({
+      date,debit,credit,balance,
+      narration:r.map(x=>String(x??'')).join(' ').trim(),
+      sourceRow:i+1
+    });
+  }
+  result.sort((a,b)=>a.date-b.date);
+
+  // Keep the actual detected columns visible in the mapping controls.
+  const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=String(val);};
+  set('mapHeaderRow','auto');
+  set('mapDate',dateCol);
+  set('mapDebit',debitCol);
+  set('mapCredit',creditCol);
+  set('mapBalance',balanceCol);
+
+  return result;
+}
+
 function stmtRowsFromMapping(){
+  // First use the exact bank-statement layout when present. This prevents
+  // merged/blank leading cells or non-standard header rows from breaking
+  // calculation for Central Bank of India statements.
+  const known=stmtRowsFromKnownBankFormat();
+  if(known.length)return known;
+
   const info=stmtHeaderInfo(stmtRawRows);
   let dateCol=Number(document.getElementById('mapDate').value);
   let debitCol=Number(document.getElementById('mapDebit').value);
@@ -2466,23 +2522,19 @@ function stmtScrollTo(id){
   if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function stmtMenuCalculate(){
-  const map=document.getElementById('stmtMappingCard');
   const file=document.getElementById('stmtFile');
   if(!file?.files?.length){
     stmtScrollTo('stmtFile');
-    document.getElementById('stmtStatus').style.display='block';
-    document.getElementById('stmtStatus').textContent='Please upload a bank statement first.';
-    return;
-  }
-  if(map?.style.display!=='none'){
-    stmtScrollTo('stmtMappingCard');
+    const s=document.getElementById('stmtStatus');
+    if(s){s.style.display='block';s.textContent='Please upload a bank statement first.';}
     return;
   }
   if(stmtLastResult){
     stmtScrollTo('stmtResults');
     return;
   }
-  stmtScrollTo('stmtPreviewCard');
+  // Calculate directly using the detected/mapped columns.
+  stmtRunCalculation();
 }
 document.getElementById('stmtMenuCalculate')?.addEventListener('click',stmtMenuCalculate);
 document.getElementById('stmtMenuMonthly')?.addEventListener('click',()=>{
@@ -2523,7 +2575,11 @@ document.getElementById('stmtFile').addEventListener('change',async e=>{
     const rows=await parseStatementFile(file);
     if(!rows.length)throw new Error('No rows detected in the file.');
     populateStatementPreview(rows);
-    status.textContent=`Loaded "${file.name}" — ${rows.length} rows.`;
+    const mapped=stmtRowsFromKnownBankFormat();
+    status.textContent=mapped.length
+      ? `Loaded "${file.name}" — ${rows.length} rows. Detected ${mapped.length} transaction rows.`
+      : `Loaded "${file.name}" — ${rows.length} rows. Review the column mapping before calculating.`;
+
   }catch(err){
     status.textContent='Could not read this file: '+err.message;
     document.getElementById('stmtPreviewCard').style.display='none';
@@ -2799,7 +2855,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v4.7 ---------- */
+/* ---------- Simple Calculator v4.8 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
