@@ -404,7 +404,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v3.3</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v3.4</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -943,7 +943,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v3.3</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v3.4</strong>
   </footer>
 </div>
 
@@ -2521,7 +2521,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v3.3 ---------- */
+/* ---------- Simple Calculator v3.4 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
@@ -2732,7 +2732,7 @@ simpleCalcRenderHistory();
       <textarea id="askMeInput" rows="4" placeholder="Example: What is the EMI of ₹1,00,000 for 60 months at 5%?"></textarea>
       <div class="askme-voice-row">
         <button id="askMeMicBtn" class="btn askme-mic" type="button" onclick="toggleAskMeVoice()" aria-label="Speak your question">🎙️</button>
-        <span id="askMeVoiceStatus" class="askme-voice-status">Tap the microphone and speak your question.</span>
+        <span id="askMeVoiceStatus" class="askme-voice-status">Tap the microphone and speak your question — e.g. “10 plus 20”.</span>
       </div>
       <p class="askme-voice-note">After you speak, tap Ask. The answer can also be read aloud.</p>
       <div class="askme-actions">
@@ -2857,7 +2857,7 @@ function initAskMeVoice(){
     if(b){b.classList.remove('listening');b.textContent='🎙️';}
     const input=document.getElementById('askMeInput');
     if(input && input.value.trim())askMeSetVoiceStatus('Question captured. Tap Ask for the answer.');
-    else askMeSetVoiceStatus('Tap the microphone and speak your question.');
+    else askMeSetVoiceStatus('Tap the microphone and speak your question — e.g. “10 plus 20”.');
   };
   return true;
 }
@@ -2889,12 +2889,56 @@ function speakAskMeAnswer(){
   window.speechSynthesis.speak(u);
 }
 
+
+function askMeArithmeticExpression(q){
+  let s=String(q||'').toLowerCase().trim();
+  s=s.replace(/[₹,]/g,'');
+  s=s.replace(/\bwhat\s+is\b/g,' ').replace(/\bcalculate\b/g,' ')
+   .replace(/\bplease\b/g,' ').replace(/\bcan\s+you\b/g,' ')
+   .replace(/\bcompute\b/g,' ');
+  s=s.replace(/\bdivided\s+by\b/g,' / ').replace(/\bdivide\s+by\b/g,' / ')
+   .replace(/\bover\b/g,' / ').replace(/\bmultiplied\s+by\b/g,' * ')
+   .replace(/\bmultiply\s+by\b/g,' * ').replace(/\btimes\b/g,' * ')
+   .replace(/\bplus\b/g,' + ').replace(/\bminus\b/g,' - ')
+   .replace(/\bsubtract\b/g,' - ').replace(/\badd\b/g,' + ')
+   .replace(/×/g,' * ').replace(/÷/g,' / ').replace(/−/g,' - ');
+  const words={zero:'0',one:'1',two:'2',three:'3',four:'4',five:'5',
+    six:'6',seven:'7',eight:'8',nine:'9',ten:'10',eleven:'11',
+    twelve:'12',thirteen:'13',fourteen:'14',fifteen:'15',sixteen:'16',
+    seventeen:'17',eighteen:'18',nineteen:'19',twenty:'20',thirty:'30',
+    forty:'40',fifty:'50',sixty:'60',seventy:'70',eighty:'80',ninety:'90'};
+  Object.keys(words).sort((a,b)=>b.length-a.length).forEach(w=>{
+    s=s.replace(new RegExp('\\b'+w+'\\b','g'),words[w]);
+  });
+  s=s.replace(/\s+/g,'').trim();
+  if(!/^[0-9+\-*/%.]+$/.test(s)||!/[+\-*/%]/.test(s))return null;
+  s=s.replace(/(\d+(?:\.\d+)?)%/g,'($1/100)');
+  try{
+    const value=Function('"use strict";return ('+s+')')();
+    return (typeof value==='number'&&isFinite(value))?value:null;
+  }catch(e){return null;}
+}
+function askMeArithmeticAnswer(original,value){
+  const formatted=Number(value).toLocaleString('en-IN',{maximumFractionDigits:10});
+  return '<div class="ask-result-title">Calculation</div>'+
+    '<div class="ask-result-row"><span>Expression</span><b>'+String(original).replace(/</g,'&lt;')+'</b></div>'+
+    '<div class="ask-main-result"><span>Answer</span><b>'+formatted+'</b></div>'+
+    '<button class="btn askme-speak" type="button" onclick="speakAskMeAnswer()">🔊 Read answer aloud</button>';
+}
+
 function answerAskMe(){
   const input=document.getElementById('askMeInput'),a=document.getElementById('askMeAnswer');
   const q=(input?.value||'').trim(),ql=q.toLowerCase();
   if(!a)return;
   a.classList.remove('show');
   if(!q){a.innerHTML='<div class="ask-result-title">Please enter a question.</div>';a.classList.add('show');return;}
+
+  const arithmetic=askMeArithmeticExpression(q);
+  if(arithmetic!==null){
+    a.innerHTML=askMeArithmeticAnswer(q,arithmetic);
+    a.classList.add('show');
+    return;
+  }
 
   if(/emi|installment|instalment|monthly payment/.test(ql)){
     const principal=askMeMoney(q),rate=askMeRate(q),months=askMeMonths(q);
@@ -2928,7 +2972,7 @@ function answerAskMe(){
   else if(/interest/.test(ql))
     a.innerHTML='<div class="ask-result-title">Interest calculation</div><div>For a standard EMI, ask for the loan amount, rate and tenure. For bank-statement interest, use the Bank Statement Interest module.</div>';
   else
-    a.innerHTML='<div class="ask-result-title">Try an EMI question</div><div>For example: <b>“Calculate EMI of ₹5 lakh for 5 years at 7.5%.”</b></div>';
+    a.innerHTML='<div class="ask-result-title">I can calculate that</div><div>Try <b>10 + 20</b>, <b>100 × 5</b>, <b>200 ÷ 4</b>, or speak: <b>“125 plus 75 divided by 5”</b>.</div>';
   a.classList.add('show');
 }
 </script>
