@@ -1,0 +1,2297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Anil Sharma Financial Calculators</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root {
+    --paper: #F4F6F3;
+    --ink: #16221F;
+    --muted: #5B6B63;
+    --rule: #D8DED9;
+    --green: #0F6E5C;
+    --clay: #B5493B;
+    --brass: #C98A2C;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); font-family: 'IBM Plex Sans', sans-serif; color: var(--ink); }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 24px 20px 40px; }
+
+  .masthead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 4px; flex-wrap: wrap; }
+  .masthead-title { font-family: 'Fraunces', serif; font-size: 26px; font-weight: 700; margin: 0; }
+  .masthead-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .masthead-badge { text-align: right; font-size: 11px; color: var(--muted); line-height: 1.5; white-space: nowrap; }
+  .masthead-badge strong { color: var(--ink); font-family: 'Fraunces', serif; font-size: 13px; font-weight: 600; display: block; }
+
+  .tabs { display: flex; gap: 4px; margin: 20px 0 24px; border-bottom: 1px solid var(--rule); overflow-x: auto; }
+  .tab {
+    font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600; color: var(--muted);
+    background: none; border: none; padding: 10px 14px; cursor: pointer; white-space: nowrap;
+    border-bottom: 2px solid transparent; position: relative; top: 1px;
+  }
+  .tab.active { color: var(--ink); border-bottom: 2px solid var(--brass); }
+  .tab:hover:not(.active) { color: var(--ink); }
+  .tab .lock { font-size: 10px; color: #9AA6A0; margin-left: 4px; }
+
+  .module { display: none; }
+  .module.active { display: block; }
+
+  .placeholder { background: #fff; border: 1px dashed var(--rule); border-radius: 6px; padding: 48px 24px; text-align: center; color: var(--muted); }
+  .placeholder-title { font-family: 'Fraunces', serif; font-size: 20px; color: var(--ink); margin-bottom: 8px; }
+
+  .eyebrow { font-size: 11px; letter-spacing: 0.12em; color: var(--brass); font-weight: 600; margin-bottom: 6px; }
+  h1.page-title { font-family: 'Fraunces', serif; font-size: 30px; font-weight: 600; margin: 0; }
+  .lede { color: var(--muted); margin-top: 6px; font-size: 14.5px; max-width: 560px; }
+  .card { background: #fff; border: 1px solid var(--rule); border-radius: 6px; }
+  .input-card { padding: 24px; margin: 24px 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; }
+  label { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; display: block; margin-bottom: 4px; }
+  input, select {
+    font-family: 'IBM Plex Mono', monospace; border: 1px solid #C7D0CB; background: #fff;
+    padding: 8px 10px; border-radius: 3px; font-size: 14px; width: 100%; color: var(--ink);
+  }
+  input:focus, select:focus { outline: 2px solid var(--green); outline-offset: 1px; }
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 1px; background: var(--rule); border-radius: 6px; overflow: hidden; margin-bottom: 28px; }
+  .stat { background: #fff; padding: 16px 18px; }
+  .stat-label { font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+  .stat-value { font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 600; }
+  .chart-card { padding: 20px 12px 8px; margin-bottom: 28px; }
+  .chart-title { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 600; padding: 0 12px 12px; }
+  .ledger { overflow: hidden; }
+  .stub { padding: 16px 20px; background: #FBFAF6; border-left: 3px dashed var(--brass); }
+  .stub-title { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 600; }
+  .stub-sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .folio-toggle {
+    width: 100%; text-align: left; background: #ECF1EC; border: none;
+    border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+    padding: 10px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+  .folio-toggle:hover { background: #E3EAE4; }
+  .folio-name { font-weight: 600; font-size: 13.5px; }
+  .folio-meta { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); }
+  .debit { color: var(--clay); }
+  .credit { color: var(--green); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead tr { background: #FBFAF6; }
+  th { padding: 8px 14px; font-size: 10.5px; letter-spacing: 0.05em; color: var(--muted); text-align: right; }
+  th:nth-child(1), th:nth-child(2) { text-align: left; }
+  td { padding: 7px 14px; font-family: 'IBM Plex Mono', monospace; text-align: right; border-bottom: 1px solid var(--rule); }
+  td:nth-child(1), td:nth-child(2) { text-align: left; }
+  tbody tr:hover { background: #ECF1EC; }
+  .table-scroll { overflow-x: auto; }
+
+  .subtabs { display: flex; gap: 4px; margin: 18px 0 22px; }
+  .subtab {
+    font-family: 'IBM Plex Sans', sans-serif; font-size: 12.5px; font-weight: 600; color: var(--muted);
+    background: #fff; border: 1px solid var(--rule); padding: 7px 14px; cursor: pointer; border-radius: 4px;
+  }
+  .subtab.active { color: #fff; background: var(--green); border-color: var(--green); }
+  .depmodule { display: none; }
+  .depmodule.active { display: block; }
+  .note { font-size: 12px; color: var(--muted); background: #FBFAF6; border: 1px solid var(--rule); border-left: 3px solid var(--brass); border-radius: 4px; padding: 10px 14px; margin-bottom: 20px; }
+  .btn { font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600; color: #fff; background: var(--green); border: none; padding: 10px 18px; border-radius: 4px; cursor: pointer; }
+  .btn:hover { background: #0b5949; }
+
+  /* v1.7 — appearance, highlighted bank-statement menu and health check */
+  body.dark{
+    --paper:#111714;--ink:#EDF4F0;--muted:#A9B9B1;--rule:#2E3A35;
+    --green:#2FA58B;--clay:#F07A69;--brass:#E0A43A;
+    background:var(--paper);color:var(--ink);
+  }
+  body.dark .card,body.dark .ledger,body.dark .input-card{background:#17201C;border-color:var(--rule)}
+  body.dark input,body.dark select{background:#101612;color:var(--ink);border-color:#425149}
+  body.dark .note{background:#1A211E;color:var(--muted);border-color:#39463F}
+  body.dark .stmt-slab-row{background:#151D19;border-color:var(--rule)}
+  .appearance-tools{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin:10px 0 0}
+  .appearance-tools .btn{padding:8px 12px}
+  #tabs .tab[data-module="statement"]{
+    font-weight:800;border:2px solid var(--brass);box-shadow:0 0 0 2px rgba(201,138,44,.14);
+  }
+  #tabs .tab[data-module="statement"].active{
+    background:var(--brass);color:#17130A;border-color:var(--brass);font-weight:900;
+  }
+  #tabs .tab[data-module="health"]{
+    font-weight:800;border:2px solid var(--green);
+  }
+  #tabs .tab[data-module="health"].active{
+    background:var(--green);color:#fff;font-weight:900;
+  }
+  .health-ok{color:var(--green);font-weight:800}
+  .health-bad{color:var(--clay);font-weight:800}
+
+  footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--rule); text-align: center; font-size: 11.5px; color: var(--muted); }
+  footer strong { color: var(--ink); }
+
+  /* v1.7 — Bank Statement Interest Comparison */
+  .stmt-slab-row{
+    display:grid;
+    grid-template-columns:1.1fr 1.4fr 1.2fr 1.6fr auto;
+    gap:8px;align-items:end;margin-bottom:8px;padding:10px;
+    border:1px solid var(--rule);border-radius:6px;background:#FBFAF6;
+  }
+  .stmt-slab-row .slab-label{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .stmt-slab-row input{width:100%}
+  .stmt-highlight{border-left:4px solid var(--brass)}
+  .stmt-good{color:var(--green);font-weight:700}
+  .stmt-review{color:var(--clay);font-weight:700}
+  .stmt-daily-note{font-size:12px;color:var(--muted);margin:8px 0}
+  @media(max-width:700px){
+    .stmt-slab-row{grid-template-columns:1fr 1fr;gap:10px}
+    .stmt-slab-row .wide{grid-column:1/-1}
+    #stmtTable,#stmtDailyTable{min-width:980px}
+  }
+
+.loan-menu-panel{border:1px solid var(--line)}
+#emiCalculatorMenu .btn.active{background:var(--accent)!important;color:#0E0E10!important;border-color:var(--accent)!important;font-weight:800}
+#emiCalculatorMenu .btn{min-height:46px}
+
+#loanCalculatorMenus .loan-menu-btn{min-height:48px;font-weight:800}
+#loanCalculatorMenus .loan-menu-btn.active{background:var(--accent)!important;color:#0E0E10!important;border-color:var(--accent)!important;box-shadow:0 0 0 2px rgba(201,138,44,.18)}
+''</style>
+<style>
+.premium-menu{border:2px solid var(--line);background:linear-gradient(145deg,var(--card),var(--bg));margin-bottom:12px}.premium-kicker{font-size:.78rem;letter-spacing:.14em;font-weight:900;color:var(--brass)}.premium-menu-head h2{font-size:1.65rem;margin:4px 0;font-weight:900}.premium-menu-head p{margin:0;color:var(--muted)}.premium-menu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}.premium-menu-item{display:flex;align-items:center;gap:12px;text-align:left;padding:15px;border:2px solid var(--line);border-radius:16px;background:var(--card);cursor:pointer}.premium-menu-item b{display:block;font-size:1rem;font-weight:900}.premium-menu-item small{display:block;color:var(--muted);margin-top:3px}.premium-menu-item.active{border-color:var(--brass);box-shadow:0 0 0 2px rgba(180,130,30,.18)}.premium-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--brass);color:#111;font-weight:900;font-size:1.2rem;flex:0 0 auto}.premium-actions{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}.app-modal{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:9999;display:none;padding:20px;align-items:center;justify-content:center}.app-modal.open{display:flex}.app-modal-card{width:min(720px,96vw);max-height:88vh;overflow:auto;background:var(--card);color:var(--text);border:2px solid var(--line);border-radius:22px;padding:20px}.app-modal-head{display:flex;justify-content:space-between;align-items:center}.app-modal-head button{font-size:1.8rem;border:0;background:transparent;color:inherit}.help-grid{display:grid;gap:12px;margin-top:16px}.help-grid>div{padding:14px;border:1px solid var(--line);border-radius:14px}.help-grid p{margin:6px 0 0;color:var(--muted)}#askMeInput{width:100%;box-sizing:border-box;margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--text);font:inherit}.ask-answer{margin-top:12px;padding:14px;border-radius:14px;background:var(--bg)}.floating-ask{position:fixed;right:18px;bottom:18px;z-index:5000;border:2px solid var(--brass);background:var(--brass);color:#111;border-radius:999px;padding:13px 18px;font-weight:900;box-shadow:0 8px 24px rgba(0,0,0,.25)}@media(max-width:700px){.premium-menu-grid{grid-template-columns:1fr}.premium-menu-head h2{font-size:1.35rem}}
+</style><style id="contrastFixV25">
+/* v2.6 — high-contrast dark-mode results */
+body.dark .summary .stat{
+  background:#F7F9F7 !important;
+  color:#16221F !important;
+}
+body.dark .summary .stat-label{
+  color:#405149 !important;
+  font-weight:800 !important;
+}
+body.dark .summary .stat-value{
+  color:#16221F !important;
+  font-weight:900 !important;
+  opacity:1 !important;
+  text-shadow:none !important;
+}
+body.dark .summary .stat-value.debit,
+body.dark .summary .stat-value.stmt-review{
+  color:#B33F31 !important;
+}
+body.dark .summary .stat-value.credit,
+body.dark .summary .stat-value.stmt-good{
+  color:#08745B !important;
+}
+body.dark #summary .stat-value{
+  color:#16221F !important;
+}
+body.dark #summary .stat-value[style*="var(--clay)"]{color:#B33F31 !important}
+body.dark #summary .stat-value[style*="var(--green)"]{color:#08745B !important}
+body.dark #summary .stat-value[style*="var(--brass)"]{color:#9A5C00 !important}
+body.dark #summary .stat-value[style*="var(--ink)"]{color:#16221F !important}
+
+body.dark .chart-card{
+  background:#17201C !important;
+  border-color:#3E4E46 !important;
+}
+body.dark .chart-title{
+  color:#F4F8F5 !important;
+  font-weight:800 !important;
+}
+body.dark .stub-title{
+  color:#F4F8F5 !important;
+  font-weight:800 !important;
+}
+body.dark .stub-sub,
+body.dark .stmt-daily-note{
+  color:#C7D3CD !important;
+}
+body.dark .card.ledger{
+  border-color:#3E4E46 !important;
+}
+body.dark .card.ledger table{
+  color:#F0F5F2 !important;
+}
+body.dark .card.ledger th{
+  color:#C7D3CD !important;
+  font-weight:800 !important;
+}
+body.dark .card.ledger td{
+  color:#F0F5F2 !important;
+  border-bottom-color:#34433C !important;
+}
+body.dark .card.ledger thead tr{
+  background:#202B26 !important;
+}
+body.dark .card.ledger tbody tr:hover{
+  background:#26332D !important;
+}
+
+/* Make important result numbers unmistakable on mobile */
+@media(max-width:700px){
+  body.dark .summary .stat-value{font-size:22px !important;letter-spacing:-.02em}
+  body.dark .summary .stat-label{font-size:10.5px !important}
+}
+</style></head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <div>
+      <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v2.6</strong></div>
+    </div>
+    <div class="masthead-badge">
+      <strong>Anil Sharma</strong>
+      Former General Manager<br/>Central Bank of India
+    </div>
+  </div>
+  <div class="appearance-tools">
+    <button id="darkModeBtn" class="btn" type="button">🌙 Dark mode</button>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-module="emi">Loan / EMI</button>
+    <button class="tab" data-module="deposits">Deposits</button>
+    <button class="tab" data-module="age">Age Calculator</button>
+    <button class="tab" data-module="statement">Bank Statement Interest</button>
+    <button class="tab" data-module="recon">Reconciliation</button>
+    <button class="tab" data-module="health">🩺 Health Check</button>
+  </div>
+
+  <!-- EMI MODULE -->
+  <div class="module active" id="module-emi">
+    <div id="loanCalculatorMenus" class="card" style="margin-bottom:16px;border:2px solid var(--accent)">
+      <div class="eyebrow">LOAN CALCULATORS</div>
+      <h2 style="margin:4px 0 10px">Choose a Loan Calculator</h2>
+      <div class="row" style="gap:10px;flex-wrap:wrap">
+        <button id="standardEmiMenuBtn" class="btn primary loan-menu-btn" type="button" onclick="openLoanMenu('standard')">EMI Calculator</button>
+        <button id="slabEmiMenuBtn" class="btn loan-menu-btn" type="button" onclick="openLoanMenu('slab')">Slab-wise Term Loan EMI</button>
+      </div>
+      <p id="loanMenuDescription" class="hint" style="margin:10px 0 0">Standard EMI using one annual interest rate throughout the loan.</p>
+    </div>
+    <div class="eyebrow">LEDGER &middot; 01 REPAYMENT SCHEDULE</div>
+    <h1 class="page-title">Loan &amp; EMI Passbook</h1>
+    <p class="lede">Enter the loan terms below. Every installment repays interest on the outstanding balance first, then principal &mdash; like an entry in a bank passbook.</p>
+
+    <div class="card input-card">
+      <div class="grid">
+        <div>
+          <label for="principal">Loan amount (&#8377;)</label>
+          <input type="number" id="principal" value="1000000" min="0" />
+        </div>
+        <div>
+          <label for="rate">Interest rate (% p.a.)</label>
+          <input type="number" id="rate" value="9.5" step="0.01" min="0" />
+        </div>
+        <div>
+          <label for="emiInterestMethod">Interest method</label>
+          <select id="emiInterestMethod"><option value="flat" selected>Single annual rate</option><option value="slab">Progressive slab rates — Term Loan</option></select><button id="emiSlabQuickBtn" class="btn sm" type="button" style="margin-top:6px">⚙ Set slab rates</button>
+        </div>
+        <div>
+          <label for="periodYears">Loan period — Years</label>
+          <select id="periodYears"><option value="0">0 Years</option><option value="1">1 Year</option><option value="2">2 Years</option><option value="3">3 Years</option><option value="4">4 Years</option><option value="5" selected>5 Years</option><option value="6">6 Years</option><option value="7">7 Years</option><option value="8">8 Years</option><option value="9">9 Years</option><option value="10">10 Years</option><option value="11">11 Years</option><option value="12">12 Years</option><option value="13">13 Years</option><option value="14">14 Years</option><option value="15">15 Years</option><option value="16">16 Years</option><option value="17">17 Years</option><option value="18">18 Years</option><option value="19">19 Years</option><option value="20">20 Years</option><option value="21">21 Years</option><option value="22">22 Years</option><option value="23">23 Years</option><option value="24">24 Years</option><option value="25">25 Years</option><option value="26">26 Years</option><option value="27">27 Years</option><option value="28">28 Years</option><option value="29">29 Years</option><option value="30">30 Years</option></select>
+        </div>
+        <div>
+          <label for="periodMonths">Additional months</label>
+          <select id="periodMonths"><option value="0" selected>0 Months</option><option value="1">1 Month</option><option value="2">2 Months</option><option value="3">3 Months</option><option value="4">4 Months</option><option value="5">5 Months</option><option value="6">6 Months</option><option value="7">7 Months</option><option value="8">8 Months</option><option value="9">9 Months</option><option value="10">10 Months</option><option value="11">11 Months</option></select>
+        </div>
+        <div>
+          <label for="count">No. of installments</label>
+          <input type="number" id="count" value="60" min="1" readonly />
+          <div class="hint">Calculated automatically from loan period and frequency.</div>
+        </div>
+        <div>
+          <label for="freq">Frequency</label>
+          <select id="freq">
+            <option value="1" selected>Monthly</option>
+            <option value="3">Quarterly</option>
+            <option value="6">Half-Yearly</option>
+            <option value="12">Yearly</option>
+          </select>
+        </div>
+        <div>
+          <label for="startDate">First installment date</label>
+          <input type="date" id="startDate" />
+        </div>
+        <div>
+          <label for="repayType">Repayment type</label>
+          <select id="repayType">
+            <option value="equal-installment" selected>Equal installment (EMI stays same)</option>
+            <option value="equal-principal">Equal principal (installment reduces)</option>
+          </select>
+        </div>
+        <div>
+          <label for="moratMonths">Moratorium period (months)</label>
+          <input type="number" id="moratMonths" value="0" min="0" />
+        </div>
+        <div>
+          <label for="moratMode">During moratorium</label>
+          <select id="moratMode">
+            <option value="paid" selected>Interest paid monthly</option>
+            <option value="accrued">Interest accrued (added to principal)</option>
+          </select>
+        </div>
+      </div>
+      <div id="emiSlabSettings" class="card input-card" style="display:none;margin-top:14px;box-shadow:none;border:1px solid var(--line);">
+        <div class="stub-title">⚙ EMI Interest Slabs &amp; Rates</div>
+        <div class="stub-sub" style="margin:4px 0 14px;color:var(--muted)">Progressive rates apply to the outstanding loan balance each period. Example: first ₹3,00,000 at 7%, next ₹2,00,000 at 8%, and any balance above ₹5,00,000 at 9%.</div>
+        <div id="emiSlabs"></div>
+        <div class="formula-box" style="margin-top:12px"><b>Slab EMI method:</b> each installment calculates interest on the opening outstanding balance by slab. The EMI is solved so that the balance reaches zero at the end of the selected period. Example: ₹5,00,000 = ₹3,00,000 @ 7% + ₹2,00,000 @ 8%.</div>
+        <div class="row" style="margin-top:12px"><button id="emiAddSlabBtn" class="btn" type="button">+ Add slab</button><button id="emiResetSlabBtn" class="btn" type="button">Reset EMI slabs</button><span id="emiSlabSave" class="hint"></span></div>
+      </div>
+      <div class="note">Both repayment types pay that period's interest on the outstanding balance first, then principal. With <strong>Equal installment</strong>, the total EMI is fixed and the interest/principal mix shifts each month. With <strong>Equal principal</strong>, the principal portion is fixed every month, so interest &mdash; and therefore the total installment &mdash; shrinks month by month. During a <strong>moratorium</strong>, no principal is repaid: choose whether you pay the interest in cash each month, or let it accrue and get added to the principal (capitalized) before EMI/installments begin.</div>
+    </div>
+
+    <div class="summary" id="summary"></div>
+
+    <div class="card chart-card">
+      <div class="chart-title">Principal vs. interest, per installment</div>
+      <canvas id="chart" height="110"></canvas>
+    </div>
+
+    <div class="card ledger">
+      <div class="stub">
+        <div class="stub-title">Installment-wise register</div>
+        <div class="stub-sub" id="ledgerSub"></div>
+      </div>
+      <div id="slabTermLoanCalculator" class="card loan-menu-panel" style="display:none;margin-top:14px">
+  <h3>Slab-wise Term Loan EMI</h3>
+  <p class="hint">Separate calculator for loans where interest is charged progressively by outstanding-balance slab.</p>
+  <div class="formula-box" style="margin-top:10px">
+    <b>Example:</b> ₹5,00,000 outstanding = ₹3,00,000 at 7% + ₹2,00,000 at 8%.
+    The slab rates are applied to the outstanding balance for each instalment period.
+  </div>
+</div>
+
+<div id="folios"></div>
+      <div id="fyInterestSummary" style="margin-top:16px"></div>
+    </div>
+  </div>
+
+  <!-- DEPOSITS MODULE -->
+  <div class="module" id="module-deposits">
+    <div class="eyebrow">LEDGER &middot; 02 DEPOSITS</div>
+    <h1 class="page-title">Deposit Calculators</h1>
+    <p class="lede">Fixed / reinvestment deposits, recurring deposits, and SIPs &mdash; each with its own maturity ledger.</p>
+
+    <div class="subtabs" id="depositTabs">
+      <button class="subtab active" data-dep="fd">FD / Reinvestment</button>
+      <button class="subtab" data-dep="rd">Recurring Deposit</button>
+      <button class="subtab" data-dep="sip">SIP</button>
+    </div>
+
+    <!-- FD / REINVESTMENT -->
+    <div class="depmodule active" id="dep-fd">
+      <div class="card input-card">
+        <div class="grid">
+          <div>
+            <label for="fdPrincipal">Principal (&#8377;)</label>
+            <input type="number" id="fdPrincipal" value="100000" min="0" />
+          </div>
+          <div>
+            <label for="fdRate">Interest rate (% p.a.)</label>
+            <input type="number" id="fdRate" value="7.25" step="0.01" min="0" />
+          </div>
+          <div>
+            <label for="fdTenureVal">Tenure</label>
+            <input type="number" id="fdTenureVal" value="3" min="1" />
+          </div>
+          <div>
+            <label for="fdTenureUnit">Period</label>
+            <select id="fdTenureUnit">
+              <option value="days">Days</option>
+              <option value="months" selected>Months</option>
+              <option value="years">Years</option>
+            </select>
+          </div>
+          <div>
+            <label for="fdMode">Interest option</label>
+            <select id="fdMode">
+              <optgroup label="Cumulative (reinvested)">
+                <option value="simple">Simple interest</option>
+                <option value="cum-monthly">Compounded monthly</option>
+                <option value="cum-quarterly" selected>Compounded quarterly</option>
+                <option value="cum-halfyearly">Compounded half-yearly</option>
+                <option value="cum-yearly">Compounded yearly</option>
+              </optgroup>
+              <optgroup label="Interest payout (principal unchanged)">
+                <option value="payout-quarterly">Quarterly payout</option>
+                <option value="payout-monthly">Monthly payout (discounted)</option>
+              </optgroup>
+            </select>
+          </div>
+          <div>
+            <label for="fdStartDate">Deposit date</label>
+            <input type="date" id="fdStartDate" />
+          </div>
+        </div>
+      </div>
+      <div class="note">Reinvestment / cumulative schemes are FDs where interest is added back to principal instead of paid out. For non-cumulative FDs: <strong>quarterly payout</strong> pays the exact simple quarterly interest (P&#215;R/4) with principal untouched, while <strong>monthly payout</strong> pays a <em>discounted</em> monthly rate &mdash; since you receive the money sooner, banks pay slightly less than a plain 1/12th of the annual interest, so that 12 monthly payouts work out equivalent to 4 quarterly ones. This mirrors standard practice at Indian banks (e.g. ICICI, SBI).</div>
+      <div class="summary" id="fdSummary"></div>
+      <div class="card ledger">
+        <div class="stub">
+          <div class="stub-title">Compounding-period register</div>
+          <div class="stub-sub" id="fdLedgerSub"></div>
+        </div>
+        <div class="table-scroll"><table id="fdTable"></table></div>
+      </div>
+    </div>
+
+    <!-- RECURRING DEPOSIT -->
+    <div class="depmodule" id="dep-rd">
+      <div class="card input-card">
+        <div class="grid">
+          <div>
+            <label for="rdInstallment">Monthly installment (&#8377;)</label>
+            <input type="number" id="rdInstallment" value="5000" min="0" />
+          </div>
+          <div>
+            <label for="rdRate">Interest rate (% p.a.)</label>
+            <input type="number" id="rdRate" value="7" step="0.01" min="0" />
+          </div>
+          <div>
+            <label for="rdMonths">Tenure (months)</label>
+            <input type="number" id="rdMonths" value="24" min="1" />
+          </div>
+          <div>
+            <label for="rdStartDate">First installment date</label>
+            <input type="date" id="rdStartDate" />
+          </div>
+        </div>
+      </div>
+      <div class="note">Interest is compounded quarterly on the running balance, in line with standard bank RD practice; the last part-quarter (if any) earns simple interest.</div>
+      <div class="summary" id="rdSummary"></div>
+      <div class="card ledger">
+        <div class="stub">
+          <div class="stub-title">Quarter-wise register</div>
+          <div class="stub-sub" id="rdLedgerSub"></div>
+        </div>
+        <div class="table-scroll"><table id="rdTable"></table></div>
+      </div>
+    </div>
+
+    <!-- SIP -->
+    <div class="depmodule" id="dep-sip">
+      <div class="card input-card">
+        <div class="grid">
+          <div>
+            <label for="sipInstallment">Monthly investment (&#8377;)</label>
+            <input type="number" id="sipInstallment" value="10000" min="0" />
+          </div>
+          <div>
+            <label for="sipRate">Expected return (% p.a.)</label>
+            <input type="number" id="sipRate" value="12" step="0.01" min="0" />
+          </div>
+          <div>
+            <label for="sipMonths">Tenure (months)</label>
+            <input type="number" id="sipMonths" value="60" min="1" />
+          </div>
+          <div>
+            <label for="sipStartDate">First investment date</label>
+            <input type="date" id="sipStartDate" />
+          </div>
+        </div>
+      </div>
+      <div class="note">Returns are assumed constant for illustration; actual mutual fund/SIP returns vary and are not guaranteed.</div>
+      <div class="summary" id="sipSummary"></div>
+      <div class="card ledger">
+        <div class="stub">
+          <div class="stub-title">Month-wise register</div>
+          <div class="stub-sub" id="sipLedgerSub"></div>
+        </div>
+        <div class="table-scroll"><table id="sipTable"></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AGE MODULE -->
+  <div class="module" id="module-age">
+    <div class="eyebrow">LEDGER &middot; 03 AGE</div>
+    <h1 class="page-title">Age Calculator</h1>
+    <p class="lede">Exact age in years, months and days between two dates &mdash; useful for eligibility checks, maturity age, and retirement dates.</p>
+
+    <div class="card input-card">
+      <div class="grid">
+        <div>
+          <label for="ageDob">Date of birth</label>
+          <input type="date" id="ageDob" />
+        </div>
+        <div>
+          <label for="ageAsOf">Age as on</label>
+          <input type="date" id="ageAsOf" />
+        </div>
+      </div>
+    </div>
+
+    <div class="summary" id="ageSummary"></div>
+
+    <div class="card ledger">
+      <div class="stub">
+        <div class="stub-title">Age in other units</div>
+        <div class="stub-sub">For quick cross-checking against eligibility criteria</div>
+      </div>
+      <div class="table-scroll"><table id="ageTable"></table></div>
+    </div>
+  </div>
+
+  <!-- STATEMENT MODULE -->
+  <div class="module" id="module-statement">
+    <div class="eyebrow">LEDGER &middot; 04 STATEMENT INTEREST</div>
+    <h1 class="page-title">Bank Statement Interest Calculator</h1>
+    <p class="lede">Upload a bank statement, map its columns, then compare the bank's interest credit with independently calculated daily-product interest using progressive slabs and the actual calendar days of each month.</p>
+
+    <div class="card input-card">
+      <div class="grid">
+        <div>
+          <label for="stmtFile">Statement file (CSV / XLSX / XLS / PDF / JSON)</label>
+          <input type="file" id="stmtFile" accept=".csv,.xlsx,.xls,.pdf,.json" />
+        </div>
+        <div>
+          <label for="stmtManualRate">Default annual rate (%)</label>
+          <input type="number" id="stmtManualRate" value="4" step="0.01" min="0" />
+        </div>
+        <div>
+          <label for="stmtBankInterest">Bank-stated interest, optional (&#8377;)</label>
+          <input type="number" id="stmtBankInterest" placeholder="Override / total for comparison" />
+        </div>
+      </div>
+      <div id="stmtStatus" class="note" style="display:none;margin-top:16px;margin-bottom:0;"></div>
+    </div>
+
+    <div class="card input-card" id="stmtMappingCard" style="display:none;">
+      <div class="stub-title" style="margin-bottom:12px;">Step 1 — Confirm statement columns</div>
+      <div class="grid">
+        <div><label for="mapDate">Date column</label><select id="mapDate"></select></div>
+        <div><label for="mapDebit">Debit / withdrawal column</label><select id="mapDebit"></select></div>
+        <div><label for="mapCredit">Credit / deposit column</label><select id="mapCredit"></select></div>
+        <div><label for="mapBalance">Balance column</label><select id="mapBalance"></select></div>
+        <div><label for="mapHeaderRow">Header row</label><select id="mapHeaderRow"><option value="auto">Auto-detect</option><option value="yes">First row</option><option value="no">No header row</option></select></div>
+      </div>
+      <div class="note" style="margin-top:16px;margin-bottom:0">
+        If a brought-forward / opening balance exists, the calculation starts on the 1st of the first month. If there is no brought-forward balance and the first transaction is after the 1st, the first transaction day's closing balance is required; later months start on the 1st with the previous closing balance carried forward.
+      </div>
+      <div class="row" style="margin-top:18px">
+        <button id="stmtCalcBtn" class="btn" type="button">Calculate interest comparison</button><button id="stmtSettingsBtn" class="btn primary" type="button">⚙ Interest Settings</button>
+        <button id="stmtResetBtn" class="btn" type="button">Reset</button>
+      </div>
+    </div>
+
+    <div class="card ledger" id="stmtPreviewCard" style="display:none;margin-bottom:24px;">
+      <div class="stub"><div class="stub-title">File preview</div><div class="stub-sub" id="stmtPreviewSub"></div></div>
+      <div class="table-scroll"><table id="stmtPreviewTable"></table></div>
+    </div>
+
+    <div class="card input-card" id="stmtSlabCard" style="display:block;">
+      <div class="stub-title">⚙ Interest Settings — Slabs &amp; Rates</div>
+      <div class="stub-sub" style="margin:4px 0 14px;color:var(--muted)">
+        Each day's closing balance is progressively split across these slabs. Daily interest = daily product × annual rate ÷ 365. The slab amount, not the full balance, earns the slab rate.
+      </div>
+      <div class="note">
+        Example: if the closing balance is &#8377;8,00,000, a &#8377;3,00,000 first slab is calculated at its rate, the next slab only on the next portion, and so on.
+      </div>
+      <div id="stmtSlabs"></div>
+      <div class="row" style="margin-top:12px">
+        <button id="stmtAddSlabBtn" class="btn" type="button">+ Add slab</button>
+        <button id="stmtResetSlabBtn" class="btn" type="button">Reset built-in slabs</button>
+        <span id="stmtSlabTotal" class="hint"></span>
+      </div>
+      <div id="stmtSlabSave" class="hint" style="margin-top:8px;color:var(--green)">✓ Slab settings are saved automatically on this device and will not change when a statement is reloaded or recalculated. Use <b>Reset built-in slabs</b> to replace them.</div>
+    </div>
+
+    <div id="stmtResults" style="display:none;">
+      <div class="summary" id="stmtSummary"></div>
+
+      <div class="card ledger">
+        <div class="stub">
+          <div class="stub-title">Month-wise interest comparison</div>
+          <div class="stub-sub" id="stmtLedgerSub"></div>
+        </div>
+        <div class="table-scroll"><table id="stmtTable"></table></div>
+      </div>
+
+      <div class="card" id="stmtDailyCard" style="display:none;">
+        <div class="stub-title">Daily product calculation</div>
+        <div class="stub-sub" style="margin:4px 0 10px;color:var(--muted)">Every displayed day, closing balance, slab allocation, rate and daily interest are shown below.</div>
+        <div class="table-scroll"><table id="stmtDailyTable"></table></div>
+        <div id="stmtBalanceSchedule" class="tblwrap" style="margin-top:12px"></div>
+<div id="stmtDailyTotals"></div>
+      </div>
+
+      <div class="row" style="margin-bottom:24px">
+        <button id="stmtShowDailyBtn" class="btn" type="button">Show daily calculation</button>
+        <button id="stmtPrintBtn" class="btn" type="button">Print / Save report</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECON MODULE -->
+  <div class="module" id="module-recon">
+    <div class="eyebrow">LEDGER &middot; 05 RECONCILIATION</div>
+    <h1 class="page-title">Bank Reconciliation</h1>
+    <p class="lede">Upload your books (cash book) and the bank statement &mdash; CSV, Excel, PDF or JSON &mdash; and this will match entries and list what's outstanding on each side.</p>
+
+    <div class="card input-card">
+      <div class="grid">
+        <div>
+          <label for="reconBooksFile">Books / cash book file</label>
+          <input type="file" id="reconBooksFile" accept=".csv,.xlsx,.xls,.pdf,.json" />
+        </div>
+        <div>
+          <label for="reconBankFile">Bank statement file</label>
+          <input type="file" id="reconBankFile" accept=".csv,.xlsx,.xls,.pdf,.json" />
+        </div>
+        <div>
+          <label for="reconTolerance">Match window (&plusmn; days)</label>
+          <input type="number" id="reconTolerance" value="5" min="0" />
+        </div>
+      </div>
+      <div id="reconStatus" class="note" style="display:none;margin-top:16px;margin-bottom:0;"></div>
+    </div>
+
+    <div class="card input-card" id="reconMappingCard" style="display:none;">
+      <div class="stub-title" style="margin-bottom:12px;">Books columns</div>
+      <div class="grid">
+        <div><label for="booksMapDate">Date column</label><select id="booksMapDate"></select></div>
+        <div><label for="booksMapDebit">Debit column</label><select id="booksMapDebit"></select></div>
+        <div><label for="booksMapCredit">Credit column</label><select id="booksMapCredit"></select></div>
+        <div><label for="booksMapBalance">Balance column (optional)</label><select id="booksMapBalance"></select></div>
+        <div><label for="booksMapDesc">Description column (optional)</label><select id="booksMapDesc"></select></div>
+        <div><label for="booksMapHeaderRow">First row is header?</label><select id="booksMapHeaderRow"><option value="yes">Yes</option><option value="no">No</option></select></div>
+      </div>
+      <div class="stub-title" style="margin:22px 0 12px;">Bank columns</div>
+      <div class="grid">
+        <div><label for="bankMapDate">Date column</label><select id="bankMapDate"></select></div>
+        <div><label for="bankMapDebit">Debit column</label><select id="bankMapDebit"></select></div>
+        <div><label for="bankMapCredit">Credit column</label><select id="bankMapCredit"></select></div>
+        <div><label for="bankMapBalance">Balance column (optional)</label><select id="bankMapBalance"></select></div>
+        <div><label for="bankMapDesc">Description column (optional)</label><select id="bankMapDesc"></select></div>
+        <div><label for="bankMapHeaderRow">First row is header?</label><select id="bankMapHeaderRow"><option value="yes">Yes</option><option value="no">No</option></select></div>
+      </div>
+      <div style="margin-top:18px;"><button id="reconRunBtn" class="btn">Reconcile</button></div>
+    </div>
+
+    <div id="reconResults" style="display:none;">
+      <div class="summary" id="reconSummary"></div>
+      <div class="card ledger" style="margin-bottom:24px;">
+        <div class="stub"><div class="stub-title">Reconciliation statement</div><div class="stub-sub">Books balance reconciled to the bank statement balance</div></div>
+        <div class="table-scroll"><table id="reconStatementTable"></table></div>
+      </div>
+      <div class="card ledger" style="margin-bottom:24px;">
+        <div class="stub"><div class="stub-title">In books, not yet in bank</div><div class="stub-sub" id="reconBooksOnlySub"></div></div>
+        <div class="table-scroll"><table id="reconBooksOnlyTable"></table></div>
+      </div>
+      <div class="card ledger">
+        <div class="stub"><div class="stub-title">In bank, not yet in books</div><div class="stub-sub" id="reconBankOnlySub"></div></div>
+        <div class="table-scroll"><table id="reconBankOnlyTable"></table></div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- HEALTH CHECK MODULE -->
+  <div class="module" id="module-health">
+    <div class="eyebrow">CONTROL &middot; 06 APP HEALTH</div>
+    <h1 class="page-title">App Health Check</h1>
+    <p class="lede">Check navigation, statement mapping, slab settings, calculation functions, dark mode and local storage before relying on the results.</p>
+    <div class="card input-card">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div>
+          <div class="stub-title">Health Check</div>
+          <div class="hint">Run the checks after uploading a statement if you want to verify the interest calculator.</div>
+        </div>
+        <button id="healthRunBtn" class="btn" type="button">Run Health Check</button>
+      </div>
+      <div id="healthSummary" class="summary" style="margin-top:16px"></div>
+      <div class="table-scroll" style="margin-top:14px">
+        <table id="healthTable"></table>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v2.6</strong>
+  </footer>
+</div>
+
+<script>
+/* ---------- Tab switching ---------- */
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('module-' + tab.dataset.module).classList.add('active');
+  });
+});
+
+/* ---------- EMI module logic ---------- */
+const fmtDate = (d) => d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+const fmtINR = (n) => isFinite(n) ? n.toLocaleString("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 }) : "—";
+const addMonths = (date, months) => { const d = new Date(date); d.setMonth(d.getMonth() + months); return d; };
+
+const EMI_DEFAULT_SLABS=[{to:300000,rate:7},{to:500000,rate:8},{to:null,rate:9}];
+function emiNormaliseSlabs(slabs){return (slabs||[]).map(x=>({to:(x.to===null||x.to===''||x.to===undefined)?null:Number(x.to),rate:Number(x.rate)||0})).filter(x=>x.to===null||isFinite(x.to));}
+function emiLoadSlabs(){try{const x=JSON.parse(localStorage.getItem('financial_emi_interest_slabs_v1')||'null');if(Array.isArray(x)&&x.length)return emiNormaliseSlabs(x);}catch(e){}return EMI_DEFAULT_SLABS.map(x=>({...x}));}
+function emiSaveSlabs(slabs){try{localStorage.setItem('financial_emi_interest_slabs_v1',JSON.stringify(emiNormaliseSlabs(slabs)));}catch(e){}}
+function emiAllocate(balance,slabs){const b=Math.max(0,Number(balance)||0),parts=[];let prev=0;for(const s of emiNormaliseSlabs(slabs)){if(b<=prev)break;const upper=s.to===null?Infinity:s.to;const portion=Math.max(0,Math.min(b,upper)-prev);if(portion>0)parts.push({portion,rate:s.rate});if(!isFinite(upper))break;prev=upper;}return parts;}
+function emiSlabInterest(balance,slabs,periodFactor){return emiAllocate(balance,slabs).reduce((a,p)=>a+p.portion*p.rate/100*periodFactor,0);}
+function emiRenderSlabs(){const el=document.getElementById('emiSlabs');if(!el)return;const slabs=emiLoadSlabs();el.innerHTML=slabs.map((x,i)=>`<div class="stmt-slab-row"><div class="wide"><div class="slab-label">Slab ${i+1}</div></div><div><label>Upto amount</label><input class="emi-slab-to" type="number" min="0" step="1" value="${x.to===null?'':x.to}" placeholder="No limit"></div><div><label>Annual rate %</label><input class="emi-slab-rate" type="number" min="0" step="0.01" value="${x.rate}"></div><div><label>Coverage</label><div class="hint">${x.to===null?'Above previous slab':'First ₹'+fmtINR(x.to)}</div></div><div><button class="btn sm" type="button" onclick="emiRemoveSlab(${i})" ${slabs.length<=1?'disabled':''}>Remove</button></div></div>`).join('');el.querySelectorAll('input').forEach(inp=>inp.addEventListener('change',emiPersistSlabs));}
+function emiCurrentSlabs(){return [...document.querySelectorAll('#emiSlabs .stmt-slab-row')].map(r=>({to:r.querySelector('.emi-slab-to').value===''?null:Number(r.querySelector('.emi-slab-to').value),rate:Number(r.querySelector('.emi-slab-rate').value)||0}));}
+function emiPersistSlabs(){emiSaveSlabs(emiCurrentSlabs());if(document.getElementById('emiSlabSave'))document.getElementById('emiSlabSave').textContent='✓ Saved. Slabs remain unchanged until Reset EMI slabs.';renderEmi();}
+function emiAddSlab(){const s=emiLoadSlabs(),last=s[s.length-1];if(last.to===null){const prev=s.length>1?s[s.length-2].to:500000;s.splice(s.length-1,0,{to:Number(prev||0)+200000,rate:last.rate});}else s.push({to:null,rate:last.rate});emiSaveSlabs(s);emiRenderSlabs();renderEmi();}
+function emiRemoveSlab(i){const s=emiLoadSlabs();if(s.length<=1)return;s.splice(i,1);emiSaveSlabs(s);emiRenderSlabs();renderEmi();}
+function emiResetSlabs(){emiSaveSlabs(EMI_DEFAULT_SLABS);emiRenderSlabs();renderEmi();}
+function emiSlabSchedule({principal,count,freqMonths,startDate,repaymentType,moratoriumMonths,moratoriumMode,slabs}){
+ let rows=[],balance=principal,period=0,moratoriumInterest=0;const morat=Math.max(0,Math.floor(moratoriumMonths||0)),pf=freqMonths/12;
+ for(let m=1;m<=morat;m++){period++;const opening=balance,interest=emiSlabInterest(opening,slabs,pf),dueDate=addMonths(startDate,m);moratoriumInterest+=interest;if(moratoriumMode==='accrued'){balance=opening+interest;rows.push({period,dueDate,opening,installment:0,interest,principalPaid:0,closing:balance,moratorium:true,moratoriumPaid:false});}else rows.push({period,dueDate,opening,installment:interest,interest,principalPaid:0,closing:balance,moratorium:true,moratoriumPaid:true});}
+ const scheduleStart=addMonths(startDate,morat),n=count;
+ if(repaymentType==='equal-principal'){const pp0=balance/n;for(let i=1;i<=n;i++){const opening=balance,interest=emiSlabInterest(opening,slabs,pf),pp=i===n?balance:pp0,inst=pp+interest;balance=Math.max(0,balance-pp);period++;rows.push({period,dueDate:addMonths(scheduleStart,i*freqMonths),opening,installment:inst,interest,principalPaid:pp,closing:balance,moratorium:false});}const rr=rows.filter(r=>!r.moratorium);return {rows,installment:rr[0]?.installment||0,firstInstallment:rr[0]?.installment||0,lastInstallment:rr.at(-1)?.installment||0,moratoriumInterest,effectivePrincipal:balance,moratoriumMonths:morat};}
+ const startBalance=balance;function remaining(emi){let b=startBalance;for(let i=1;i<=n;i++){const interest=emiSlabInterest(b,slabs,pf);b-=emi-interest;if(b<=0)return 0;}return b;}
+ let lo=0,hi=Math.max(startBalance/n,1);for(let z=0;z<100&&remaining(hi)>0.0001;z++)hi*=2;for(let z=0;z<120;z++){const mid=(lo+hi)/2;if(remaining(mid)>0)lo=mid;else hi=mid;}const installment=hi;balance=startBalance;
+ for(let i=1;i<=n;i++){const opening=balance,interest=emiSlabInterest(opening,slabs,pf);let pp=installment-interest,inst=installment;if(i===n){pp=balance;inst=pp+interest;}balance=Math.max(0,balance-pp);period++;rows.push({period,dueDate:addMonths(scheduleStart,i*freqMonths),opening,installment:inst,interest,principalPaid:pp,closing:balance,moratorium:false});}
+ return {rows,installment,moratoriumInterest,effectivePrincipal:balance,moratoriumMonths:morat,slab:true};
+}
+
+function computeSchedule({ principal, annualRate, count, freqMonths, startDate, repaymentType, moratoriumMonths, moratoriumMode }) {
+  const monthlyRate = annualRate / 100 / 12;
+  const rows = [];
+  let balance = principal;
+  let period = 0;
+  const morat = Math.max(0, Math.floor(moratoriumMonths || 0));
+  let moratoriumInterest = 0;
+
+  // ---- Moratorium period: no principal repayment; interest is either serviced monthly or capitalized ----
+  for (let m = 1; m <= morat; m++) {
+    period++;
+    const opening = balance;
+    const interest = opening * monthlyRate;
+    moratoriumInterest += interest;
+    const dueDate = addMonths(startDate, m);
+    if (moratoriumMode === 'accrued') {
+      balance = opening + interest; // capitalized into principal, nothing paid
+      rows.push({ period, dueDate, opening, installment: 0, interest, principalPaid: 0, closing: balance, moratorium: true, moratoriumPaid: false });
+    } else {
+      // interest paid: balance (principal) stays untouched, interest paid in cash each month
+      rows.push({ period, dueDate, opening, installment: interest, interest, principalPaid: 0, closing: balance, moratorium: true, moratoriumPaid: true });
+    }
+  }
+
+  const effectivePrincipal = balance; // what the regular schedule will amortize (= original principal, or capitalized amount)
+  const scheduleStart = addMonths(startDate, morat);
+  const periodRate = (annualRate / 100) * (freqMonths / 12);
+  const n = count;
+
+  if (repaymentType === 'equal-principal') {
+    // Fixed principal each period; interest (and so the total installment) shrinks as the balance shrinks.
+    const principalPerPeriod = balance / n;
+    for (let i = 1; i <= n; i++) {
+      const opening = balance;
+      const interest = opening * periodRate;
+      let principalPaid = principalPerPeriod;
+      if (i === n) principalPaid = balance; // clear rounding drift on the last row
+      const thisInstallment = principalPaid + interest;
+      balance = Math.max(0, balance - principalPaid);
+      period++;
+      rows.push({ period, dueDate: addMonths(scheduleStart, i * freqMonths), opening, installment: thisInstallment, interest, principalPaid, closing: balance, moratorium: false });
+    }
+    const regularRows = rows.filter(r => !r.moratorium);
+    return {
+      rows,
+      installment: regularRows[0] ? regularRows[0].installment : 0,
+      firstInstallment: regularRows[0] ? regularRows[0].installment : 0,
+      lastInstallment: regularRows[regularRows.length - 1] ? regularRows[regularRows.length - 1].installment : 0,
+      moratoriumInterest, effectivePrincipal, moratoriumMonths: morat,
+    };
+  }
+
+  // Equal installment (standard EMI): fixed total installment; principal/interest mix shifts over time.
+  let installment;
+  if (periodRate === 0) {
+    installment = balance / n;
+  } else {
+    const factor = Math.pow(1 + periodRate, n);
+    installment = (balance * periodRate * factor) / (factor - 1);
+  }
+  for (let i = 1; i <= n; i++) {
+    const interest = balance * periodRate;
+    let principalPaid = installment - interest;
+    let thisInstallment = installment;
+    if (i === n) {
+      principalPaid = balance;
+      thisInstallment = principalPaid + interest;
+    }
+    const opening = balance;
+    balance = Math.max(0, balance - principalPaid);
+    period++;
+    rows.push({ period, dueDate: addMonths(scheduleStart, i * freqMonths), opening, installment: thisInstallment, interest, principalPaid, closing: balance, moratorium: false });
+  }
+  return { rows, installment, moratoriumInterest, effectivePrincipal, moratoriumMonths: morat };
+}
+
+let chart = null;
+let expandedYear = null;
+
+
+function emiInterestBreakdown(balance,slabs,freqMonths){
+  return emiAllocate(balance,slabs).map((p,i)=>'S'+(i+1)+': ₹'+fmtINR(p.portion)+' @ '+Number(p.rate).toFixed(2)+'% = ₹'+fmtINR(p.portion*p.rate/100*(freqMonths/12))).join('<br>');
+}
+
+function syncEmiPeriodToCount(){
+  const y=Math.max(0,Math.floor(Number(document.getElementById('periodYears')?.value)||0));
+  const m=Math.max(0,Math.min(11,Math.floor(Number(document.getElementById('periodMonths')?.value)||0)));
+  const freq=Number(document.getElementById('freq')?.value)||1;
+  const totalMonths=y*12+m;
+  const count=Math.max(1,Math.ceil(totalMonths/freq));
+  const el=document.getElementById('count');
+  if(el) el.value=count;
+  return count;
+}
+
+
+
+function openLoanMenu(mode){
+  const standard=mode==='standard';
+  const method=document.getElementById('emiInterestMethod');
+  if(method) method.value=standard?'flat':'slab';
+  const rateWrap=document.getElementById('rate')?.closest('.grid > div');
+  const methodWrap=document.getElementById('emiInterestMethod')?.closest('.grid > div');
+  const slab=document.getElementById('emiSlabSettings');
+  if(rateWrap) rateWrap.style.display=standard?'block':'none';
+  if(methodWrap) methodWrap.style.display=standard?'none':'none';
+  if(slab) slab.style.display=standard?'none':'block';
+  const b1=document.getElementById('standardEmiMenuBtn'), b2=document.getElementById('slabEmiMenuBtn');
+  if(b1){b1.classList.toggle('primary',standard);b1.classList.toggle('active',standard);}
+  if(b2){b2.classList.toggle('primary',!standard);b2.classList.toggle('active',!standard);}
+  const d=document.getElementById('loanMenuDescription');
+  if(d) d.textContent=standard ? 'Standard EMI using one annual interest rate throughout the loan.' : 'Separate slab-wise term loan EMI. Set the outstanding-balance slabs and rates below; the slab settings remain unchanged until Reset EMI slabs.';
+  renderEmi();
+}
+
+function showLoanCalculator(mode){
+  const std=document.getElementById('standardEmiMenuPanel');
+  const slab=document.getElementById('slabTermLoanCalculator');
+  const normalCard=document.getElementById('emiCalculatorCard');
+  const b1=document.getElementById('menuStandardEMI');
+  const b2=document.getElementById('menuSlabEMI');
+  if(std) std.style.display=mode==='standard'?'block':'none';
+  if(slab) slab.style.display=mode==='slab'?'block':'none';
+  if(normalCard) normalCard.style.display=mode==='standard'?'block':'none';
+  if(b1){b1.classList.toggle('primary',mode==='standard');b1.classList.toggle('active',mode==='standard');}
+  if(b2){b2.classList.toggle('primary',mode==='slab');b2.classList.toggle('active',mode==='slab');}
+  // The existing slab inputs/results are moved into the dedicated slab menu
+  // when available, without changing the underlying calculation engine.
+  const slabSettings=document.getElementById('emiSlabSettings');
+  const slabResults=document.getElementById('slabEmiResults');
+  if(slabSettings) slabSettings.style.display=mode==='slab'?'block':'none';
+  if(slabResults) slabResults.style.display=mode==='slab'?'block':'none';
+}
+
+function renderEmi() {
+  const principal = Number(document.getElementById('principal').value) || 0;
+  const annualRate = Number(document.getElementById('rate').value) || 0;
+  const count = syncEmiPeriodToCount();
+  const freqMonths = Number(document.getElementById('freq').value);
+  const repaymentType = document.getElementById('repayType').value;
+  const moratoriumMonths = Number(document.getElementById('moratMonths').value) || 0;
+  const moratoriumMode = document.getElementById('moratMode').value;
+  const startDateVal = document.getElementById('startDate').value;
+  if (!principal || !count || !startDateVal) return;
+
+  const startDate = new Date(startDateVal + "T00:00:00");
+  const method=document.getElementById('emiInterestMethod')?.value||'flat';
+  const args={ principal, annualRate, count, freqMonths, startDate, repaymentType, moratoriumMonths, moratoriumMode };
+  const calc=method==='slab'?emiSlabSchedule({...args,slabs:emiLoadSlabs()}):computeSchedule(args);
+  const { rows, installment, firstInstallment, lastInstallment, moratoriumInterest, effectivePrincipal } = calc;
+
+  const regularRows = rows.filter(r => !r.moratorium);
+  const totalInterest = rows.reduce((s, r) => s + r.interest, 0);
+  const totalRepayment = rows.reduce((s, r) => s + r.installment, 0);
+
+  const stats = repaymentType === 'equal-principal'
+    ? [
+        { label: "First installment", value: fmtINR(firstInstallment), color: "var(--ink)" },
+        { label: "Last installment", value: fmtINR(lastInstallment), color: "var(--ink)" },
+        { label: "Total repayment", value: fmtINR(totalRepayment), color: "var(--ink)" },
+        { label: "Total interest paid", value: fmtINR(totalInterest), color: "var(--clay)" },
+      ]
+    : [
+        { label: "Installment amount", value: fmtINR(installment), color: "var(--ink)" },
+        { label: "Total repayment", value: fmtINR(totalRepayment), color: "var(--ink)" },
+        { label: "Total interest paid", value: fmtINR(totalInterest), color: "var(--clay)" },
+        { label: "Total principal", value: fmtINR(principal), color: "var(--green)" },
+      ];
+  if(method==='slab'){
+    stats.push({ label: "Interest method", value: "Progressive slabs", color: "var(--brass)" });
+  }
+  if (moratoriumMonths > 0) {
+    if (moratoriumMode === 'accrued') {
+      stats.push({ label: "Interest capitalized in moratorium", value: fmtINR(moratoriumInterest), color: "var(--brass)" });
+      if (Math.abs(effectivePrincipal - principal) > 0.5) {
+        stats.push({ label: "Principal after moratorium", value: fmtINR(effectivePrincipal), color: "var(--ink)" });
+      }
+    } else {
+      stats.push({ label: "Moratorium interest paid", value: fmtINR(moratoriumInterest), color: "var(--brass)" });
+    }
+  }
+  document.getElementById('summary').innerHTML = stats.map(s => `
+    <div class="stat">
+      <div class="stat-label">${s.label}</div>
+      <div class="stat-value" style="color:${s.color}">&#8377; ${s.value}</div>
+    </div>`).join('');
+
+  const labels = rows.map(r => `#${r.period}`);
+  const step = Math.max(1, Math.ceil(rows.length / 12));
+  try {
+    if (typeof Chart === 'undefined') throw new Error('Chart.js did not load (offline or blocked CDN) — skipping chart, rest of the app is unaffected.');
+    const ctx = document.getElementById('chart').getContext('2d');
+    if (chart) chart.destroy();
+    const isDark = document.body.classList.contains('dark');
+    const chartText = isDark ? '#E6EEE9' : '#5B6B63';
+    const chartGrid = isDark ? '#3A4942' : '#E7ECE7';
+    const chartPrincipal = isDark ? '#2FA58B' : '#0F6E5C';
+    const chartInterest = isDark ? '#F07A69' : '#B5493B';
+    const chartBalance = isDark ? '#E0A43A' : '#C98A2C';
+    chart = new Chart(ctx, {
+      data: {
+        labels,
+        datasets: [
+          { type: 'bar', label: 'Principal', data: rows.map(r => r.principalPaid), backgroundColor: chartPrincipal, stack: 'a' },
+        { type: 'bar', label: 'Interest', data: rows.map(r => r.interest), backgroundColor: chartInterest, stack: 'a' },
+        { type: 'line', label: 'Balance', data: rows.map(r => r.closing), borderColor: chartBalance, borderWidth: 2, pointRadius: 0, yAxisID: 'y' },
+      ],
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { ticks: { autoSkip: false, callback: (v, i) => i % step === 0 ? labels[i] : '', font: { size: 11 }, color: chartText }, grid: { display: false } },
+        y: { ticks: { font: { size: 11 }, color: chartText, callback: (v) => (v/1000).toFixed(0) + 'k' }, grid: { color: chartGrid }, stacked: true },
+      },
+      plugins: {
+        legend: { labels: { font: { size: 12, family: "'IBM Plex Sans', sans-serif" } } },
+        tooltip: { titleFont: { family: "'IBM Plex Mono', monospace" }, bodyFont: { family: "'IBM Plex Mono', monospace" },
+          callbacks: { label: (ctx) => `${ctx.dataset.label}: ₹ ${fmtINR(ctx.parsed.y)}` } },
+      },
+    },
+    });
+  } catch (chartErr) {
+    console.warn('EMI chart skipped:', chartErr.message);
+    const canvas = document.getElementById('chart');
+    if (canvas) canvas.style.display = 'none';
+  }
+
+  const byYear = new Map();
+  rows.forEach(r => {
+    const y = r.dueDate.getFullYear();
+    if (!byYear.has(y)) byYear.set(y, []);
+    byYear.get(y).push(r);
+  });
+  const years = Array.from(byYear.entries());
+  if (expandedYear === null && years.length) expandedYear = years[0][0];
+
+  document.getElementById('ledgerSub').textContent = `${rows.length} entries, grouped by folio year — ${method==='slab'?'progressive slab interest':'single annual rate'} — tap a year to expand`;
+
+  document.getElementById('folios').innerHTML = years.map(([year, yearRows]) => {
+    const open = expandedYear === year || years.length === 1;
+    const yearInterest = yearRows.reduce((s, r) => s + r.interest, 0);
+    const yearPrincipal = yearRows.reduce((s, r) => s + r.principalPaid, 0);
+    const body = yearRows.map(r => `
+      <tr${r.moratorium ? ' style="background:#FBFAF6;"' : ''}>
+        <td>${r.moratorium ? 'M' + r.period : r.period}</td>
+        <td>${fmtDate(r.dueDate)}</td>
+        <td>${fmtINR(r.opening)}</td>
+        <td>${method==='slab' ? emiInterestBreakdown(r.opening, emiLoadSlabs(), freqMonths) : '—'}</td>
+        <td class="debit">${fmtINR(r.interest)}</td>
+        <td class="credit">${fmtINR(r.principalPaid)}</td>
+        <td style="font-weight:600">${r.moratorium && !r.moratoriumPaid ? '<em style="font-weight:400;color:var(--muted);">accrued</em>' : fmtINR(r.installment)}</td>
+        <td>${fmtINR(r.closing)}</td>
+      </tr>`).join('');
+    return `
+      <div>
+        <button class="folio-toggle" data-year="${year}">
+          <span class="folio-name">Folio ${year}</span>
+          <span class="folio-meta">Principal &#8377;${fmtINR(yearPrincipal)} &middot; <span class="debit">Interest &#8377;${fmtINR(yearInterest)}</span> &middot; ${open ? '−' : '+'}</span>
+        </button>
+        ${open ? `
+        <div class="table-scroll">
+          <table>
+            <thead><tr>
+              <th>#</th><th>Due date</th><th>Opening bal.</th><th>Slab-wise interest</th><th>Total interest</th><th>Principal</th><th>Installment</th><th>Closing bal.</th>
+            </tr></thead>
+            <tbody>${body}</tbody>
+          </table>
+        </div>` : ''}
+      </div>`;
+  }).join('');
+
+  // Financial year interest summary: April to March.
+  const fyMap = new Map();
+  rows.forEach(r => {
+    const d=r.dueDate, y=d.getMonth()>=3?d.getFullYear():d.getFullYear()-1;
+    const key=`FY ${y}-${String(y+1).slice(-2)}`;
+    if(!fyMap.has(key)) fyMap.set(key,{interest:0,principal:0,installment:0,from:y,to:y+1});
+    const z=fyMap.get(key); z.interest+=r.interest; z.principal+=r.principalPaid; z.installment+=r.installment;
+  });
+  const fyEntries=[...fyMap.entries()].sort((a,b)=>a[1].from-b[1].from);
+  document.getElementById('fyInterestSummary').innerHTML=`
+    <div class="stub-title">Financial Year-wise Interest</div>
+    <div class="stub-sub" style="margin:4px 0 10px;color:var(--muted)">Interest payable during each Indian financial year (1 April to 31 March).</div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Financial Year</th><th>Interest</th><th>Principal</th><th>Total instalments</th></tr></thead>
+      <tbody>${fyEntries.map(([fy,z])=>`<tr><td><strong>${fy}</strong></td><td class="debit">${fmtINR(z.interest)}</td><td class="credit">${fmtINR(z.principal)}</td><td>${fmtINR(z.installment)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><th>Total</th><th>${fmtINR(fyEntries.reduce((a,[,z])=>a+z.interest,0))}</th><th>${fmtINR(fyEntries.reduce((a,[,z])=>a+z.principal,0))}</th><th>${fmtINR(fyEntries.reduce((a,[,z])=>a+z.installment,0))}</th></tr></tfoot>
+    </table></div>`;
+
+  document.querySelectorAll('.folio-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const y = Number(btn.dataset.year);
+      expandedYear = expandedYear === y ? null : y;
+      renderEmi();
+    });
+  });
+}
+
+['principal','rate','periodYears','periodMonths','freq','startDate','repayType','moratMonths','moratMode'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderEmi);
+  document.getElementById(id).addEventListener('change', renderEmi);
+});
+document.getElementById('emiInterestMethod')?.addEventListener('change',()=>{const on=document.getElementById('emiInterestMethod').value==='slab';document.getElementById('emiSlabSettings').style.display=on?'block':'none';if(on)emiRenderSlabs();renderEmi();});
+document.getElementById('emiSlabQuickBtn')?.addEventListener('click',()=>{
+  const sel=document.getElementById('emiInterestMethod');
+  sel.value='slab';
+  document.getElementById('emiSlabSettings').style.display='block';
+  emiRenderSlabs();
+  document.getElementById('emiSlabSettings').scrollIntoView({behavior:'smooth',block:'start'});
+  renderEmi();
+});
+document.getElementById('emiAddSlabBtn')?.addEventListener('click',emiAddSlab);
+document.getElementById('emiResetSlabBtn')?.addEventListener('click',emiResetSlabs);
+
+document.getElementById('startDate').value = new Date().toISOString().slice(0,10);
+try { renderEmi(); } catch (e) { console.error('renderEmi failed:', e); }
+
+/* ---------- Deposits: sub-tab switching ---------- */
+document.querySelectorAll('#depositTabs .subtab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('#depositTabs .subtab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.depmodule').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('dep-' + t.dataset.dep).classList.add('active');
+  });
+});
+
+const todayStr = new Date().toISOString().slice(0,10);
+['fdStartDate','rdStartDate','sipStartDate'].forEach(id => document.getElementById(id).value = todayStr);
+
+/* ---------- FD / Reinvestment ---------- */
+function tenureToDays(val, unit) {
+  if (unit === 'days') return val;
+  if (unit === 'months') return val * 30.4368; // avg month length for day-count estimate
+  return val * 365; // years
+}
+
+function computeFD({ principal, annualRate, tenureVal, tenureUnit, mode, startDate }) {
+  const totalDays = tenureToDays(tenureVal, tenureUnit);
+  const tenureYears = totalDays / 365;
+  const rows = [];
+
+  function maturityDate() {
+    if (tenureUnit === 'days') {
+      const d = new Date(startDate); d.setDate(d.getDate() + Math.round(tenureVal)); return d;
+    }
+    const totalMonths = tenureUnit === 'years' ? tenureVal * 12 : tenureVal;
+    return addMonths(startDate, totalMonths);
+  }
+
+  if (mode === 'simple') {
+    const interest = principal * (annualRate / 100) * tenureYears;
+    rows.push({ period: 1, date: maturityDate(), opening: principal, interest, closing: principal + interest });
+    return { rows, maturity: principal + interest, totalInterest: interest, reinvest: true };
+  }
+
+  let compoundsPerYear, periodRate, reinvest;
+  if (mode === 'payout-quarterly') {
+    // exact simple interest each quarter — no discount, principal untouched
+    compoundsPerYear = 4;
+    periodRate = (annualRate / 100) / 4;
+    reinvest = false;
+  } else if (mode === 'payout-monthly') {
+    // discounted monthly rate: 12 monthly payouts ≈ equivalent value to 4 exact quarterly payouts
+    compoundsPerYear = 12;
+    periodRate = (annualRate / 100) / (12 * (1 + annualRate / 400));
+    reinvest = false;
+  } else {
+    const map = { 'cum-monthly': 12, 'cum-quarterly': 4, 'cum-halfyearly': 2, 'cum-yearly': 1 };
+    compoundsPerYear = map[mode] || 4;
+    periodRate = (annualRate / 100) / compoundsPerYear;
+    reinvest = true;
+  }
+
+  const monthsPerPeriod = 12 / compoundsPerYear;
+  // derive period count from exact calendar months when the tenure was entered in months/years,
+  // to avoid drift from the average day-length approximation used for day-based tenures
+  const totalPeriods = tenureUnit === 'days'
+    ? compoundsPerYear * tenureYears
+    : (tenureUnit === 'years' ? tenureVal * 12 : tenureVal) / monthsPerPeriod;
+  const fullPeriods = Math.abs(totalPeriods - Math.round(totalPeriods)) < 1e-6 ? Math.round(totalPeriods) : Math.floor(totalPeriods);
+  let balance = principal;
+  let totalPayout = 0;
+
+  for (let i = 1; i <= fullPeriods; i++) {
+    const opening = reinvest ? balance : principal;
+    const interest = opening * periodRate;
+    if (reinvest) balance += interest; else totalPayout += interest;
+    const d = addMonths(startDate, i * monthsPerPeriod);
+    rows.push({ period: i, date: d, opening, interest, closing: reinvest ? balance : principal });
+  }
+  const leftoverPeriods = totalPeriods - fullPeriods;
+  if (leftoverPeriods > 1e-6) {
+    const opening = reinvest ? balance : principal;
+    const interest = opening * periodRate * leftoverPeriods;
+    if (reinvest) balance += interest; else totalPayout += interest;
+    rows.push({ period: fullPeriods + 1, date: maturityDate(), opening, interest, closing: reinvest ? balance : principal, partial: true });
+  }
+
+  const totalInterest = reinvest ? balance - principal : totalPayout;
+  const maturity = reinvest ? balance : principal;
+  return { rows, maturity, totalInterest, reinvest };
+}
+
+function renderFD() {
+  const principal = Number(document.getElementById('fdPrincipal').value) || 0;
+  const annualRate = Number(document.getElementById('fdRate').value) || 0;
+  const tenureVal = Number(document.getElementById('fdTenureVal').value) || 0;
+  const tenureUnit = document.getElementById('fdTenureUnit').value;
+  const mode = document.getElementById('fdMode').value;
+  const startDateVal = document.getElementById('fdStartDate').value;
+  if (!principal || !tenureVal || !startDateVal) return;
+  const startDate = new Date(startDateVal + "T00:00:00");
+
+  const { rows, maturity, totalInterest, reinvest } = computeFD({ principal, annualRate, tenureVal, tenureUnit, mode, startDate });
+  const years = tenureToDays(tenureVal, tenureUnit) / 365;
+  const effYield = years > 0 ? (Math.pow((principal + totalInterest) / principal, 1 / years) - 1) * 100 : 0;
+
+  const stats = reinvest
+    ? [
+        { label: "Maturity value", value: fmtINR(maturity), color: "var(--ink)" },
+        { label: "Total interest", value: fmtINR(totalInterest), color: "var(--clay)" },
+        { label: "Principal", value: fmtINR(principal), color: "var(--green)" },
+        { label: "Effective annual yield", value: effYield.toFixed(2) + " %", color: "var(--brass)", raw: true },
+      ]
+    : [
+        { label: "Total interest paid out", value: fmtINR(totalInterest), color: "var(--clay)" },
+        { label: "Principal (returned at maturity)", value: fmtINR(principal), color: "var(--green)" },
+        { label: "Total received", value: fmtINR(principal + totalInterest), color: "var(--ink)" },
+        { label: "Effective annual yield", value: effYield.toFixed(2) + " %", color: "var(--brass)", raw: true },
+      ];
+  document.getElementById('fdSummary').innerHTML = stats.map(s => `<div class="stat"><div class="stat-label">${s.label}</div><div class="stat-value" style="color:${s.color}">${s.raw ? s.value : '&#8377; ' + s.value}</div></div>`).join('');
+
+  document.getElementById('fdLedgerSub').textContent = `${rows.length} interest ${rows.length === 1 ? (reinvest ? 'credit' : 'payout') : (reinvest ? 'credits' : 'payouts')} ${reinvest ? 'to maturity' : 'over the tenure'}`;
+  document.getElementById('fdTable').innerHTML = `
+    <thead><tr><th>#</th><th>${reinvest ? 'Credit date' : 'Payout date'}</th><th>Opening bal.</th><th>Interest ${reinvest ? 'credited' : 'paid'}</th><th>${reinvest ? 'Closing bal.' : 'Principal'}</th></tr></thead>
+    <tbody>${rows.map(r => `
+      <tr>
+        <td>${r.period}${r.partial ? ' (part)' : ''}</td>
+        <td>${fmtDate(r.date)}</td>
+        <td>${fmtINR(r.opening)}</td>
+        <td class="credit">${fmtINR(r.interest)}</td>
+        <td style="font-weight:600">${fmtINR(r.closing)}</td>
+      </tr>`).join('')}</tbody>`;
+}
+
+['fdPrincipal','fdRate','fdTenureVal','fdTenureUnit','fdMode','fdStartDate'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderFD);
+  document.getElementById(id).addEventListener('change', renderFD);
+});
+
+/* ---------- Recurring Deposit ---------- */
+function computeRD({ installment, annualRate, months, startDate }) {
+  const quarterlyRate = annualRate / 100 / 4;
+  let balance = 0;
+  let qStartBalance = 0;
+  let qDeposits = [];
+  const quarters = [];
+  let qIndex = 1;
+
+  for (let m = 1; m <= months; m++) {
+    balance += installment;
+    qDeposits.push(m);
+    if (m % 3 === 0) {
+      const interest = balance * quarterlyRate;
+      balance += interest;
+      const d = addMonths(startDate, m);
+      quarters.push({ quarter: qIndex, date: d, opening: qStartBalance, deposited: qDeposits.length * installment, interest, closing: balance, partial: false });
+      qStartBalance = balance;
+      qDeposits = [];
+      qIndex++;
+    }
+  }
+  if (qDeposits.length > 0) {
+    const fraction = qDeposits.length / 3;
+    const interest = balance * quarterlyRate * fraction;
+    balance += interest;
+    const d = addMonths(startDate, months);
+    quarters.push({ quarter: qIndex, date: d, opening: qStartBalance, deposited: qDeposits.length * installment, interest, closing: balance, partial: true });
+  }
+  const totalDeposited = installment * months;
+  return { quarters, maturity: balance, totalDeposited, totalInterest: balance - totalDeposited };
+}
+
+function renderRD() {
+  const installment = Number(document.getElementById('rdInstallment').value) || 0;
+  const annualRate = Number(document.getElementById('rdRate').value) || 0;
+  const months = Number(document.getElementById('rdMonths').value) || 0;
+  const startDateVal = document.getElementById('rdStartDate').value;
+  if (!installment || !months || !startDateVal) return;
+  const startDate = new Date(startDateVal + "T00:00:00");
+
+  const { quarters, maturity, totalDeposited, totalInterest } = computeRD({ installment, annualRate, months, startDate });
+
+  document.getElementById('rdSummary').innerHTML = [
+    { label: "Maturity value", value: fmtINR(maturity), color: "var(--ink)" },
+    { label: "Total deposited", value: fmtINR(totalDeposited), color: "var(--green)" },
+    { label: "Total interest", value: fmtINR(totalInterest), color: "var(--clay)" },
+    { label: "Monthly installment", value: fmtINR(installment), color: "var(--ink)" },
+  ].map(s => `<div class="stat"><div class="stat-label">${s.label}</div><div class="stat-value" style="color:${s.color}">&#8377; ${s.value}</div></div>`).join('');
+
+  document.getElementById('rdLedgerSub').textContent = `${quarters.length} quarters over ${months} months`;
+  document.getElementById('rdTable').innerHTML = `
+    <thead><tr><th>Qtr</th><th>Credit date</th><th>Opening bal.</th><th>Deposited</th><th>Interest credited</th><th>Closing bal.</th></tr></thead>
+    <tbody>${quarters.map(q => `
+      <tr>
+        <td>${q.quarter}${q.partial ? ' (part)' : ''}</td>
+        <td>${fmtDate(q.date)}</td>
+        <td>${fmtINR(q.opening)}</td>
+        <td class="credit">${fmtINR(q.deposited)}</td>
+        <td class="debit">${fmtINR(q.interest)}</td>
+        <td style="font-weight:600">${fmtINR(q.closing)}</td>
+      </tr>`).join('')}</tbody>`;
+}
+
+['rdInstallment','rdRate','rdMonths','rdStartDate'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderRD);
+  document.getElementById(id).addEventListener('change', renderRD);
+});
+
+/* ---------- SIP ---------- */
+function computeSIP({ installment, annualRate, months, startDate }) {
+  const i = annualRate / 100 / 12;
+  let balance = 0;
+  let invested = 0;
+  const rows = [];
+  for (let m = 1; m <= months; m++) {
+    balance = (balance + installment) * (1 + i);
+    invested += installment;
+    const d = addMonths(startDate, m - 1);
+    rows.push({ month: m, date: d, invested, corpus: balance, gain: balance - invested });
+  }
+  return { rows, maturity: balance, totalInvested: invested, totalGain: balance - invested };
+}
+
+function renderSIP() {
+  const installment = Number(document.getElementById('sipInstallment').value) || 0;
+  const annualRate = Number(document.getElementById('sipRate').value) || 0;
+  const months = Number(document.getElementById('sipMonths').value) || 0;
+  const startDateVal = document.getElementById('sipStartDate').value;
+  if (!installment || !months || !startDateVal) return;
+  const startDate = new Date(startDateVal + "T00:00:00");
+
+  const { rows, maturity, totalInvested, totalGain } = computeSIP({ installment, annualRate, months, startDate });
+
+  document.getElementById('sipSummary').innerHTML = [
+    { label: "Maturity value", value: fmtINR(maturity), color: "var(--ink)" },
+    { label: "Total invested", value: fmtINR(totalInvested), color: "var(--green)" },
+    { label: "Wealth gained", value: fmtINR(totalGain), color: "var(--clay)" },
+    { label: "Monthly investment", value: fmtINR(installment), color: "var(--ink)" },
+  ].map(s => `<div class="stat"><div class="stat-label">${s.label}</div><div class="stat-value" style="color:${s.color}">&#8377; ${s.value}</div></div>`).join('');
+
+  document.getElementById('sipLedgerSub').textContent = `${rows.length} monthly investments`;
+  document.getElementById('sipTable').innerHTML = `
+    <thead><tr><th>#</th><th>Date</th><th>Invested (cum.)</th><th>Gain</th><th>Corpus value</th></tr></thead>
+    <tbody>${rows.map(r => `
+      <tr>
+        <td>${r.month}</td>
+        <td>${fmtDate(r.date)}</td>
+        <td>${fmtINR(r.invested)}</td>
+        <td class="credit">${fmtINR(r.gain)}</td>
+        <td style="font-weight:600">${fmtINR(r.corpus)}</td>
+      </tr>`).join('')}</tbody>`;
+}
+
+['sipInstallment','sipRate','sipMonths','sipStartDate'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderSIP);
+  document.getElementById(id).addEventListener('change', renderSIP);
+});
+
+try { renderFD(); } catch (e) { console.error('renderFD failed:', e); }
+try { renderRD(); } catch (e) { console.error('renderRD failed:', e); }
+try { renderSIP(); } catch (e) { console.error('renderSIP failed:', e); }
+
+/* ---------- Age Calculator ---------- */
+function diffYMD(from, to) {
+  let y = to.getFullYear() - from.getFullYear();
+  let m = to.getMonth() - from.getMonth();
+  let d = to.getDate() - from.getDate();
+  if (d < 0) {
+    m--;
+    const prevMonth = new Date(to.getFullYear(), to.getMonth(), 0);
+    d += prevMonth.getDate();
+  }
+  if (m < 0) { y--; m += 12; }
+  return { y, m, d };
+}
+
+function nextBirthday(dob, asOf) {
+  let next = new Date(asOf.getFullYear(), dob.getMonth(), dob.getDate());
+  if (next < asOf) next = new Date(asOf.getFullYear() + 1, dob.getMonth(), dob.getDate());
+  const daysLeft = Math.round((next - asOf) / 86400000);
+  return { next, daysLeft };
+}
+
+function renderAge() {
+  const dobVal = document.getElementById('ageDob').value;
+  const asOfVal = document.getElementById('ageAsOf').value;
+  if (!dobVal || !asOfVal) return;
+  const dob = new Date(dobVal + "T00:00:00");
+  const asOf = new Date(asOfVal + "T00:00:00");
+
+  if (asOf < dob) {
+    document.getElementById('ageSummary').innerHTML = `<div class="stat"><div class="stat-label">Notice</div><div class="stat-value" style="color:var(--clay);font-size:14px">"Age as on" date is before the date of birth.</div></div>`;
+    document.getElementById('ageTable').innerHTML = '';
+    return;
+  }
+
+  const { y, m, d } = diffYMD(dob, asOf);
+  const totalDays = Math.round((asOf - dob) / 86400000);
+  const totalWeeks = Math.floor(totalDays / 7);
+  const totalMonths = y * 12 + m;
+  const { next, daysLeft } = nextBirthday(dob, asOf);
+
+  document.getElementById('ageSummary').innerHTML = [
+    { label: "Exact age", value: `${y}y ${m}m ${d}d`, color: "var(--ink)", raw: true },
+    { label: "Total days lived", value: totalDays.toLocaleString('en-IN'), color: "var(--green)", raw: true },
+    { label: "Total months", value: totalMonths, color: "var(--ink)", raw: true },
+    { label: "Next birthday", value: `${fmtDate(next)} (${daysLeft}d)`, color: "var(--brass)", raw: true },
+  ].map(s => `<div class="stat"><div class="stat-label">${s.label}</div><div class="stat-value" style="color:${s.color};${s.raw ? 'font-size:17px' : ''}">${s.raw ? s.value : s.value}</div></div>`).join('');
+
+  const rows = [
+    { unit: "Years, months, days", value: `${y} years, ${m} months, ${d} days` },
+    { unit: "Total complete months", value: totalMonths.toLocaleString('en-IN') },
+    { unit: "Total weeks", value: totalWeeks.toLocaleString('en-IN') },
+    { unit: "Total days", value: totalDays.toLocaleString('en-IN') },
+    { unit: "Date of birth", value: fmtDate(dob) },
+    { unit: "Age as on", value: fmtDate(asOf) },
+  ];
+  document.getElementById('ageTable').innerHTML = `
+    <thead><tr><th style="text-align:left">Unit</th><th style="text-align:right">Value</th></tr></thead>
+    <tbody>${rows.map(r => `<tr><td>${r.unit}</td><td style="text-align:right;font-weight:600">${r.value}</td></tr>`).join('')}</tbody>`;
+}
+
+document.getElementById('ageDob').value = "1990-01-01";
+document.getElementById('ageAsOf').value = todayStr;
+['ageDob','ageAsOf'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderAge);
+  document.getElementById(id).addEventListener('change', renderAge);
+});
+try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
+
+/* ---------- Bank Statement Interest Calculator v2.6 ---------- */
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+let stmtRawRows = [];
+let stmtLastResult = null;
+
+const STMT_DEFAULT_SLABS = [
+  {to:300000, rate:4},
+  {to:500000, rate:5},
+  {to:null, rate:6}
+];
+
+function stmtEsc(s){
+  return String(s===null||s===undefined?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+function stmtMoney(n){
+  return Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function stmtDate(d){
+  if(!(d instanceof Date)||isNaN(d)) return '';
+  return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+}
+function stmtMonthKey(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function stmtMonthLabel(k){
+  const [y,m]=k.split('-');
+  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(m)-1]+" '"+String(y).slice(2);
+}
+function stmtDayKey(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function stmtDaysInYear(y){
+  return ((y%4===0&&y%100!==0)||y%400===0)?366:365;
+}
+
+function parseDateFlexible(val) {
+  if (val instanceof Date && !isNaN(val)) return val;
+  if (typeof val === 'number') {
+    try {
+      const d = XLSX.SSF.parse_date_code(val);
+      if (d) return new Date(d.y,d.m-1,d.d);
+    } catch(e){}
+  }
+  if (typeof val !== 'string') return null;
+  const s=val.trim();
+  if(!s) return null;
+  let m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if(m){
+    let y=Number(m[3]); if(y<100)y+=y>70?1900:2000;
+    const d=new Date(y,Number(m[2])-1,Number(m[1]));
+    return isNaN(d)?null:d;
+  }
+  m=s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if(m){const d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));return isNaN(d)?null:d;}
+  m=s.match(/^(\d{1,2})[\s\-]([A-Za-z]{3,9})[\s\-](\d{2,4})$/);
+  if(m){
+    let y=Number(m[3]); if(y<100)y+=y>70?1900:2000;
+    const months={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+    const mi=months[m[2].slice(0,3).toLowerCase()];
+    if(mi!==undefined){const d=new Date(y,mi,Number(m[1]));return isNaN(d)?null:d;}
+  }
+  const f=new Date(s);
+  return isNaN(f)?null:f;
+}
+
+function parseNumberFlexible(val) {
+  if(typeof val==='number') return val;
+  if(val===null||val===undefined) return 0;
+  let s=String(val).trim(); if(!s)return 0;
+  let neg=false;
+  if(/^\(.*\)$/.test(s)){neg=true;s=s.slice(1,-1);}
+  if(/\bdr\b/i.test(s))neg=true;
+  s=s.replace(/\b(cr|dr)\b/i,'').replace(/[₹$,\s]/g,'');
+  const n=parseFloat(s);
+  return isNaN(n)?0:(neg?-Math.abs(n):n);
+}
+
+async function parseStatementFile(file) {
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(ext==='csv'||ext==='xlsx'||ext==='xls'){
+    const data=await file.arrayBuffer();
+    const wb=XLSX.read(data,{type:'array',cellDates:true});
+    const sheet=wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(sheet,{header:1,raw:false,defval:''});
+  }
+  if(ext==='json'){
+    const text=await file.text();
+    let data; try{data=JSON.parse(text);}catch(e){throw new Error('Not valid JSON.');}
+    if(!Array.isArray(data)||!data.length)throw new Error('JSON must be a non-empty array.');
+    if(Array.isArray(data[0]))return data;
+    const headers=Array.from(data.reduce((set,obj)=>{Object.keys(obj).forEach(k=>set.add(k));return set;},new Set()));
+    return [headers,...data.map(obj=>headers.map(h=>obj[h]!==undefined?obj[h]:''))];
+  }
+  if(ext==='pdf'){
+    if(!window.pdfjsLib)throw new Error('PDF reader failed to load.');
+    const data=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data}).promise;
+    const rows=[];
+    for(let p=1;p<=pdf.numPages;p++){
+      const page=await pdf.getPage(p), content=await page.getTextContent();
+      const lines=new Map();
+      content.items.forEach(item=>{
+        const y=Math.round(item.transform[5]);
+        if(!lines.has(y))lines.set(y,[]);
+        lines.get(y).push(item);
+      });
+      Array.from(lines.keys()).sort((a,b)=>b-a).forEach(y=>{
+        const items=lines.get(y).sort((a,b)=>a.transform[4]-b.transform[4]);
+        const t=items.map(i=>i.str).join(' ').trim();
+        if(t){
+          const tokens=t.split(/\s{2,}/).map(x=>x.trim()).filter(Boolean);
+          if(tokens.length>1)rows.push(tokens);
+        }
+      });
+    }
+    return rows;
+  }
+  throw new Error('Unsupported file type.');
+}
+
+function stmtGuessColumn(headers,keywords){
+  for(let i=0;i<headers.length;i++){
+    const h=String(headers[i]||'').toLowerCase();
+    if(keywords.some(k=>h.includes(k)))return i;
+  }
+  return -1;
+}
+
+function stmtFindHeaderRow(rows){
+  const max=Math.min(rows.length,30);let best=-1,bestScore=-1;
+  for(let i=0;i<max;i++){const cells=(rows[i]||[]).map(x=>String(x??'').trim().toLowerCase()),j=cells.join(' | ');const date=/\bdate\b|transaction date|txn date|posting date/.test(j),bal=/\bbalance\b|closing balance|running balance/.test(j),flow=/debit|withdrawal|credit|deposit|\bdr\b|\bcr\b/.test(j),nar=/narration|description|particulars|transaction details/.test(j);if(date&&bal&&(flow||nar)){let score=20+(flow?5:0)+(nar?4:0)+(cells.length>=5?3:0)+(/transaction date/.test(j)?5:0);if(/opening balance|total debit|total credit|closing balance/.test(j)&&!date)score-=20;if(score>bestScore){bestScore=score;best=i;}}}return best;
+}
+function stmtHeaderInfo(rows){
+  const mode=document.getElementById('mapHeaderRow').value;
+  if(mode==='no') return {headerIndex:-1,headers:null,start:0};
+  if(mode==='yes') return {headerIndex:0,headers:rows[0]||[],start:1};
+  const idx=stmtFindHeaderRow(rows);
+  if(idx>=0) return {headerIndex:idx,headers:rows[idx]||[],start:idx+1};
+  return {headerIndex:0,headers:rows[0]||[],start:1};
+}
+
+function populateStatementPreview(rows){
+  stmtRawRows=rows;
+  const maxCols=rows.reduce((m,r)=>Math.max(m,r.length),0);
+  const info=stmtHeaderInfo(rows);
+  const headers=info.headers;
+
+  const options=()=>{
+    let h='<option value="-1">— not present —</option>';
+    for(let i=0;i<maxCols;i++){
+      const label=headers&&headers[i]!==undefined&&headers[i]!==''?headers[i]:'Column '+(i+1);
+      h+=`<option value="${i}">${stmtEsc(label)}</option>`;
+    }
+    return h;
+  };
+
+  ['mapDate','mapDebit','mapCredit','mapBalance'].forEach(id=>{
+    document.getElementById(id).innerHTML=options();
+  });
+
+  if(headers){
+    const dc=stmtGuessColumn(headers,['date','txn date','transaction date','posting date','value date']);
+    const db=stmtGuessColumn(headers,['debit','withdrawal','dr amount','dr amt','debit amount']);
+    const cr=stmtGuessColumn(headers,['credit','deposit','cr amount','cr amt','credit amount']);
+    const ba=stmtGuessColumn(headers,['balance','closing balance','running balance']);
+    if(dc>=0)document.getElementById('mapDate').value=dc;
+    if(db>=0)document.getElementById('mapDebit').value=db;
+    if(cr>=0)document.getElementById('mapCredit').value=cr;
+    if(ba>=0)document.getElementById('mapBalance').value=ba;
+  }
+
+  const previewStart=Math.max(0,info.headerIndex>=0?info.headerIndex:0);
+  const preview=rows.slice(previewStart,Math.min(rows.length,previewStart+8));
+  document.getElementById('stmtPreviewTable').innerHTML=
+    `<thead><tr>${Array.from({length:maxCols},(_,i)=>`<th style="text-align:left">${stmtEsc(headers&&headers[i]?headers[i]:'Col '+(i+1))}</th>`).join('')}</tr></thead>`+
+    `<tbody>${preview.map(r=>`<tr>${Array.from({length:maxCols},(_,i)=>`<td style="text-align:left">${stmtEsc(r[i]??'')}</td>`).join('')}</tr>`).join('')}</tbody>`;
+
+  document.getElementById('stmtPreviewSub').textContent=
+    `${rows.length} rows detected — ${info.headerIndex>=0?'header row '+(info.headerIndex+1)+' detected; review mapping before calculation.':'no clear header row detected; review mapping before calculation.'}`;
+
+  document.getElementById('stmtMappingCard').style.display='block';
+  document.getElementById('stmtPreviewCard').style.display='block';
+  document.getElementById('stmtSlabCard').style.display='block';
+  document.getElementById('stmtResults').style.display='none';
+}
+
+function stmtRowsFromMapping(){
+  const info=stmtHeaderInfo(stmtRawRows);
+  const dateCol=Number(document.getElementById('mapDate').value);
+  const debitCol=Number(document.getElementById('mapDebit').value);
+  const creditCol=Number(document.getElementById('mapCredit').value);
+  const balCol=Number(document.getElementById('mapBalance').value);
+  const start=info.start;
+  const rows=[];
+  for(let i=start;i<stmtRawRows.length;i++){
+    const r=stmtRawRows[i]||[];
+    const date=parseDateFlexible(r[dateCol]);
+    if(!date)continue;
+    const debit=debitCol>=0?Math.abs(parseNumberFlexible(r[debitCol])):0;
+    const credit=creditCol>=0?Math.abs(parseNumberFlexible(r[creditCol])):0;
+    const balance=balCol>=0 && String(r[balCol]??'').trim()!=='' ? parseNumberFlexible(r[balCol]) : null;
+    if(!debit&&!credit&&balance===null)continue;
+    rows.push({date,debit,credit,balance,narration:r.map(x=>String(x??'')).join(' ').trim(),sourceRow:i+1});
+  }
+  rows.sort((a,b)=>a.date-b.date);
+  return rows;
+}
+
+function stmtExtractOpening(rows){
+  // IDFC-style statements often have a summary row:
+  // "Opening Balance | Total Debit | Total Credit | Closing Balance"
+  // followed by a numeric row. Never parse the text label itself as zero.
+  const raw=stmtRawRows||[];
+  for(let i=0;i<raw.length;i++){
+    const r=raw[i]||[];
+    const joined=r.map(x=>String(x??'')).join(' ').toLowerCase();
+    if(/opening\s+balance|brought\s+forward|balance\s+b\/f|opening\s+bal(?:ance)?/.test(joined)){
+      for(let j=i;j<=Math.min(i+2,raw.length-1);j++){
+        const rr=raw[j]||[];
+        for(let c=0;c<rr.length;c++){
+          const v=rr[c];
+          if(typeof v==='number' && isFinite(v) && Number(v)!==0) return Number(v);
+          const text=String(v??'').trim();
+          if(/^[-+]?₹?\s*[\d,]+(?:\.\d+)?$/.test(text)){
+            const n=parseNumberFlexible(text);
+            if(isFinite(n)) return n;
+          }
+        }
+      }
+    }
+  }
+  // Fallback: explicit label followed by a numeric value anywhere in the same row.
+  for(const r of raw){
+    const cells=(r||[]).map(x=>String(x??''));
+    const joined=cells.join(' ');
+    if(/opening\s+balance|brought\s+forward|balance\s+b\/f|opening\s+bal(?:ance)?/i.test(joined)){
+      for(const cell of cells){
+        if(/^[-+]?₹?\s*[\d,]+(?:\.\d+)?$/.test(cell.trim())){
+          const n=parseNumberFlexible(cell);
+          if(isFinite(n)) return n;
+        }
+      }
+    }
+  }
+  return null;
+}
+function stmtBuildDaily(rows){
+  if(!rows.length)return {days:[],error:'No dated transactions could be read from the mapped statement.'};
+  const first=new Date(rows[0].date.getFullYear(),rows[0].date.getMonth(),rows[0].date.getDate());
+  const last=new Date(rows[rows.length-1].date.getFullYear(),rows[rows.length-1].date.getMonth(),rows[rows.length-1].date.getDate());
+  const byDay={};
+  rows.forEach(r=>{(byDay[stmtDayKey(r.date)]??=[]).push(r);});
+
+  let opening=stmtExtractOpening(rows);
+  let startDate;
+  let firstMonthMode='full';
+
+  if(opening===null && first.getDate()>1){
+    const firstRows=byDay[stmtDayKey(first)]||[];
+    const withBal=firstRows.filter(r=>r.balance!==null&&isFinite(r.balance));
+    if(!withBal.length){
+      return {days:[],error:'No brought-forward balance is shown and the first transaction is after the 1st. A closing balance on the first transaction day is required to calculate interest from that date.',missingOpening:true};
+    }
+    opening=withBal[withBal.length-1].balance;
+    startDate=first;
+    firstMonthMode='from-first-transaction';
+  }else{
+    if(opening===null){
+      const firstRows=byDay[stmtDayKey(first)]||[];
+      const withBal=firstRows.filter(r=>r.balance!==null&&isFinite(r.balance));
+      if(withBal.length){
+        const net=firstRows.reduce((a,r)=>a+r.credit-r.debit,0);
+        opening=withBal[withBal.length-1].balance-net;
+      }
+    }
+    if(opening===null||!isFinite(opening)){
+      return {days:[],error:'Opening / brought-forward balance could not be established from the statement.',missingOpening:true};
+    }
+    // An explicit brought-forward/opening balance means the interest period starts
+    // on the 1st of that calendar month, even when the first transaction is later.
+    startDate=new Date(first.getFullYear(),first.getMonth(),1);
+    firstMonthMode='from-opening-balance';
+  }
+
+  const end=new Date(last.getFullYear(),last.getMonth()+1,0);
+  const days=[];
+  let balance=opening;
+  for(let d=new Date(startDate);d<=end;d.setDate(d.getDate()+1)){
+    const tx=byDay[stmtDayKey(d)]||[];
+    if(tx.length){
+      const withBal=tx.filter(r=>r.balance!==null&&isFinite(r.balance));
+      if(withBal.length)balance=withBal[withBal.length-1].balance;
+      else tx.forEach(r=>balance+=r.credit-r.debit);
+    }
+    days.push({date:new Date(d),month:stmtMonthKey(d),daysInMonth:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),balance,hasTransaction:tx.length>0,txCount:tx.length});
+  }
+  const completeLast=last.getDate()===end.getDate();
+  return {days,from:first,to:last,opening,closing:balance,startDate,firstMonthMode,partial:!(first.getDate()===1&&completeLast)||firstMonthMode!=='full'};
+}
+
+function stmtSlabRows(){
+  return [...document.querySelectorAll('#stmtSlabs .stmt-slab-row')].map(r=>({
+    to:r.querySelector('.slab-to')?.value===''?null:Number(r.querySelector('.slab-to')?.value),
+    rate:Number(r.querySelector('.slab-rate')?.value)||0
+  }));
+}
+function stmtNormaliseSlabs(slabs){
+  return slabs.map(x=>({to:x.to===null||x.to===undefined||x.to===''?null:Math.max(0,Number(x.to)),rate:Math.max(0,Number(x.rate)||0)}));
+}
+function stmtValidateSlabs(slabs){
+  const e=[];
+  if(!slabs.length)e.push('Add at least one interest slab.');
+  slabs.forEach((s,i)=>{
+    const prev=i?slabs[i-1].to:0;
+    if(s.to!==null&&s.to<prev)e.push('Slab '+(i+1)+': upper amount must be greater than or equal to the previous slab.');
+    if(s.rate<0)e.push('Slab '+(i+1)+': rate cannot be negative.');
+    if(i<slabs.length-1&&s.to===null)e.push('Only the final slab can have no upper limit.');
+  });
+  if(slabs.length&&slabs[slabs.length-1].to!==null)e.push('The final slab should normally have no upper limit.');
+  return e;
+}
+function stmtAllocate(balance,slabs){
+  const b=Math.max(0,Number(balance)||0),parts=[];
+  let prev=0;
+  for(const s of slabs){
+    if(b<=prev)break;
+    const upper=s.to===null?Infinity:s.to;
+    const portion=Math.max(0,Math.min(b,upper)-prev);
+    if(portion>0)parts.push({portion,rate:s.rate});
+    if(!isFinite(upper))break;
+    prev=upper;
+  }
+  return parts;
+}
+function stmtSaveSlabs(slabs){
+  try{localStorage.setItem('financial_stmt_interest_slabs_v11',JSON.stringify(slabs));}catch(e){}
+}
+function stmtLoadSlabs(){
+  try{
+    const x=JSON.parse(localStorage.getItem('financial_stmt_interest_slabs_v11')||'null');
+    if(Array.isArray(x)&&x.length)return stmtNormaliseSlabs(x);
+  }catch(e){}
+  return STMT_DEFAULT_SLABS.map(x=>({...x}));
+}
+function stmtRenderSlabs(slabs){
+  const el=document.getElementById('stmtSlabs'); if(!el)return;
+  el.innerHTML=slabs.map((s,i)=>`
+    <div class="stmt-slab-row" data-i="${i}">
+      <div class="wide"><div class="slab-label">Slab ${i+1}</div></div>
+      <div><label>Upto amount</label><input class="slab-to" type="number" min="0" step="1" value="${s.to===null?'':s.to}" placeholder="No limit"></div>
+      <div><label>Annual rate %</label><input class="slab-rate" type="number" min="0" step="0.01" value="${s.rate}"></div>
+      <div><label>Coverage</label><div class="hint">${s.to===null?'Above previous slab':'First ₹'+stmtMoney(s.to)}</div></div>
+      <div><button class="btn sm" type="button" onclick="stmtRemoveSlab(${i})" ${slabs.length<=1?'disabled':''}>Remove</button></div>
+    </div>`).join('');
+  const finite=slabs.reduce((a,s)=>a+(s.to===null?0:Number(s.to||0)),0);
+  document.getElementById('stmtSlabTotal').innerHTML=`<b>Finite slab limits:</b> ₹${stmtMoney(finite)} <span class="hint">(no-limit slab excluded)</span>`;
+}
+function stmtPersistSlabs(){
+  const slabs=stmtNormaliseSlabs(stmtSlabRows());
+  stmtSaveSlabs(slabs);
+  stmtRenderSlabs(slabs);
+}
+function stmtAddSlab(){
+  // Preserve every existing slab's amount and rate. Only the newly introduced
+  // slab receives defaults. Existing settings remain unchanged until Reset.
+  let s=stmtSlabRows();
+  if(!s.length)s=STMT_DEFAULT_SLABS.map(x=>({...x}));
+  const last={...s[s.length-1]};
+  if(last.to===null){
+    const prev=s.length>1?s[s.length-2].to:300000;
+    const newTo=Number(prev||300000)+500000;
+    s.splice(s.length-1,0,{to:newTo,rate:last.rate});
+    // The existing final slab retains its rate and becomes the no-limit slab.
+  }else{
+    s.push({to:null,rate:last.rate});
+  }
+  s=stmtNormaliseSlabs(s);stmtSaveSlabs(s);stmtRenderSlabs(s);
+}
+function stmtRemoveSlab(i){
+  let s=stmtSlabRows(); if(s.length<=1)return;
+  s.splice(i,1);s=stmtNormaliseSlabs(s);stmtSaveSlabs(s);stmtRenderSlabs(s);
+}
+function stmtResetSlabs(){
+  const s=STMT_DEFAULT_SLABS.map(x=>({...x}));
+  stmtSaveSlabs(s);stmtRenderSlabs(s);
+}
+
+function stmtCalculate(rows,slabs,manualBankInterest){
+  const daily=stmtBuildDaily(rows);
+  if(!daily.days.length)return {...daily,monthly:[],total:0};
+  const out=[];let total=0;
+  daily.days.forEach(d=>{
+    const parts=stmtAllocate(d.balance,slabs);
+    let interest=0;
+    parts.forEach(p=>interest+=p.portion*p.rate/100/365);
+    total+=interest;out.push({...d,parts,interest});
+  });
+  const by={};
+  out.forEach(d=>{
+    const m=by[d.month]??={month:d.month,days:d.daysInMonth,calculatedDays:0,dailyProduct:0,interest:0,slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),actualInterest:0};
+    m.dailyProduct+=d.balance;m.calculatedDays++;m.interest+=d.interest;
+    d.parts.forEach((p,i)=>{m.slabProducts[i]+=p.portion;m.slabInterest[i]+=p.portion*p.rate/100/365;});
+  });
+  rows.forEach(r=>{
+    if(r.credit>0&&/monthly interest credit|interest credit|\binterest\b|\bint\.?\s*credit/i.test(r.narration||'')){
+      const k=stmtMonthKey(r.date);
+      const m=by[k]??={month:k,days:new Date(r.date.getFullYear(),r.date.getMonth()+1,0).getDate(),calculatedDays:0,dailyProduct:0,interest:0,slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),actualInterest:0};
+      m.actualInterest+=r.credit;
+    }
+  });
+  const monthly=Object.values(by).sort((a,b)=>a.month.localeCompare(b.month));
+  const autoBank=monthly.reduce((a,m)=>a+(m.actualInterest||0),0);
+  const bankInterest=manualBankInterest!==null&&!isNaN(manualBankInterest)?manualBankInterest:(autoBank>0?autoBank:null);
+  return {...daily,daily:out,monthly,total,autoBankInterest:autoBank,bankInterest,overallDifference:bankInterest!==null?total-bankInterest:null};
+}
+
+function stmtRenderResults(result,slabs){
+  const box=document.getElementById('stmtResults');
+  if(result.error){
+    box.style.display='block';
+    document.getElementById('stmtSummary').innerHTML='<div class="stat stmt-highlight"><div class="stat-label">Calculation notice</div><div class="stat-value" style="font-size:14px;color:var(--clay)">'+stmtEsc(result.error)+'</div></div>';
+    document.getElementById('stmtTable').innerHTML='';return;
+  }
+  const months=result.monthly||[];
+  const totalBank=result.bankInterest;
+  const diff=result.overallDifference;
+  const bankAvailable=totalBank!==null&&totalBank!==undefined;
+  const bankSource=(document.getElementById('stmtBankInterest').value.trim()!=='')?'Manual / entered':'Detected from interest-credit transactions';
+  document.getElementById('stmtSummary').innerHTML=[
+    {label:'Calculated interest',value:'₹ '+stmtMoney(result.total),cls:''},
+    {label:'Bank interest credited',value:bankAvailable?'₹ '+stmtMoney(totalBank):'Not detected',cls:''},
+    {label:'Difference',value:bankAvailable?((diff>=0?'+':'−')+'₹ '+stmtMoney(Math.abs(diff||0))):'—',cls:bankAvailable?(Math.abs(diff||0)<0.01?'stmt-good':'stmt-review'):''},
+    {label:'Days calculated',value:String(result.days.length),cls:''}
+  ].map(s=>`<div class="stat"><div class="stat-label">${s.label}</div><div class="stat-value ${s.cls}">${s.value}</div></div>`).join('');
+  document.getElementById('stmtLedgerSub').textContent=
+    `${months.length} calendar month(s) · ${result.days.length} day(s) · bank figure: ${bankSource}`;
+  let h='<thead><tr><th style="text-align:left">Month</th><th>Calendar days</th><th>Calculated days</th><th>Daily product</th><th>Calculated interest</th><th>Bank interest credited</th><th>Difference</th><th>Status</th></tr></thead><tbody>';
+  months.forEach(m=>{
+    const b=Number(m.actualInterest||0);
+    const d=b?m.interest-b:null;
+    const status=b===0?'<span class="hint">No interest credit found</span>':Math.abs(d)<0.01?'<span class="stmt-good">Matches</span>':'<span class="stmt-review">Review</span>';
+    h+=`<tr><td style="text-align:left">${stmtMonthLabel(m.month)}</td><td>${m.days}</td><td>${m.calculatedDays}</td><td>₹${stmtMoney(m.dailyProduct)}</td><td>₹${stmtMoney(m.interest)}</td><td>${b?'₹'+stmtMoney(b):'—'}</td><td>${d===null?'—':(d>=0?'+':'−')+'₹'+stmtMoney(Math.abs(d))}</td><td>${status}</td></tr>`;
+  });
+  h+=`</tbody><tfoot><tr><th style="text-align:left">TOTAL</th><th></th><th>${months.reduce((a,m)=>a+m.calculatedDays,0)}</th><th>₹${stmtMoney(months.reduce((a,m)=>a+m.dailyProduct,0))}</th><th>₹${stmtMoney(result.total)}</th><th>${bankAvailable?'₹'+stmtMoney(totalBank):'—'}</th><th>${bankAvailable?((diff>=0?'+':'−')+'₹'+stmtMoney(Math.abs(diff||0))):'—'}</th><th></th></tr></tfoot>`;
+  document.getElementById('stmtTable').innerHTML=h;
+  let note='Daily product × annual rate ÷ 365. Daily product is the applicable balance/slab portion for that date.';
+  if(result.opening!==null && result.opening!==undefined){
+    note += ' Opening / brought-forward balance used for the first day: ₹'+stmtMoney(result.opening)+'.';
+  }
+  if(result.partial){
+    note += result.firstMonthMode==='from-first-transaction'
+      ? ' No brought-forward balance was available, so the first month starts on '+stmtDate(result.startDate)+'; later months start on the 1st.'
+      : ' An opening / brought-forward balance is available, so the first month starts on the 1st; the balance is carried forward until the first transaction changes it.';
+  }
+  document.getElementById('stmtLedgerSub').insertAdjacentHTML('afterend',`<div class="note" style="margin:10px 20px">${stmtEsc(note)}</div>`);
+  document.getElementById('stmtResults').style.display='block';
+  document.getElementById('stmtDailyCard').style.display='none';
+  document.getElementById('stmtShowDailyBtn').textContent='Show daily calculation';
+  stmtLastResult={result,slabs};
+}
+
+function stmtShowDaily(){
+  const box=document.getElementById('stmtDailyCard');
+  if(!stmtLastResult)return;
+  const {result,slabs}=stmtLastResult;
+  if(box.style.display==='block'){box.style.display='none';document.getElementById('stmtShowDailyBtn').textContent='Show daily calculation';return;}
+  const days=result.daily||[];
+  let bh='<table class="interest-table"><thead><tr><th style="text-align:left">Date</th><th>Closing Balance on Date</th></tr></thead><tbody>';
+  days.forEach(d=>{bh+=`<tr><td style="text-align:left">${stmtDate(d.date)}</td><td>₹${stmtMoney(d.balance)}</td></tr>`;});
+  bh+='</tbody></table>';
+  const bs=document.getElementById('stmtBalanceSchedule'); if(bs)bs.innerHTML='<h3 style="margin:12px 0 6px">Daily Date &amp; Balance Schedule</h3>'+bh;
+  let h='<thead><tr><th style="text-align:left">Date</th><th>Days in month</th><th>Closing balance</th><th>Daily product (Balance)</th><th>Interest basis</th>';
+  slabs.forEach((s,i)=>h+=`<th>Slab ${i+1} product</th><th>Rate</th><th>Daily interest</th>`);
+  h+='<th>Total daily interest</th></tr></thead><tbody>';
+  days.forEach(d=>{
+    h+=`<tr><td style="text-align:left">${stmtDate(d.date)}</td><td>${d.daysInMonth}</td><td>₹${stmtMoney(d.balance)}</td><td>₹${stmtMoney(d.balance)}</td><td>365-day basis</td>`;
+    slabs.forEach((s,i)=>{
+      const p=d.parts[i]||{portion:0,rate:s.rate};
+      const di=p.portion*p.rate/100/365;
+      h+=`<td>₹${stmtMoney(p.portion)}</td><td>${Number(p.rate).toFixed(2)}%</td><td>₹${stmtMoney(di)}</td>`;
+    });
+    h+=`<td><b>₹${stmtMoney(d.interest)}</b></td></tr>`;
+  });
+  const totalProduct=days.reduce((a,d)=>a+d.balance,0);
+  const totalInterest=days.reduce((a,d)=>a+d.interest,0);
+  h+='</tbody><tfoot><tr><th colspan="3" style="text-align:left">TOTAL</th><th>₹'+stmtMoney(totalProduct)+'</th>';
+  slabs.forEach((s,i)=>{
+    const product=days.reduce((a,d)=>a+((d.parts[i]||{}).portion||0),0);
+    const interest=days.reduce((a,d)=>a+((d.parts[i] ? d.parts[i].portion*d.parts[i].rate/100/365 : 0)),0);
+    h+=`<th>₹${stmtMoney(product)}</th><th></th><th>₹${stmtMoney(interest)}</th>`;
+  });
+  h+=`<th>₹${stmtMoney(totalInterest)}</th></tr></tfoot>`;
+  document.getElementById('stmtDailyTable').innerHTML=h;
+  document.getElementById('stmtDailyTotals').innerHTML=
+    `<div class="summary" style="margin-top:16px"><div class="stat"><div class="stat-label">Total daily product</div><div class="stat-value">₹${stmtMoney(totalProduct)}</div></div><div class="stat"><div class="stat-label">Total daily interest</div><div class="stat-value">₹${stmtMoney(totalInterest)}</div></div><div class="stat"><div class="stat-label">Days displayed</div><div class="stat-value">${days.length}</div></div></div>`;
+  box.style.display='block';
+  document.getElementById('stmtShowDailyBtn').textContent='Hide daily calculation';
+}
+
+function stmtRunCalculation(){
+  const rows=stmtRowsFromMapping();
+  if(!rows.length){
+    const info=stmtHeaderInfo(stmtRawRows);
+    alert('No valid transactions were found.\n\nHeader row: '+(info.headerIndex>=0?(info.headerIndex+1):'not detected')+'\nDate column: '+document.getElementById('mapDate').value+'\nDebit column: '+document.getElementById('mapDebit').value+'\nCredit column: '+document.getElementById('mapCredit').value+'\nBalance column: '+document.getElementById('mapBalance').value+'\n\nPlease confirm the column mapping and try again.');
+    return;
+  }
+  const slabs=stmtNormaliseSlabs(stmtSlabRows());
+  const errors=stmtValidateSlabs(slabs);
+  if(errors.length){alert(errors.join('\n'));return;}
+  stmtSaveSlabs(slabs);
+  const manual=document.getElementById('stmtBankInterest').value.trim();
+  const manualVal=manual===''?null:Number(manual);
+  const result=stmtCalculate(rows,slabs,manualVal);
+  stmtRenderResults(result,slabs);
+}
+
+document.getElementById('stmtFile').addEventListener('change',async e=>{
+  const file=e.target.files[0]; if(!file)return;
+  const status=document.getElementById('stmtStatus');
+  status.style.display='block';status.textContent='Reading file…';
+  document.getElementById('stmtResults').style.display='none';
+  try{
+    const rows=await parseStatementFile(file);
+    if(!rows.length)throw new Error('No rows detected in the file.');
+    populateStatementPreview(rows);
+    status.textContent=`Loaded "${file.name}" — ${rows.length} rows.`;
+  }catch(err){
+    status.textContent='Could not read this file: '+err.message;
+    document.getElementById('stmtPreviewCard').style.display='none';
+    document.getElementById('stmtMappingCard').style.display='none';
+    document.getElementById('stmtSlabCard').style.display='none';
+  }
+});
+document.getElementById('mapHeaderRow').addEventListener('change',()=>{
+  if(stmtRawRows.length)populateStatementPreview(stmtRawRows);
+});
+document.getElementById('stmtCalcBtn').addEventListener('click',stmtRunCalculation);
+document.getElementById('stmtAddSlabBtn').addEventListener('click',stmtAddSlab);
+document.getElementById('stmtResetSlabBtn').addEventListener('click',stmtResetSlabs);
+document.getElementById('stmtShowDailyBtn').addEventListener('click',stmtShowDaily);
+document.getElementById('stmtPrintBtn').addEventListener('click',()=>window.print());
+document.getElementById('stmtResetBtn').addEventListener('click',()=>{
+  document.getElementById('stmtFile').value='';
+  stmtRawRows=[];stmtLastResult=null;
+  // Statement Reset clears statement/calculation data only; saved slabs remain intact until Reset built-in slabs.
+  ['stmtMappingCard','stmtPreviewCard','stmtSlabCard','stmtResults'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('stmtStatus').style.display='none';
+  document.getElementById('stmtBankInterest').value='';
+});
+stmtRenderSlabs(stmtLoadSlabs());
+
+
+/* ---------- Appearance ---------- */
+(function initAppearance(){
+  const saved=localStorage.getItem('financial_calculators_dark_mode');
+  if(saved==='1')document.body.classList.add('dark');
+  const btn=document.getElementById('darkModeBtn');
+  function sync(){ if(btn)btn.textContent=document.body.classList.contains('dark')?'☀️ Light mode':'🌙 Dark mode'; }
+  sync();
+  btn?.addEventListener('click',()=>{
+    document.body.classList.toggle('dark');
+    localStorage.setItem('financial_calculators_dark_mode',document.body.classList.contains('dark')?'1':'0');
+    sync();
+  });
+})();
+
+/* ---------- App Health Check ---------- */
+function runHealthCheck(){
+  const tests=[];
+  const add=(name,ok,detail)=>tests.push({name,ok,detail});
+  add('Bank Statement Interest menu',!!document.querySelector('[data-module="statement"]'),'Highlighted menu is present');
+  add('Health Check menu',!!document.querySelector('[data-module="health"]'),'Health Check tab is present');
+  add('Statement upload',!!document.getElementById('stmtFile'),'Upload control is present');
+  add('Column mapping',!!document.getElementById('mapDate')&&!!document.getElementById('mapBalance'),'Date and Balance mapping controls are present');
+  add('Interest Settings',!!document.getElementById('stmtSlabs')&&!!document.getElementById('stmtAddSlabBtn'),'Slab/rate settings are present');
+  add('Slab persistence',!!localStorage.getItem('financial_stmt_interest_slabs_v11'),'Saved slab configuration exists');
+  add('Dark mode',document.body.classList.contains('dark'),'Dark mode is currently '+(document.body.classList.contains('dark')?'ON':'OFF'));
+  add('Daily interest engine',typeof stmtCalculate==='function'&&typeof stmtBuildDaily==='function'&&typeof stmtAllocate==='function','Calculation functions are available');
+  let rows=[];
+  try{rows=stmtRowsFromMapping();}catch(e){}
+  add('Statement rows',rows.length>0,rows.length?rows.length+' transaction rows mapped':'Upload a statement and confirm mapping to test transaction rows');
+  const slabs=stmtLoadSlabs();
+  add('Slab validity',stmtValidateSlabs(slabs).length===0,stmtValidateSlabs(slabs).length?'Invalid slab configuration':'Slab configuration is valid');
+  const ok=tests.filter(x=>x.ok).length, total=tests.length;
+  document.getElementById('healthSummary').innerHTML=`<div class="stat"><div class="stat-label">Checks passed</div><div class="stat-value ${ok===total?'health-ok':'health-bad'}">${ok} / ${total}</div></div><div class="stat"><div class="stat-label">Status</div><div class="stat-value">${ok===total?'READY':'REVIEW'}</div></div>`;
+  document.getElementById('healthTable').innerHTML='<thead><tr><th style="text-align:left">Check</th><th>Status</th><th style="text-align:left">Details</th></tr></thead><tbody>'+
+    tests.map(t=>`<tr><td style="text-align:left">${stmtEsc(t.name)}</td><td class="${t.ok?'health-ok':'health-bad'}">${t.ok?'PASS':'CHECK'}</td><td style="text-align:left">${stmtEsc(t.detail)}</td></tr>`).join('')+'</tbody>';
+}
+document.getElementById('healthRunBtn')?.addEventListener('click',runHealthCheck);
+
+/* ---------- Bank Reconciliation ---------- */
+let reconBooksRows = [];
+let reconBankRows = [];
+
+function buildColOptions(headers, maxCols) {
+  let opts = '<option value="-1">— not present —</option>';
+  for (let i = 0; i < maxCols; i++) {
+    const label = headers && headers[i] !== undefined && headers[i] !== '' ? headers[i] : `Column ${i + 1}`;
+    opts += `<option value="${i}">${label}</option>`;
+  }
+  return opts;
+}
+
+function populateReconMapping(prefix, rows) {
+  const maxCols = rows.reduce((m, r) => Math.max(m, r.length), 0);
+  const headerYes = document.getElementById(prefix + 'MapHeaderRow').value !== 'no';
+  const headers = headerYes ? rows[0] : null;
+  ['MapDate','MapDebit','MapCredit','MapBalance','MapDesc'].forEach(suffix => {
+    document.getElementById(prefix + suffix).innerHTML = buildColOptions(headers, maxCols);
+  });
+  if (headers) {
+    const dateCol = guessColumn(headers, ['date']);
+    const debitCol = guessColumn(headers, ['debit','withdrawal']);
+    const creditCol = guessColumn(headers, ['credit','deposit']);
+    const balCol = guessColumn(headers, ['balance']);
+    const descCol = guessColumn(headers, ['narration','description','particulars','remarks']);
+    if (dateCol >= 0) document.getElementById(prefix + 'MapDate').value = dateCol;
+    if (debitCol >= 0) document.getElementById(prefix + 'MapDebit').value = debitCol;
+    if (creditCol >= 0) document.getElementById(prefix + 'MapCredit').value = creditCol;
+    if (balCol >= 0) document.getElementById(prefix + 'MapBalance').value = balCol;
+    if (descCol >= 0) document.getElementById(prefix + 'MapDesc').value = descCol;
+  }
+}
+
+function checkReconReady() {
+  if (reconBooksRows.length && reconBankRows.length) {
+    populateReconMapping('books', reconBooksRows);
+    populateReconMapping('bank', reconBankRows);
+    document.getElementById('reconMappingCard').style.display = 'block';
+    document.getElementById('reconResults').style.display = 'none';
+  }
+}
+
+document.getElementById('reconBooksFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('reconStatus');
+  status.style.display = 'block';
+  status.textContent = 'Reading books file…';
+  try {
+    reconBooksRows = await parseStatementFile(file);
+    if (!reconBooksRows.length) throw new Error('No rows detected.');
+    checkReconReady();
+    status.textContent = `Books file loaded — ${reconBooksRows.length} rows.`;
+  } catch (err) {
+    status.textContent = 'Could not read the books file: ' + err.message;
+  }
+});
+
+document.getElementById('reconBankFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('reconStatus');
+  status.style.display = 'block';
+  status.textContent = 'Reading bank file…';
+  try {
+    reconBankRows = await parseStatementFile(file);
+    if (!reconBankRows.length) throw new Error('No rows detected.');
+    checkReconReady();
+    status.textContent = `Bank file loaded — ${reconBankRows.length} rows.`;
+  } catch (err) {
+    status.textContent = 'Could not read the bank file: ' + err.message;
+  }
+});
+
+['booksMapHeaderRow','bankMapHeaderRow'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    if (id.startsWith('books') && reconBooksRows.length) populateReconMapping('books', reconBooksRows);
+    if (id.startsWith('bank') && reconBankRows.length) populateReconMapping('bank', reconBankRows);
+  });
+});
+
+function extractReconTransactions(rows, prefix) {
+  const headerYes = document.getElementById(prefix + 'MapHeaderRow').value !== 'no';
+  const dataRows = headerYes ? rows.slice(1) : rows;
+  const dateIdx = Number(document.getElementById(prefix + 'MapDate').value);
+  const debitIdx = Number(document.getElementById(prefix + 'MapDebit').value);
+  const creditIdx = Number(document.getElementById(prefix + 'MapCredit').value);
+  const balIdx = Number(document.getElementById(prefix + 'MapBalance').value);
+  const descIdx = Number(document.getElementById(prefix + 'MapDesc').value);
+  return dataRows.map(r => ({
+    date: parseDateFlexible(r[dateIdx]),
+    debit: debitIdx >= 0 ? parseNumberFlexible(r[debitIdx]) : 0,
+    credit: creditIdx >= 0 ? parseNumberFlexible(r[creditIdx]) : 0,
+    balance: balIdx >= 0 ? parseNumberFlexible(r[balIdx]) : null,
+    desc: descIdx >= 0 ? String(r[descIdx] || '') : '',
+  })).filter(t => t.date && (t.debit || t.credit));
+}
+
+function lastBalance(tx) {
+  const withBal = tx.filter(t => t.balance !== null && !isNaN(t.balance));
+  if (!withBal.length) return null;
+  withBal.sort((a, b) => a.date - b.date);
+  return withBal[withBal.length - 1].balance;
+}
+
+function reconcile(booksTx, bankTx, toleranceDays) {
+  const books = booksTx.map(t => ({ ...t, net: t.credit - t.debit, matched: false }));
+  const bank = bankTx.map(t => ({ ...t, net: t.credit - t.debit, matched: false }));
+
+  // pass 1: exact date + amount
+  books.forEach(b => {
+    if (b.matched) return;
+    const m = bank.find(k => !k.matched && k.date.getTime() === b.date.getTime() && Math.abs(k.net - b.net) < 0.01);
+    if (m) { b.matched = true; m.matched = true; }
+  });
+  // pass 2: amount match within date window
+  books.forEach(b => {
+    if (b.matched) return;
+    const m = bank.find(k => !k.matched && Math.abs(k.net - b.net) < 0.01 && Math.abs((k.date - b.date) / 86400000) <= toleranceDays);
+    if (m) { b.matched = true; m.matched = true; }
+  });
+
+  const booksOnly = books.filter(b => !b.matched).sort((a, b) => a.date - b.date);
+  const bankOnly = bank.filter(b => !b.matched).sort((a, b) => a.date - b.date);
+  return { booksOnly, bankOnly, matchedCount: books.length - booksOnly.length };
+}
+
+function buildReconciliationStatement(booksBalance, bankBalanceActual, booksOnly, bankOnly) {
+  const chequesIssuedNotPresented = booksOnly.filter(b => b.debit > 0).reduce((s, b) => s + b.debit, 0);
+  const depositsNotCredited = booksOnly.filter(b => b.credit > 0).reduce((s, b) => s + b.credit, 0);
+  const directCreditsByBank = bankOnly.filter(b => b.credit > 0).reduce((s, b) => s + b.credit, 0);
+  const directDebitsByBank = bankOnly.filter(b => b.debit > 0).reduce((s, b) => s + b.debit, 0);
+  const computedBankBalance = (booksBalance || 0) + chequesIssuedNotPresented - depositsNotCredited + directCreditsByBank - directDebitsByBank;
+  const diff = (bankBalanceActual !== null) ? computedBankBalance - bankBalanceActual : null;
+  return { chequesIssuedNotPresented, depositsNotCredited, directCreditsByBank, directDebitsByBank, computedBankBalance, diff };
+}
+
+function renderReconResults(result, statement, booksBalance, bankBalanceActual) {
+  const stats = [
+    { label: "Matched entries", value: result.matchedCount, color: "var(--green)", raw: true },
+    { label: "In books, not bank", value: result.booksOnly.length, color: "var(--clay)", raw: true },
+    { label: "In bank, not books", value: result.bankOnly.length, color: "var(--clay)", raw: true },
+    { label: "Residual difference", value: statement.diff !== null ? fmtINR(statement.diff) : "—", color: (statement.diff !== null && Math.abs(statement.diff) < 1) ? "var(--green)" : "var(--brass)" },
+  ];
+  document.getElementById('reconSummary').innerHTML = stats.map(s => `<div class="stat"><div class="stat-label">${s.label}</div><div class="stat-value" style="color:${s.color}">${s.raw ? s.value : '&#8377; ' + s.value}</div></div>`).join('');
+
+  document.getElementById('reconStatementTable').innerHTML = `
+    <thead><tr><th style="text-align:left">Item</th><th>Amount</th></tr></thead>
+    <tbody>
+      <tr><td style="text-align:left">Balance as per Books</td><td style="font-weight:700">${booksBalance !== null ? fmtINR(booksBalance) : '—'}</td></tr>
+      <tr><td style="text-align:left">Add: Cheques / payments issued, not yet presented</td><td class="credit">+ ${fmtINR(statement.chequesIssuedNotPresented)}</td></tr>
+      <tr><td style="text-align:left">Less: Deposits recorded in books, not yet credited by bank</td><td class="debit">− ${fmtINR(statement.depositsNotCredited)}</td></tr>
+      <tr><td style="text-align:left">Add: Credited directly by bank, not yet in books</td><td class="credit">+ ${fmtINR(statement.directCreditsByBank)}</td></tr>
+      <tr><td style="text-align:left">Less: Debited directly by bank (charges, etc.), not yet in books</td><td class="debit">− ${fmtINR(statement.directDebitsByBank)}</td></tr>
+      <tr style="background:#FBFAF6;font-weight:700"><td style="text-align:left">= Balance as per Bank Statement (computed)</td><td>${fmtINR(statement.computedBankBalance)}</td></tr>
+      ${bankBalanceActual !== null ? `<tr><td style="text-align:left">Balance as per Bank Statement (from file)</td><td>${fmtINR(bankBalanceActual)}</td></tr>` : ''}
+    </tbody>`;
+
+  document.getElementById('reconBooksOnlySub').textContent = `${result.booksOnly.length} entries in your books not matched in the bank statement`;
+  document.getElementById('reconBooksOnlyTable').innerHTML = `
+    <thead><tr><th style="text-align:left">Date</th><th style="text-align:left">Description</th><th>Debit</th><th>Credit</th></tr></thead>
+    <tbody>${result.booksOnly.map(b => `<tr><td style="text-align:left">${fmtDate(b.date)}</td><td style="text-align:left">${b.desc || ''}</td><td class="debit">${b.debit ? fmtINR(b.debit) : ''}</td><td class="credit">${b.credit ? fmtINR(b.credit) : ''}</td></tr>`).join('')}</tbody>`;
+
+  document.getElementById('reconBankOnlySub').textContent = `${result.bankOnly.length} entries in the bank statement not matched in your books`;
+  document.getElementById('reconBankOnlyTable').innerHTML = `
+    <thead><tr><th style="text-align:left">Date</th><th style="text-align:left">Description</th><th>Debit</th><th>Credit</th></tr></thead>
+    <tbody>${result.bankOnly.map(b => `<tr><td style="text-align:left">${fmtDate(b.date)}</td><td style="text-align:left">${b.desc || ''}</td><td class="debit">${b.debit ? fmtINR(b.debit) : ''}</td><td class="credit">${b.credit ? fmtINR(b.credit) : ''}</td></tr>`).join('')}</tbody>`;
+
+  document.getElementById('reconResults').style.display = 'block';
+}
+
+document.getElementById('reconRunBtn').addEventListener('click', () => {
+  const tolerance = Number(document.getElementById('reconTolerance').value) || 0;
+  const booksTx = extractReconTransactions(reconBooksRows, 'books');
+  const bankTx = extractReconTransactions(reconBankRows, 'bank');
+  if (!booksTx.length || !bankTx.length) {
+    alert('Please map at least the Date column and one of Debit/Credit for both files.');
+    return;
+  }
+  const result = reconcile(booksTx, bankTx, tolerance);
+  const booksBalance = lastBalance(booksTx);
+  const bankBalanceActual = lastBalance(bankTx);
+  const statement = buildReconciliationStatement(booksBalance, bankBalanceActual, result.booksOnly, result.bankOnly);
+  renderReconResults(result, statement, booksBalance, bankBalanceActual);
+});
+
+try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:',e);}
+</script>
+<div id="calculatorHelpModal" class="app-modal"><div class="app-modal-card"><div class="app-modal-head"><h2>❔ How to Use</h2><button onclick="closeAppModal('calculatorHelpModal')">×</button></div><div class="help-grid">
+<div><b>1. EMI Calculator</b><p>Use one annual interest rate for the entire loan.</p></div>
+<div><b>2. Slab-wise Term Loan EMI</b><p>Use the separate menu, then enter each outstanding-balance slab and its annual rate.</p></div>
+<div><b>3. Bank Statement Interest</b><p>Load the statement, confirm Date/Debit/Credit/Balance, set saved interest slabs and calculate.</p></div>
+<div><b>4. Review</b><p>Check the daily/account statement, total interest and financial-year summary.</p></div>
+<div><b>Important</b><p>Verify applicable bank terms, opening balance, rates and rounding before relying on a result.</p></div>
+</div></div></div>
+<div id="askMeModal" class="app-modal"><div class="app-modal-card"><div class="app-modal-head"><h2>💬 Ask Me</h2><button onclick="closeAppModal('askMeModal')">×</button></div><p class="hint">Ask me a calculation in plain language — for example: “What is the EMI of ₹1,00,000 for 60 months at 5%?”</p><textarea id="askMeInput" rows="4" placeholder="How do I calculate slab-wise EMI?"></textarea><button class="btn primary" onclick="answerAskMe()">Ask</button><div id="askMeAnswer" class="ask-answer"></div></div></div>
+<button id="floatingAskMe" class="floating-ask" onclick="openAskMe()">💬 Ask Me</button>
+<script>
+function openCalcMenu(mode){
+ document.querySelectorAll('.premium-menu-item').forEach((b,i)=>b.classList.toggle('active',['emi','slab','interest','other'][i]===mode));
+ if(mode==='emi' && typeof showLoanCalculator==='function') showLoanCalculator('standard');
+ if(mode==='slab' && typeof showLoanCalculator==='function') showLoanCalculator('slab');
+ if(mode==='interest'){document.getElementById('pInterestCompare')?.scrollIntoView({behavior:'smooth'});}
+}
+function openCalculatorHelp(){document.getElementById('calculatorHelpModal')?.classList.add('open')}
+function openAskMe(){document.getElementById('askMeModal')?.classList.add('open');setTimeout(()=>document.getElementById('askMeInput')?.focus(),100)}
+function closeAppModal(id){document.getElementById(id)?.classList.remove('open')}
+function askMeNum(s){
+  if(!s) return null;
+  s = String(s).replace(/,/g,'').replace(/₹/g,'').trim();
+  const n = parseFloat(s);
+  return isFinite(n) ? n : null;
+}
+function askMeMoney(q){
+  const m = q.match(/(?:₹|rs\.?|inr)?\s*([\d,]+(?:\.\d+)?)\s*(?:lakh|lac|lacs|crore|cr)?/i);
+  if(!m) return null;
+  let n=askMeNum(m[1]); if(n===null) return null;
+  const unit=(m[0].match(/lakh|lac|lacs|crore|cr/i)||[''])[0].toLowerCase();
+  if(unit==='lakh'||unit==='lac'||unit==='lacs') n*=100000;
+  if(unit==='crore'||unit==='cr') n*=10000000;
+  return n;
+}
+function askMeRate(q){
+  const patterns=[
+    /(?:at|@|rate(?:\s+of)?|interest(?:\s+rate)?(?:\s+of)?)\s*([0-9]+(?:\.[0-9]+)?)\s*%/i,
+    /([0-9]+(?:\.[0-9]+)?)\s*%\s*(?:p\.?a\.?|per\s+annum|annual|interest|rate)?/i
+  ];
+  for(const p of patterns){ const m=q.match(p); if(m) return parseFloat(m[1]); }
+  return null;
+}
+function askMeMonths(q){
+  let m=q.match(/([0-9]+)\s*(?:months?|mos?)\b/i);
+  if(m) return parseInt(m[1],10);
+  m=q.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:years?|yrs?)\b/i);
+  if(m) return Math.round(parseFloat(m[1])*12);
+  return null;
+}
+function askMeEMI(principal, months, annualRate){
+  if(months<=0 || principal<0 || annualRate<0) return null;
+  if(annualRate===0) return principal/months;
+  const r=annualRate/100/12;
+  const f=Math.pow(1+r,months);
+  return principal*r*f/(f-1);
+}
+function askMeINR(n){
+  return '₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function askMeOpenStandard(){
+  try{
+    const tab=document.querySelector('.tab[data-module="emi"]');
+    if(tab) tab.click();
+    if(typeof openLoanMenu==='function') openLoanMenu('standard');
+  }catch(e){}
+}
+function answerAskMe(){
+  const q=(document.getElementById('askMeInput')?.value||'').trim();
+  const ql=q.toLowerCase(), a=document.getElementById('askMeAnswer');
+  if(!q){ a.textContent='Please enter a question.'; return; }
+
+  // Natural-language EMI calculation
+  if(/emi|installment|instalment|monthly payment/.test(ql)){
+    const principal=askMeMoney(q);
+    const rate=askMeRate(q);
+    const months=askMeMonths(q);
+    if(principal!==null && rate!==null && months!==null){
+      const emi=askMeEMI(principal,months,rate);
+      const total=emi*months, interest=total-principal;
+      a.innerHTML='<b>EMI calculation</b><br><br>'+
+        'Loan amount: <b>'+askMeINR(principal)+'</b><br>'+
+        'Interest rate: <b>'+rate.toFixed(2)+'% p.a.</b><br>'+
+        'Tenure: <b>'+months+' months</b><br><br>'+
+        'Monthly EMI: <b>'+askMeINR(emi)+'</b><br>'+
+        'Total repayment: <b>'+askMeINR(total)+'</b><br>'+
+        'Total interest: <b>'+askMeINR(interest)+'</b><br><br>'+
+        '<span class="hint">This is a standard reducing-balance EMI using one annual rate.</span>';
+      return;
+    }
+    if(/slab|progressive/.test(ql)){
+      a.textContent='Open SLAB-WISE TERM LOAN EMI. Enter the loan amount and period, then set each slab limit and annual rate. The rates are applied progressively to the outstanding balance.';
+      return;
+    }
+    a.innerHTML='I can calculate EMI directly. Please include <b>loan amount, interest rate and tenure</b>.<br><br>'+
+      'Example: <b>EMI of ₹1,00,000 for 60 months at 5%</b>';
+    return;
+  }
+
+  if(/statement|bank statement/.test(ql)){
+    a.textContent='Open BANK STATEMENT INTEREST, confirm the statement columns, check the opening balance and set the applicable interest slabs before calculating.';
+    return;
+  }
+  if(/slab|progressive/.test(ql)){
+    a.textContent='Open SLAB-WISE TERM LOAN EMI. Enter the loan amount and period, then set each slab limit and annual rate. The rates are applied progressively to the outstanding balance.';
+    return;
+  }
+  if(/interest/.test(ql)){
+    a.textContent='For a standard loan with one rate, ask: “What is the EMI of ₹1,00,000 for 60 months at 5%?” For bank-statement interest, open BANK STATEMENT INTEREST.';
+    return;
+  }
+  if(/loan|period|tenure/.test(ql)){
+    a.textContent='You can ask me to calculate a standard EMI by giving the loan amount, interest rate and tenure. Example: “Calculate EMI ₹5 lakh, 7.5%, 5 years.”';
+    return;
+  }
+  a.textContent='I can answer EMI questions directly. Try: “What is the EMI of ₹1,00,000 for 60 months at 5%?”';
+}
+</script></body>
+</html>
