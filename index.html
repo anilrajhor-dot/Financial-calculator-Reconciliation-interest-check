@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v5.3</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v5.4</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -978,7 +978,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v5.3</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v5.4</strong>
   </footer>
 </div>
 
@@ -1851,58 +1851,99 @@ async function stmtParseXlsxDirect(file){
   if(typeof JSZip==='undefined') throw new Error('Direct XLSX reader unavailable.');
   const buf=await file.arrayBuffer();
   const zip=await JSZip.loadAsync(buf);
-  const sheetFile=zip.file('xl/worksheets/sheet1.xml');
-  if(!sheetFile) throw new Error('The first worksheet XML was not found.');
 
-  // Read shared strings when present.
+  // Read shared strings once. Some bank files store headers and values there;
+  // others use inlineStr. We support both.
   const shared=[];
   const ssFile=zip.file('xl/sharedStrings.xml');
   if(ssFile){
     const ssXml=await ssFile.async('text');
     const ssDoc=new DOMParser().parseFromString(ssXml,'application/xml');
-    ssDoc.querySelectorAll('si').forEach(si=>{
-      shared.push(Array.from(si.querySelectorAll('t')).map(t=>t.textContent||'').join(''));
-    });
+    const sis=ssDoc.getElementsByTagNameNS('*','si');
+    for(let i=0;i<sis.length;i++){
+      const ts=sis[i].getElementsByTagNameNS('*','t');
+      let s='';
+      for(let j=0;j<ts.length;j++)s+=ts[j].textContent||'';
+      shared.push(s);
+    }
   }
 
-  const xml=await sheetFile.async('text');
-  const doc=new DOMParser().parseFromString(xml,'application/xml');
-  if(doc.querySelector('parsererror')) throw new Error('Invalid worksheet XML.');
+  const sheetFiles=Object.keys(zip.files)
+    .filter(n=>/^xl\/worksheets\/sheet\d+\.xml$/i.test(n))
+    .sort((a,b)=>{
+      const na=Number((a.match(/sheet(\d+)/i)||[])[1]||0);
+      const nb=Number((b.match(/sheet(\d+)/i)||[])[1]||0);
+      return na-nb;
+    });
 
   const cellToCol=ref=>{
     const m=String(ref||'').match(/^([A-Z]+)(\d+)$/i);
     if(!m)return null;
     let n=0;
-    for(const ch of m[1].toUpperCase()) n=n*26+(ch.charCodeAt(0)-64);
+    for(const ch of m[1].toUpperCase())n=n*26+(ch.charCodeAt(0)-64);
     return n-1;
   };
 
-  const rows=[];
-  doc.querySelectorAll('sheetData > row').forEach(rowEl=>{
-    const rr=Number(rowEl.getAttribute('r')||0)-1;
-    if(rr<0)return;
-    if(!rows[rr])rows[rr]=[];
-    rowEl.querySelectorAll(':scope > c').forEach(c=>{
-      const col=cellToCol(c.getAttribute('r'));
-      if(col===null)return;
-      const type=c.getAttribute('t')||'';
-      let value='';
-      if(type==='inlineStr'){
-        value=Array.from(c.querySelectorAll('is t')).map(x=>x.textContent||'').join('');
-      }else if(type==='s'){
-        const v=c.querySelector('v')?.textContent||'';
-        const idx=Number(v);
-        value=Number.isFinite(idx)&&shared[idx]!==undefined?shared[idx]:'';
-      }else if(type==='b'){
-        value=(c.querySelector('v')?.textContent||'')==='1';
-      }else{
-        value=c.querySelector('v')?.textContent||'';
+  const parseSheet=xml=>{
+    const doc=new DOMParser().parseFromString(xml,'application/xml');
+    if(doc.getElementsByTagName('parsererror').length)throw new Error('Invalid worksheet XML.');
+    const rowEls=doc.getElementsByTagNameNS('*','row');
+    const rows=[];
+    for(let ri=0;ri<rowEls.length;ri++){
+      const rowEl=rowEls[ri];
+      const rr=Math.max(0,Number(rowEl.getAttribute('r')||ri+1)-1);
+      const row=[];
+      const cellEls=rowEl.getElementsByTagNameNS('*','c');
+      for(let ci=0;ci<cellEls.length;ci++){
+        const c=cellEls[ci];
+        const col=cellToCol(c.getAttribute('r'));
+        if(col===null)continue;
+        const type=c.getAttribute('t')||'';
+        let value='';
+        if(type==='inlineStr'){
+          const ts=c.getElementsByTagNameNS('*','t');
+          for(let j=0;j<ts.length;j++)value+=ts[j].textContent||'';
+        }else if(type==='s'){
+          const v=c.getElementsByTagNameNS('*','v')[0]?.textContent||'';
+          const idx=Number(v);
+          value=Number.isFinite(idx)&&shared[idx]!==undefined?shared[idx]:'';
+        }else{
+          value=c.getElementsByTagNameNS('*','v')[0]?.textContent||'';
+        }
+        row[col]=value;
       }
-      rows[rr][col]=value;
-    });
-  });
+      rows[rr]=row;
+    }
+    return rows;
+  };
 
-  return rows.filter(r=>Array.isArray(r));
+  // Try every worksheet, not just sheet1. Choose the worksheet containing
+  // transaction headers. This is essential for IDFC/other bank workbooks
+  // whose first sheet may be a cover or summary sheet.
+  let best=[];
+  for(const name of sheetFiles){
+    try{
+      const xml=await zip.file(name).async('text');
+      const rows=parseSheet(xml);
+      const text=rows.slice(0,250).map(r=>(r||[]).join(' | ')).join(' | ').toLowerCase();
+      const score=
+        (/\bpost\s*date\b/.test(text)?4:0)+
+        (/\btransaction\s*date\b/.test(text)?4:0)+
+        (/\bdebit\b/.test(text)?2:0)+
+        (/\bcredit\b/.test(text)?2:0)+
+        (/\bbalance\b/.test(text)?2:0);
+      const bestText=best.slice(0,250).map(r=>(r||[]).join(' | ')).join(' | ').toLowerCase();
+      const bestScore=
+        (/\bpost\s*date\b/.test(bestText)?4:0)+
+        (/\btransaction\s*date\b/.test(bestText)?4:0)+
+        (/\bdebit\b/.test(bestText)?2:0)+
+        (/\bcredit\b/.test(bestText)?2:0)+
+        (/\bbalance\b/.test(bestText)?2:0);
+      if(score>bestScore || (!best.length&&rows.length>best.length))best=rows;
+    }catch(e){}
+  }
+  if(!best.length)throw new Error('No worksheet rows could be read from the XLSX file.');
+  return best.filter(r=>Array.isArray(r));
 }
 
 async function parseStatementFile(file) {
@@ -2127,7 +2168,10 @@ function stmtRowsFromKnownBankFormat(){
 
   const match=(cell,aliases)=>{
     const x=norm(cell);
-    return aliases.some(a=>x===a||x.includes(a));
+    return aliases.some(a=>{
+      const aa=norm(a);
+      return x===aa||x.includes(aa);
+    });
   };
 
   // Search all rows for a transaction header. This handles Central Bank,
@@ -2161,6 +2205,20 @@ function stmtRowsFromKnownBankFormat(){
     }
   }
 
+  if(header<0){
+    // Last-resort structural detector: find a row containing Date, Debit,
+    // Credit and Balance labels after normalising punctuation/line breaks.
+    for(let i=0;i<Math.min(raw.length,250);i++){
+      const cells=(raw[i]||[]).map(norm);
+      const d=cells.findIndex(x=>x.includes('post date')||x.includes('transaction date')||x==='date');
+      const db=cells.findIndex(x=>x.includes('debit')||x.includes('withdrawal'));
+      const cr=cells.findIndex(x=>x.includes('credit')||x.includes('deposit'));
+      const ba=cells.findIndex(x=>x==='balance'||x.includes('closing balance')||x.includes('running balance'));
+      if(d>=0&&db>=0&&cr>=0&&ba>=0){
+        header=i;dateCol=d;debitCol=db;creditCol=cr;balanceCol=ba;break;
+      }
+    }
+  }
   if(header<0)return [];
 
   const result=[];
@@ -3080,7 +3138,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v5.3 ---------- */
+/* ---------- Simple Calculator v5.4 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
