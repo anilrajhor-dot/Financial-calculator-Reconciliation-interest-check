@@ -292,14 +292,48 @@ body.dark .ledger td.debit{
 body.dark .ledger td.credit{
   color:#2FA58B !important;
 }
-</style></head>
+</style>
+<style id="askMeV30">
+#askMeModal{position:fixed!important;inset:0!important;z-index:99999!important;display:none!important;padding:10px!important;background:rgba(0,0,0,.72)!important;align-items:center!important;justify-content:center!important}
+#askMeModal.open{display:flex!important}
+#askMeModal .app-modal-card{width:min(680px,calc(100vw - 20px))!important;max-height:90vh!important;overflow:auto!important;margin:0!important;padding:0!important;background:var(--paper,#F4F6F3)!important;color:var(--ink,#16221F)!important;border:1px solid var(--rule,#D8DED9)!important;border-radius:18px!important;box-shadow:0 22px 70px rgba(0,0,0,.45)!important}
+body.dark #askMeModal .app-modal-card{background:#17201C!important;color:#F2F7F4!important;border-color:#46564E!important}
+#askMeModal .askme-head{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;padding:15px 16px 12px!important;border-bottom:1px solid var(--rule,#D8DED9)!important}
+#askMeModal .askme-title{margin:0!important;font-family:'Fraunces',serif!important;font-size:24px!important;line-height:1.15!important;font-weight:700!important}
+#askMeModal .askme-close{width:40px!important;height:40px!important;border:1px solid var(--rule,#D8DED9)!important;border-radius:10px!important;background:transparent!important;color:inherit!important;font-size:26px!important;line-height:1!important;cursor:pointer!important}
+#askMeModal .askme-body{padding:15px 16px 17px!important}
+#askMeModal .askme-label{display:block!important;margin:0 0 7px!important;font-size:11px!important;letter-spacing:.07em!important;text-transform:uppercase!important;color:var(--muted,#5B6B63)!important;font-weight:800!important}
+#askMeModal #askMeInput{display:block!important;width:100%!important;min-height:112px!important;max-height:190px!important;margin:0!important;padding:13px 14px!important;resize:vertical!important;box-sizing:border-box!important;border:1px solid #AEBBB4!important;border-radius:12px!important;background:#fff!important;color:#16221F!important;font:16px/1.5 'IBM Plex Sans',sans-serif!important}
+body.dark #askMeModal #askMeInput{background:#0F1612!important;color:#F2F7F4!important;border-color:#506158!important}
+#askMeModal #askMeInput::placeholder{color:#7B8982!important}
+#askMeModal #askMeInput:focus{outline:2px solid var(--green,#0F6E5C)!important;outline-offset:1px!important}
+#askMeModal .askme-actions{display:block!important;margin-top:12px!important}
+#askMeModal .askme-ask{width:100%!important;padding:11px 22px!important}
+#askMeModal .askme-example{margin:8px 0 0!important;font-size:12px!important;line-height:1.4!important;color:var(--muted,#5B6B63)!important}
+#askMeModal .ask-answer{display:none;margin-top:16px!important;padding:16px!important;border:1px solid var(--rule,#D8DED9)!important;border-left:4px solid var(--brass,#C98A2C)!important;border-radius:12px!important;background:#fff!important;color:#16221F!important;font-size:14px!important;line-height:1.55!important}
+body.dark #askMeModal .ask-answer{background:#101713!important;color:#F2F7F4!important;border-color:#3E4E46!important;border-left-color:#E0A43A!important}
+#askMeModal .ask-answer.show{display:block!important}
+#askMeModal .ask-result-title{font-family:'Fraunces',serif!important;font-size:18px!important;font-weight:700!important;margin-bottom:12px!important}
+#askMeModal .ask-result-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;margin-bottom:12px!important}
+#askMeModal .ask-result-row{padding:9px 10px!important;border:1px solid var(--rule,#D8DED9)!important;border-radius:8px!important;background:#FBFAF6!important}
+body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:#35443D!important}
+#askMeModal .ask-result-row span{display:block!important;font-size:10.5px!important;text-transform:uppercase!important;letter-spacing:.05em!important;color:var(--muted,#5B6B63)!important;margin-bottom:3px!important}
+#askMeModal .ask-result-row b{font-family:'IBM Plex Mono',monospace!important;font-size:14px!important}
+#askMeModal .ask-main-result{padding:13px!important;border-radius:10px!important;background:#0F6E5C!important;color:#fff!important;text-align:center!important;margin:12px 0!important}
+#askMeModal .ask-main-result span{display:block!important;font-size:10.5px!important;text-transform:uppercase!important;letter-spacing:.08em!important;opacity:.9!important}
+#askMeModal .ask-main-result b{display:block!important;font-family:'IBM Plex Mono',monospace!important;font-size:24px!important;margin-top:3px!important}
+#askMeModal .ask-note{font-size:11.5px!important;color:var(--muted,#5B6B63)!important;margin-top:8px!important}
+@media(max-width:700px){#askMeModal .ask-result-grid{grid-template-columns:1fr!important}#askMeModal .ask-main-result b{font-size:22px!important}}
+</style>
+
+</head>
 <body>
 <div class="wrap">
 
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v2.9</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v3.0</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -776,7 +810,7 @@ body.dark .ledger td.credit{
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v2.9</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v3.0</strong>
   </footer>
 </div>
 
@@ -2314,8 +2348,24 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 <div><b>4. Review</b><p>Check the daily/account statement, total interest and financial-year summary.</p></div>
 <div><b>Important</b><p>Verify applicable bank terms, opening balance, rates and rounding before relying on a result.</p></div>
 </div></div></div>
-<div id="askMeModal" class="app-modal"><div class="app-modal-card"><div class="app-modal-head"><h2>💬 Ask Me</h2><button onclick="closeAppModal('askMeModal')">×</button></div><p class="hint">Ask about using the calculator.</p><textarea id="askMeInput" rows="4" placeholder="How do I calculate slab-wise EMI?"></textarea><button class="btn primary" onclick="answerAskMe()">Ask</button><div id="askMeAnswer" class="ask-answer"></div></div></div>
-<button id="floatingAskMe" class="floating-ask" onclick="openAskMe()">💬 Ask Me</button>
+<div id="askMeModal" class="app-modal" role="dialog" aria-modal="true" aria-labelledby="askMeTitle">
+  <div class="app-modal-card">
+    <div class="askme-head">
+      <h2 id="askMeTitle" class="askme-title">💬 Ask Me</h2>
+      <button class="askme-close" type="button" aria-label="Close Ask Me" onclick="closeAppModal('askMeModal')">×</button>
+    </div>
+    <div class="askme-body">
+      <label class="askme-label" for="askMeInput">Your question</label>
+      <textarea id="askMeInput" rows="4" placeholder="Example: What is the EMI of ₹1,00,000 for 60 months at 5%?"></textarea>
+      <div class="askme-actions">
+        <button class="btn primary askme-ask" type="button" onclick="answerAskMe()">Ask</button>
+        <p class="askme-example">I can calculate standard EMI from amount, rate and tenure.</p>
+      </div>
+      <div id="askMeAnswer" class="ask-answer" aria-live="polite"></div>
+    </div>
+  </div>
+</div>
+<button id="floatingAskMe" class="floating-ask" type="button" onclick="openAskMe()">💬 Ask Me</button>
 <script>
 function openCalcMenu(mode){
  document.querySelectorAll('.premium-menu-item').forEach((b,i)=>b.classList.toggle('active',['emi','slab','interest','other'][i]===mode));
@@ -2324,14 +2374,99 @@ function openCalcMenu(mode){
  if(mode==='interest'){document.getElementById('pInterestCompare')?.scrollIntoView({behavior:'smooth'});}
 }
 function openCalculatorHelp(){document.getElementById('calculatorHelpModal')?.classList.add('open')}
-function openAskMe(){document.getElementById('askMeModal')?.classList.add('open');setTimeout(()=>document.getElementById('askMeInput')?.focus(),100)}
-function closeAppModal(id){document.getElementById(id)?.classList.remove('open')}
-function answerAskMe(){
- const q=(document.getElementById('askMeInput')?.value||'').toLowerCase(),a=document.getElementById('askMeAnswer');
- if(/slab|progressive/.test(q)) a.textContent='Open SLAB-WISE TERM LOAN EMI. Enter the loan amount and period, then set each slab limit and annual rate. The rates are applied progressively to the outstanding balance.';
- else if(/emi|installment|instalment/.test(q)) a.textContent='Use EMI CALCULATOR for one rate. Use SLAB-WISE TERM LOAN EMI when different rates apply to different outstanding-balance slabs.';
- else if(/statement|interest|bank/.test(q)) a.textContent='Open BANK STATEMENT INTEREST, confirm the statement columns, check the opening balance and set the applicable interest slabs before calculating.';
- else a.textContent='Ask me about EMI, slab-wise term-loan EMI, bank-statement interest, slab settings, loan period, account statement or financial-year interest.';
+function openAskMe(){
+  const modal=document.getElementById('askMeModal'),input=document.getElementById('askMeInput'),answer=document.getElementById('askMeAnswer');
+  if(answer){answer.classList.remove('show');answer.innerHTML='';}
+  if(modal)modal.classList.add('open');
+  setTimeout(()=>input?.focus(),120);
 }
-</script></body>
+function closeAppModal(id){
+  const el=document.getElementById(id);
+  if(el)el.classList.remove('open');
+}
+function askMeMoney(q){
+  const m=q.match(/(?:₹|rs\.?|inr)?\s*([\d,]+(?:\.\d+)?)\s*(lakh|lac|lacs|crore|cr)?/i);
+  if(!m)return null;
+  let n=parseFloat(String(m[1]).replace(/,/g,''));
+  if(!isFinite(n))return null;
+  const unit=(m[2]||'').toLowerCase();
+  if(unit==='lakh'||unit==='lac'||unit==='lacs')n*=100000;
+  if(unit==='crore'||unit==='cr')n*=10000000;
+  return n;
+}
+function askMeRate(q){
+  const p=[
+    /(?:at|@|rate(?:\s+of)?|interest(?:\s+rate)?(?:\s+of)?)\s*([0-9]+(?:\.[0-9]+)?)\s*%/i,
+    /([0-9]+(?:\.[0-9]+)?)\s*%\s*(?:p\.?a\.?|per\s+annum|annual|interest|rate)?/i
+  ];
+  for(const x of p){const m=q.match(x);if(m)return parseFloat(m[1]);}
+  return null;
+}
+function askMeMonths(q){
+  let m=q.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:months?|mos?)\b/i);
+  if(m)return Math.round(parseFloat(m[1]));
+  m=q.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:years?|yrs?)\b/i);
+  if(m)return Math.round(parseFloat(m[1])*12);
+  return null;
+}
+function askMeINR(n){return '₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function askMeEMI(principal,months,annualRate){
+  if(months<=0||principal<0||annualRate<0)return null;
+  if(annualRate===0)return principal/months;
+  const r=annualRate/100/12,f=Math.pow(1+r,months);
+  return principal*r*f/(f-1);
+}
+function answerAskMe(){
+  const input=document.getElementById('askMeInput'),a=document.getElementById('askMeAnswer');
+  const q=(input?.value||'').trim(),ql=q.toLowerCase();
+  if(!a)return;
+  a.classList.remove('show');
+  if(!q){a.innerHTML='<div class="ask-result-title">Please enter a question.</div>';a.classList.add('show');return;}
+
+  if(/emi|installment|instalment|monthly payment/.test(ql)){
+    const principal=askMeMoney(q),rate=askMeRate(q),months=askMeMonths(q);
+    if(principal!==null&&rate!==null&&months!==null){
+      const emi=askMeEMI(principal,months,rate),total=emi*months,interest=total-principal;
+      a.innerHTML=
+        '<div class="ask-result-title">EMI Calculation</div>'+
+        '<div class="ask-result-grid">'+
+        '<div class="ask-result-row"><span>Loan amount</span><b>'+askMeINR(principal)+'</b></div>'+
+        '<div class="ask-result-row"><span>Interest rate</span><b>'+rate.toFixed(2)+'% p.a.</b></div>'+
+        '<div class="ask-result-row"><span>Tenure</span><b>'+months+' months</b></div>'+
+        '<div class="ask-result-row"><span>Total repayment</span><b>'+askMeINR(total)+'</b></div>'+
+        '</div>'+
+        '<div class="ask-main-result"><span>Monthly EMI</span><b>'+askMeINR(emi)+'</b></div>'+
+        '<div class="ask-result-row"><span>Total interest</span><b>'+askMeINR(interest)+'</b></div>'+
+        '<div class="ask-note">Standard reducing-balance EMI using one annual interest rate.</div>';
+      a.classList.add('show');return;
+    }
+    if(/slab|progressive/.test(ql))
+      a.innerHTML='<div class="ask-result-title">Slab-wise EMI</div><div>Use the <b>Slab-wise Term Loan EMI</b> calculator and enter the outstanding-balance slabs and annual rates.</div>';
+    else
+      a.innerHTML='<div class="ask-result-title">I need three details</div><div>Please include the <b>loan amount, interest rate and tenure</b>.<br><br>Example: <b>What is the EMI of ₹1,00,000 for 60 months at 5%?</b></div>';
+    a.classList.add('show');return;
+  }
+
+  if(/statement|bank statement/.test(ql))
+    a.innerHTML='<div class="ask-result-title">Bank Statement Interest</div><div>Upload the statement, confirm the Date/Debit/Credit/Balance columns, set the applicable interest slabs and calculate the comparison.</div>';
+  else if(/slab|progressive/.test(ql))
+    a.innerHTML='<div class="ask-result-title">Slab-wise Term Loan EMI</div><div>Use the slab-wise calculator when different rates apply progressively to portions of the outstanding balance.</div>';
+  else if(/interest/.test(ql))
+    a.innerHTML='<div class="ask-result-title">Interest calculation</div><div>For a standard EMI, ask for the loan amount, rate and tenure. For bank-statement interest, use the Bank Statement Interest module.</div>';
+  else
+    a.innerHTML='<div class="ask-result-title">Try an EMI question</div><div>For example: <b>“Calculate EMI of ₹5 lakh for 5 years at 7.5%.”</b></div>';
+  a.classList.add('show');
+}
+</script>
+<script>
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape')closeAppModal('askMeModal');
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'&&document.getElementById('askMeModal')?.classList.contains('open'))answerAskMe();
+});
+document.getElementById('askMeModal')?.addEventListener('click',function(e){
+  if(e.target===this)closeAppModal('askMeModal');
+});
+</script>
+
+</body>
 </html>
