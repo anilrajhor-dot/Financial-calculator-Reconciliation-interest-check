@@ -404,7 +404,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.1</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.2</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -943,7 +943,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.1</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.2</strong>
   </footer>
 </div>
 
@@ -2599,7 +2599,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v4.1 ---------- */
+/* ---------- Simple Calculator v4.2 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
@@ -3021,6 +3021,7 @@ function initAskMeVoice(){
   return true;
 }
 function toggleAskMeVoice(){
+  askMePrimeSpeech();
   if(!askMeRecognition && !initAskMeVoice())return;
   if(askMeListening){
     try{askMeRecognition.stop();}catch(e){}
@@ -3036,16 +3037,11 @@ function speakAskMeAnswer(){
   }
   const answer=document.getElementById('askMeAnswer');
   if(!answer)return;
-  const text=answer.innerText
-    .replace(/🔊 Read answer aloud/g,'')
-    .replace(/₹/g,' rupees ')
-    .replace(/%/g,' percent ');
-  window.speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(text);
-  u.lang=(navigator.language||'en-IN');
-  u.rate=.95;
-  u.pitch=1;
-  window.speechSynthesis.speak(u);
+  const wasAuto=askMeAutoVoice;
+  askMeAutoVoice=true;
+  askMePrimeSpeech();
+  askMeSpeakText(answer.innerText);
+  askMeAutoVoice=wasAuto;
 }
 
 
@@ -3102,6 +3098,7 @@ function updateAskMeAutoVoiceButton(){
 function toggleAskMeAutoVoice(){
   askMeAutoVoice=!askMeAutoVoice; askMeSaveAutoVoice(); updateAskMeAutoVoiceButton();
   if(askMeAutoVoice){
+    askMePrimeSpeech();
     askMeSetVoiceStatus('Auto reply is ON. I will answer automatically after you finish typing or speaking.');
     const input=document.getElementById('askMeInput');
     if(input && input.value.trim()){
@@ -3113,23 +3110,47 @@ function toggleAskMeAutoVoice(){
     askMeSetVoiceStatus('Auto reply is OFF. Tap Ask when you want the answer.');
   }
 }
+let askMeSpeechTimer=null;
+function askMePrimeSpeech(){
+  if(!('speechSynthesis' in window))return;
+  try{
+    const ss=window.speechSynthesis;
+    ss.cancel();
+    const u=new SpeechSynthesisUtterance('');
+    u.volume=0; u.rate=10;
+    ss.speak(u);
+  }catch(e){}
+}
 function askMeSpeakText(text){
   if(!askMeAutoVoice||!('speechSynthesis' in window))return;
-  window.speechSynthesis.cancel();
   const clean=String(text||'').replace(/🔊 Read answer aloud/g,'')
     .replace(/₹/g,' rupees ').replace(/%/g,' percent ')
-    .replace(/×/g,' times ').replace(/÷/g,' divided by ');
-  const speakNow=()=>{
+    .replace(/×/g,' times ').replace(/÷/g,' divided by ')
+    .replace(/\s+/g,' ').trim();
+  if(!clean)return;
+  clearTimeout(askMeSpeechTimer);
+  const speak=()=>{
     try{
+      const ss=window.speechSynthesis;
+      ss.cancel();
+      const voices=ss.getVoices();
       const u=new SpeechSynthesisUtterance(clean);
-      u.lang=navigator.language||'en-IN'; u.rate=.95; u.pitch=1;
-      window.speechSynthesis.speak(u);
+      u.lang=(navigator.language||'en-IN');
+      const v=voices.find(x=>/^en-IN$/i.test(x.lang))||
+              voices.find(x=>/^en-US$/i.test(x.lang))||
+              voices.find(x=>/^en/i.test(x.lang));
+      if(v)u.voice=v;
+      u.rate=.92; u.pitch=1; u.volume=1;
+      u.onstart=()=>askMeSetVoiceStatus('🔊 Speaking the answer…');
+      u.onend=()=>askMeSetVoiceStatus('Answer spoken. Ask another question.');
+      u.onerror=()=>askMeSetVoiceStatus('Answer calculated. Tap the microphone once if sound is blocked.');
+      ss.speak(u);
     }catch(e){}
   };
-  speakNow();
-  setTimeout(()=>{
-    if(window.speechSynthesis&&!window.speechSynthesis.speaking&&!window.speechSynthesis.pending)speakNow();
-  },500);
+  speak();
+  askMeSpeechTimer=setTimeout(()=>{
+    if(window.speechSynthesis&&!window.speechSynthesis.speaking)speak();
+  },700);
 }
 
 
@@ -3254,7 +3275,7 @@ function answerAskMe(isAutoReply=false){
   if(arithmetic!==null){
     a.innerHTML=askMeArithmeticAnswer(q,arithmetic);
     a.classList.add('show');
-    askMeSpeakText(a.innerText);
+    if(askMeAutoVoice)setTimeout(()=>askMeSpeakText(a.innerText),120);
     return;
   }
 
@@ -3270,11 +3291,11 @@ function answerAskMe(isAutoReply=false){
       });
       a.innerHTML=askMeSlabEmiAnswer(principal,months,clean,calc);
       a.classList.add('show');
-      askMeSpeakText(a.innerText);
+      if(askMeAutoVoice)setTimeout(()=>askMeSpeakText(a.innerText),120);
       return;
     }
     a.innerHTML='<div class="ask-result-title">Slab-wise EMI</div><div>Please give the <b>loan amount, tenure and slab rates</b>.<br><br>Example: <b>Calculate slab EMI for ₹7 lakh for 60 months: first ₹3 lakh at 5%, next ₹2 lakh at 6%, balance at 7%.</b></div>';
-    a.classList.add('show');askMeSpeakText(a.innerText);return;
+    a.classList.add('show');if(askMeAutoVoice)setTimeout(()=>askMeSpeakText(a.innerText),120);return;
   }
 
   if(/emi|e\.?m\.?i|installment|instalment|monthly payment|loan amount/.test(ql)){
