@@ -404,7 +404,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.0</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v4.1</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -943,7 +943,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.0</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v4.1</strong>
   </footer>
 </div>
 
@@ -2599,7 +2599,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v4.0 ---------- */
+/* ---------- Simple Calculator v4.1 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
@@ -2888,39 +2888,60 @@ function askMeNumberPhrase(s){
   return has ? total+current : null;
 }
 function askMeMoney(q){
-  const s=String(q||'').toLowerCase();
-  // Prefer the phrase after "loan amount" and before the interest/rate wording.
-  const labelled=s.match(/(?:loan\s+amount|principal|amount)\s+(.*?)(?=\s+(?:at|@|rate|interest|period|tenure|for)\b|$)/i);
+  const s=String(q||'').toLowerCase().replace(/,/g,' ').trim();
+
+  // 1) Explicitly labelled amount: "loan amount five lakhs", "amount ₹5 lakh".
+  const labelled=s.match(/(?:loan\s+amount|principal|amount)\s+(.*?)(?=\s+(?:at|@|rate|interest|period|tenure|for|or)\b|$)/i);
   if(labelled){
     const n=askMeNumberPhrase(labelled[1].replace(/\b(?:rupees?|rs\.?|inr)\b/g,'').trim());
     if(n!==null)return n;
   }
-  // Explicit numeric amount with lakh/crore.
-  const m=s.match(/(?:₹|rs\.?|inr)?\s*([0-9]+(?:\.[0-9]+)?)\s*(lakh|lac|lacs|lakhs|crore|crores|cr)\b/i);
-  if(m){
-    return askMeNumberPhrase(m[1]+' '+m[2]);
+
+  // 2) Natural EMI wording: "EMI of five lakhs at 8%" or
+  // "EMI of ₹5 lakh for 60 months". This was missing in v4.0.
+  const emiAmount=s.match(/\b(?:emi|e\.?\s*m\.?\s*i\.?)\s+(?:of|for)\s+(?:₹|rs\.?|inr)?\s*([a-z0-9.\s-]+?)(?=\s+(?:at|@|rate|interest|for|or|over|period|tenure)\b|$)/i);
+  if(emiAmount){
+    const n=askMeNumberPhrase(emiAmount[1].trim());
+    if(n!==null)return n;
   }
-  // Plain rupee amount only when it is not immediately followed by %.
-  const p=s.match(/(?:loan\s+amount|principal|amount)\s+(?:₹|rs\.?|inr)?\s*([0-9][0-9,]*(?:\.[0-9]+)?)(?!\s*%)/i);
-  if(p)return parseFloat(p[1].replace(/,/g,''));
+
+  // 3) "five lakhs at 8%" even without the word EMI immediately before it.
+  const wordAmount=s.match(/\b((?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:\s+(?:one|two|three|four|five|six|seven|eight|nine))?\s+(?:lakh|lac|lacs|lakhs|crore|crores|cr|thousand))\b/i);
+  if(wordAmount){
+    const n=askMeNumberPhrase(wordAmount[1]);
+    if(n!==null)return n;
+  }
+
+  // 4) Explicit numeric lakh/crore amount.
+  const m=s.match(/(?:₹|rs\.?|inr)?\s*([0-9]+(?:\.[0-9]+)?)\s*(lakh|lac|lacs|lakhs|crore|crores|cr)\b/i);
+  if(m)return askMeNumberPhrase(m[1]+' '+m[2]);
+
+  // 5) Plain labelled numeric amount.
+  const p=s.match(/(?:loan\s+amount|principal|amount)\s+(?:₹|rs\.?|inr)?\s*([0-9][0-9 ]*(?:\.[0-9]+)?)(?!\s*%)/i);
+  if(p)return parseFloat(p[1].replace(/ /g,''));
+
   return null;
 }
 
 function askMeRate(q){
   const s=String(q||'');
-  const explicit=s.match(/([0-9]+(?:\.[0-9]+)?)\s*%/i);
+  const explicit=s.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:%|percent|per\s*cent)\b/i);
   if(explicit)return parseFloat(explicit[1]);
-  const m=s.match(/(?:rate|interest)\s*(?:of|at)?\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const m=s.match(/(?:rate|interest)\s*(?:of|at)?\s*(?:the\s+)?([0-9]+(?:\.[0-9]+)?)/i);
   return m?parseFloat(m[1]):null;
 }
 
 function askMeMonths(q){
-  let m=q.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:months?|mos?)\b/i);
+  const s=String(q||'');
+  let m=s.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:months?|mos?)\b/i);
   if(m)return Math.round(parseFloat(m[1]));
-  m=q.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:years?|yrs?)\b/i);
+  m=s.match(/(?:period|tenure)\s*(?:of|is)?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:months?|mos?)\b/i);
+  if(m)return Math.round(parseFloat(m[1]));
+  m=s.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:years?|yrs?)\b/i);
   if(m)return Math.round(parseFloat(m[1])*12);
   return null;
 }
+
 function askMeINR(n){return '₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function askMeEMI(principal,months,annualRate){
   if(months<=0||principal<0||annualRate<0)return null;
@@ -3277,7 +3298,7 @@ function answerAskMe(isAutoReply=false){
     if(/slab|progressive/.test(ql))
       a.innerHTML='<div class="ask-result-title">Slab-wise EMI</div><div>Use the <b>Slab-wise Term Loan EMI</b> calculator and enter the outstanding-balance slabs and annual rates.</div>';
     else
-      a.innerHTML='<div class="ask-result-title">I need three details</div><div>Please include the <b>loan amount, interest rate and tenure</b>.<br><br>Example: <b>What is the EMI of ₹1,00,000 for 60 months at 5%?</b></div>';
+      a.innerHTML='<div class="ask-result-title">I need three details</div><div>Please include the <b>loan amount, interest rate and tenure</b>.<br><br>Examples: <b>What is the EMI of ₹1,00,000 for 60 months at 5%?</b><br><b>What is EMI of five lakhs at 8% for 60 months?</b></div>';
     a.classList.add('show');return;
   }
 
