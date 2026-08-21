@@ -404,7 +404,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v3.4</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v3.5</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -943,7 +943,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v3.4</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v3.5</strong>
   </footer>
 </div>
 
@@ -2521,7 +2521,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v3.4 ---------- */
+/* ---------- Simple Calculator v3.5 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
@@ -2737,7 +2737,7 @@ simpleCalcRenderHistory();
       <p class="askme-voice-note">After you speak, tap Ask. The answer can also be read aloud.</p>
       <div class="askme-actions">
         <button class="btn primary askme-ask" type="button" onclick="answerAskMe()">Ask</button>
-        <p class="askme-example">I can calculate standard EMI from amount, rate and tenure.</p>
+        <p class="askme-example">Ask me anything from 10 + 20 to EMI, interest and other financial calculations.</p>
       </div>
       <div id="askMeAnswer" class="ask-answer" aria-live="polite"></div>
     </div>
@@ -2856,7 +2856,7 @@ function initAskMeVoice(){
     const b=document.getElementById('askMeMicBtn');
     if(b){b.classList.remove('listening');b.textContent='🎙️';}
     const input=document.getElementById('askMeInput');
-    if(input && input.value.trim())askMeSetVoiceStatus('Question captured. Tap Ask for the answer.');
+    if(input && input.value.trim())askMeSetVoiceStatus('Question captured. Tap Ask — I will calculate it.');
     else askMeSetVoiceStatus('Tap the microphone and speak your question — e.g. “10 plus 20”.');
   };
   return true;
@@ -2893,9 +2893,11 @@ function speakAskMeAnswer(){
 function askMeArithmeticExpression(q){
   let s=String(q||'').toLowerCase().trim();
   s=s.replace(/[₹,]/g,'');
-  s=s.replace(/\bwhat\s+is\b/g,' ').replace(/\bcalculate\b/g,' ')
+  s=s.replace(/\bwhat\s+is\b/g,' ').replace(/\btell\s+me\b/g,' ')
+   .replace(/\bwhat's\b/g,' ').replace(/\bcalculate\b/g,' ')
    .replace(/\bplease\b/g,' ').replace(/\bcan\s+you\b/g,' ')
-   .replace(/\bcompute\b/g,' ');
+   .replace(/\bcould\s+you\b/g,' ').replace(/\bcompute\b/g,' ')
+   .replace(/\bgive\s+me\b/g,' ');
   s=s.replace(/\bdivided\s+by\b/g,' / ').replace(/\bdivide\s+by\b/g,' / ')
    .replace(/\bover\b/g,' / ').replace(/\bmultiplied\s+by\b/g,' * ')
    .replace(/\bmultiply\s+by\b/g,' * ').replace(/\btimes\b/g,' * ')
@@ -2910,8 +2912,11 @@ function askMeArithmeticExpression(q){
   Object.keys(words).sort((a,b)=>b.length-a.length).forEach(w=>{
     s=s.replace(new RegExp('\\b'+w+'\\b','g'),words[w]);
   });
+  s=s.replace(/\bthe\s+answer\s+to\b/g,' ')
+   .replace(/\banswer\s+to\b/g,' ')
+   .replace(/\bof\b/g,' ');
   s=s.replace(/\s+/g,'').trim();
-  if(!/^[0-9+\-*/%.]+$/.test(s)||!/[+\-*/%]/.test(s))return null;
+  if(!/^[0-9+\-*/%.()]+$/.test(s)||!/[+\-*/%]/.test(s))return null;
   s=s.replace(/(\d+(?:\.\d+)?)%/g,'($1/100)');
   try{
     const value=Function('"use strict";return ('+s+')')();
