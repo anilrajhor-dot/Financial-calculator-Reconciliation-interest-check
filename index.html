@@ -1738,7 +1738,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculators v7.3 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculators v7.4 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -3678,6 +3678,19 @@ document.getElementById('stmtMenuReset')?.addEventListener('click',()=>{
 });
 
 document.getElementById('stmtFile').addEventListener('change',async e=>{
+  // A new statement is a completely new calculation context.
+  // Never allow the previous bank's result to be reused.
+  stmtLastResult=null;
+  stmtRawRows=[];
+  window.__statementRows=null;
+  window.__fiqMapped=null;
+  window.__stmtAIMap=null;
+  window.__stmtOpeningClosing=null;
+  const bankInterestInput=document.getElementById('stmtBankInterest');
+  if(bankInterestInput) bankInterestInput.value='';
+  document.getElementById('stmtMenuMonthly')?.setAttribute('disabled','disabled');
+  document.getElementById('stmtMenuDaily')?.setAttribute('disabled','disabled');
+
   stmtShowPdfPasswordBox(/\.pdf$/i.test((e.target.files&&e.target.files[0]&&e.target.files[0].name)||''));
   const file=e.target.files[0]; if(!file)return;
   const status=document.getElementById('stmtStatus');
@@ -3687,6 +3700,9 @@ document.getElementById('stmtFile').addEventListener('change',async e=>{
     const rows=await parseStatementFile(file);
     if(!rows.length)throw new Error('No rows detected in the file.');
     populateStatementPreview(rows);
+    // Keep this parsed workbook isolated from any previously uploaded statement.
+    window.__statementRows=stmtRawRows;
+    stmtLastResult=null;
     const ai=stmtRunAIMapper();
     const mappedAI=stmtRowsFromAIMap(ai);
     const mappedFallback=mappedAI.length?mappedAI:(stmtRowsFromKnownBankFormat().length?stmtRowsFromKnownBankFormat():stmtExtractTransactionsUniversal(stmtRawRows));
@@ -4738,7 +4754,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
 </script>
 
 <script>
-// StatementIQ working Bank Interest engine transplant for Financial Calculators v7.3
+// StatementIQ working Bank Interest engine transplant for Financial Calculators v7.4
 (function(){
   const aliasGroups={
     date:['transaction date','txn date','tran date','value date','posting date','post date','date of transaction','trans date','date'],
