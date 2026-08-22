@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v7.5</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v7.6</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -989,7 +989,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v7.5</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v7.6</strong>
   </footer>
 </div>
 
@@ -1738,7 +1738,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculators v7.5 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculators v7.6 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -4462,36 +4462,77 @@ function speakAskMeAnswer(){
 }
 
 
+function askMeArithmeticNumberPhrase(s){
+  s=String(s||'').toLowerCase().replace(/,/g,' ').trim();
+  if(!s)return null;
+  const direct=s.match(/^\s*([0-9]+(?:\.[0-9]+)?)\s*(lakh|lac|lacs|lakhs|crore|crores|cr|thousand|hundred)?\s*$/i);
+  if(direct){
+    let n=parseFloat(direct[1]), u=(direct[2]||'').toLowerCase();
+    if(u==='hundred')n*=100;
+    else if(u==='thousand')n*=1000;
+    else if(['lakh','lac','lacs','lakhs'].includes(u))n*=100000;
+    else if(['crore','crores','cr'].includes(u))n*=10000000;
+    return isFinite(n)?n:null;
+  }
+
+  const ones={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,
+    eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,
+    eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,
+    eighty:80,ninety:90};
+  const tokens=s.split(/\s+/).filter(Boolean);
+  let total=0,current=0,has=false;
+  for(const tok of tokens){
+    if(tok==='and')continue;
+    if(Object.prototype.hasOwnProperty.call(ones,tok)){current+=ones[tok];has=true;continue;}
+    if(tok==='hundred'){current=(current||1)*100;has=true;continue;}
+    if(tok==='thousand'){total+=(current||1)*1000;current=0;has=true;continue;}
+    if(['lakh','lac','lacs','lakhs'].includes(tok)){total+=(current||1)*100000;current=0;has=true;continue;}
+    if(['crore','crores','cr'].includes(tok)){total+=(current||1)*10000000;current=0;has=true;continue;}
+    return null;
+  }
+  return has?total+current:null;
+}
+
 function askMeArithmeticExpression(q){
   let s=String(q||'').toLowerCase().trim();
-  s=s.replace(/[₹,]/g,'');
+  s=s.replace(/[₹,]/g,' ');
   s=s.replace(/\bwhat\s+is\b/g,' ').replace(/\btell\s+me\b/g,' ')
    .replace(/\bwhat's\b/g,' ').replace(/\bcalculate\b/g,' ')
    .replace(/\bplease\b/g,' ').replace(/\bcan\s+you\b/g,' ')
    .replace(/\bcould\s+you\b/g,' ').replace(/\bcompute\b/g,' ')
-   .replace(/\bgive\s+me\b/g,' ');
+   .replace(/\bgive\s+me\b/g,' ').replace(/\bwhat\s+will\s+be\b/g,' ');
   s=s.replace(/\bdivided\s+by\b/g,' / ').replace(/\bdivide\s+by\b/g,' / ')
    .replace(/\bover\b/g,' / ').replace(/\bmultiplied\s+by\b/g,' * ')
    .replace(/\bmultiply\s+by\b/g,' * ').replace(/\btimes\b/g,' * ')
    .replace(/\bplus\b/g,' + ').replace(/\bminus\b/g,' - ')
    .replace(/\bsubtract\b/g,' - ').replace(/\badd\b/g,' + ')
-   .replace(/×/g,' * ').replace(/÷/g,' / ').replace(/−/g,' - ');
-  const words={zero:'0',one:'1',two:'2',three:'3',four:'4',five:'5',
-    six:'6',seven:'7',eight:'8',nine:'9',ten:'10',eleven:'11',
-    twelve:'12',thirteen:'13',fourteen:'14',fifteen:'15',sixteen:'16',
-    seventeen:'17',eighteen:'18',nineteen:'19',twenty:'20',thirty:'30',
-    forty:'40',fifty:'50',sixty:'60',seventy:'70',eighty:'80',ninety:'90'};
-  Object.keys(words).sort((a,b)=>b.length-a.length).forEach(w=>{
-    s=s.replace(new RegExp('\\b'+w+'\\b','g'),words[w]);
-  });
-  s=s.replace(/\bthe\s+answer\s+to\b/g,' ')
-   .replace(/\banswer\s+to\b/g,' ')
-   .replace(/\bof\b/g,' ');
-  s=s.replace(/\s+/g,'').trim();
-  if(!/^[0-9+\-*/%.()]+$/.test(s)||!/[+\-*/%]/.test(s))return null;
-  s=s.replace(/(\d+(?:\.\d+)?)%/g,'($1/100)');
+   .replace(/\b×/g,' * ').replace(/÷/g,' / ').replace(/−/g,' - ');
+
+  // "X percent of Y" means X/100 × Y.
+  let pct=s.match(/^\s*(.+?)\s+percent\s+of\s+(.+?)\s*$/);
+  if(pct)s='('+pct[1]+')/100*('+pct[2]+')';
+  else s=s.replace(/\bpercent\b/g,'%');
+
+  // Convert each operand independently, so "50 + hundred + 200",
+  // "five hundred + 200", and "one hundred twenty five + 75" all work.
+  const parts=s.split(/([+\-*/%()])/);
+  let out='';
+  for(let i=0;i<parts.length;i++){
+    const part=parts[i];
+    if(!part)continue;
+    if(/^[+\-*/%()]$/.test(part)){out+=part;continue;}
+    const phrase=part.trim();
+    if(!phrase)continue;
+    if(/^[0-9]+(?:\.[0-9]+)?$/.test(phrase)){out+=phrase;continue;}
+    const n=askMeArithmeticNumberPhrase(phrase);
+    if(n===null)return null;
+    out+=String(n);
+  }
+  out=out.replace(/\s+/g,'').trim();
+  if(!/^[0-9+\-*/%.()]+$/.test(out)||!/[+\-*/%]/.test(out))return null;
+  out=out.replace(/(\d+(?:\.\d+)?)%/g,'($1/100)');
   try{
-    const value=Function('"use strict";return ('+s+')')();
+    const value=Function('"use strict";return ('+out+')')();
     return (typeof value==='number'&&isFinite(value))?value:null;
   }catch(e){return null;}
 }
@@ -4763,7 +4804,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
 </script>
 
 <script>
-// StatementIQ working Bank Interest engine transplant for Financial Calculators v7.5
+// StatementIQ working Bank Interest engine transplant for Financial Calculators v7.6
 (function(){
   const aliasGroups={
     date:['transaction date','txn date','tran date','value date','posting date','post date','date of transaction','trans date','date'],
