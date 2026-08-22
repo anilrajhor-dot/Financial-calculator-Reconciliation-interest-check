@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v8.2</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v8.4</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -989,7 +989,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.2</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.4</strong>
   </footer>
 </div>
 
@@ -1738,7 +1738,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculators v8.2 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculators v8.4 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -4298,7 +4298,7 @@ function openAskMe(){
   setTimeout(()=>input?.focus(),120);
 }
 
-/* v8.2: immediate spoken arithmetic for simple voice/text commands. */
+/* v8.4: immediate spoken arithmetic for simple voice/text commands. */
 function askMeImmediateArithmetic(text){
   const original=String(text||'').trim();
   let q=original.toLowerCase()
@@ -4406,32 +4406,7 @@ function askMeNumberPhrase(s){
   return has ? total+current : null;
 }
 function askMeMoney(q){
-  const immediateArithmetic=askMeImmediateArithmetic(userText);
-  if(immediateArithmetic){
-    const answerText=immediateArithmetic.pretty;
-    // Display answer only.
-    if(typeof askMeShowAnswer==='function') askMeShowAnswer(answerText);
-    else if(typeof askMeDisplay==='function') askMeDisplay(answerText);
-
-    // Auto Reply: speak ONLY the result, never the question or explanatory text.
-    const autoOn = !!(window.askAutoReplyOn ||
-      document.getElementById('askAutoReply')?.checked ||
-      document.getElementById('askAutoReplyToggle')?.checked ||
-      document.querySelector('[data-ask-auto-reply]')?.checked);
-    if(autoOn){
-      if(typeof window.speechSynthesis!=='undefined'){
-        try{
-          window.speechSynthesis.cancel();
-          const u=new SpeechSynthesisUtterance(answerText);
-          u.lang=(navigator.language||'en-IN');
-          window.speechSynthesis.speak(u);
-        }catch(e){}
-      }else if(typeof askMeAutoSpeak==='function') askMeAutoSpeak(answerText);
-      else if(typeof speakText==='function') speakText(answerText);
-    }
-    return answerText;
-  }
-
+  // Amount extraction only. Arithmetic is handled centrally by answerAskMe().
   const s=String(q||'').toLowerCase().replace(/,/g,' ').trim();
 
   // 1) Explicitly labelled amount: "loan amount five lakhs", "amount ₹5 lakh".
@@ -4479,7 +4454,11 @@ function askMeMonths(q){
   const s=String(q||'');
   let m=s.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:months?|mos?)\b/i);
   if(m)return Math.round(parseFloat(m[1]));
-  m=s.match(/(?:period|tenure)\s*(?:of|is)?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:months?|mos?)\b/i);
+  // Bank/loan users often say "120 instalments" instead of "120 months".
+  // For a monthly EMI, the number of instalments is the number of months.
+  m=s.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:installments?|instalments?|installment|instalment)\b/i);
+  if(m)return Math.round(parseFloat(m[1]));
+  m=s.match(/(?:period|tenure)\s*(?:of|is)?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:months?|mos?|installments?|instalments?)\b/i);
   if(m)return Math.round(parseFloat(m[1]));
   m=s.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:years?|yrs?)\b/i);
   if(m)return Math.round(parseFloat(m[1])*12);
@@ -4581,10 +4560,23 @@ function speakAskMeAnswer(){
   }
   const answer=document.getElementById('askMeAnswer');
   if(!answer)return;
+  // Speak ONLY the final result. Never read the question, headings, labels,
+  // explanation, or the contents of the answer card.
+  let resultEl=answer.querySelector('.ask-main-result b');
+  if(!resultEl) resultEl=answer.querySelector('[data-speak-result]');
+  if(!resultEl){
+    const strongs=answer.querySelectorAll('strong,b');
+    if(strongs.length) resultEl=strongs[strongs.length-1];
+  }
+  const result=(resultEl?.textContent||'').trim();
+  if(!result){
+    askMeSetVoiceStatus('No final result is available to announce.');
+    return;
+  }
   const wasAuto=askMeAutoVoice;
   askMeAutoVoice=true;
   askMePrimeSpeech();
-  askMeSpeakText(answer.innerText);
+  askMeSpeakText(result);
   askMeAutoVoice=wasAuto;
 }
 
@@ -4862,7 +4854,7 @@ function askMeSlabEmiAnswer(principal,months,slabs,calc){
 function askMeSpeakEmiAmount(emi){
   if(!askMeAutoVoice)return;
   const amount=askMeINR(emi);
-  setTimeout(()=>askMeSpeakText('Your monthly EMI is '+amount),80);
+  setTimeout(()=>askMeSpeakText(amount),80);
 }
 
 function answerAskMe(isAutoReply=false){
@@ -4876,7 +4868,12 @@ function answerAskMe(isAutoReply=false){
   if(arithmetic!==null){
     a.innerHTML=askMeArithmeticAnswer(q,arithmetic);
     a.classList.add('show');
-    if(askMeAutoVoice)setTimeout(()=>askMeSpeakText(a.innerText),120);
+    // Auto Reply must speak ONLY the result. Never use a.innerText here because
+    // the answer card intentionally contains the original expression.
+    if(askMeAutoVoice){
+      const spoken=Number(arithmetic).toLocaleString('en-IN',{maximumFractionDigits:10});
+      setTimeout(()=>askMeSpeakText(spoken),120);
+    }
     return;
   }
 
@@ -4896,7 +4893,7 @@ function answerAskMe(isAutoReply=false){
       return;
     }
     a.innerHTML='<div class="ask-result-title">Slab-wise EMI</div><div>Please give the <b>loan amount, tenure and slab rates</b>.<br><br>Example: <b>Calculate slab EMI for ₹7 lakh for 60 months: first ₹3 lakh at 5%, next ₹2 lakh at 6%, balance at 7%.</b></div>';
-    a.classList.add('show');if(askMeAutoVoice)setTimeout(()=>askMeSpeakText(a.innerText),120);return;
+    a.classList.add('show');if(askMeAutoVoice)setTimeout(()=>askMeSpeakText('Please provide the loan amount, interest rate and tenure.'),120);return;
   }
 
   if(/emi|e\.?m\.?i|installment|instalment|monthly payment|loan amount/.test(ql)){
@@ -4935,7 +4932,7 @@ function answerAskMe(isAutoReply=false){
   else
     a.innerHTML='<div class="ask-result-title">I can calculate that</div><div>Try <b>10 + 20</b>, <b>100 × 5</b>, <b>200 ÷ 4</b>, or speak: <b>“125 plus 75 divided by 5”</b>.</div>';
   a.classList.add('show');
-  if(askMeAutoVoice)setTimeout(()=>askMeSpeakText(a.innerText),120);
+  if(askMeAutoVoice)setTimeout(()=>askMeSpeakText('Please provide the details needed for this calculation.'),120);
 }
 </script>
 <script>
@@ -4949,7 +4946,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
 </script>
 
 <script>
-// StatementIQ working Bank Interest engine transplant for Financial Calculators v8.2
+// StatementIQ working Bank Interest engine transplant for Financial Calculators v8.4
 (function(){
   const aliasGroups={
     date:['transaction date','txn date','tran date','value date','posting date','post date','date of transaction','trans date','date'],
