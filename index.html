@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v6.8</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v7.0</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -989,7 +989,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v6.8</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v7.0</strong>
   </footer>
 </div>
 
@@ -1981,22 +1981,14 @@ async function stmtParseXlsxDirect(file){
 
 async function parseStatementFile(file) {
   const ext=file.name.split('.').pop().toLowerCase();
-
-  // v6.8: Use the same spreadsheet-reading strategy that works in StatementIQ.
-  // raw:false is important for bank-generated XLSX files because it lets
-  // SheetJS convert formatted Excel dates/numbers into usable display values.
-  // We deliberately inspect every worksheet and choose the sheet that contains
-  // the strongest REAL transaction-header + transaction-data combination.
-  const readWorkbookSheets=async()=>{
+  if(ext==='xlsx'){
+    // v6.9: robust XLSX reader. Use SheetJS formatted values (raw:false),
+    // inspect every worksheet, and select the worksheet/header that actually
+    // contains transaction rows. This keeps the rest of the statement engine
+    // unchanged and avoids breaking the main application script.
     const data=await file.arrayBuffer();
-    const wb=XLSX.read(data,{
-      type:'array',
-      cellDates:true,
-      raw:false,
-      nodim:true,
-      WTF:false
-    });
-
+    const wb=XLSX.read(data,{type:'array',cellDates:true,raw:false,nodim:true,WTF:false});
+    const norm=v=>String(v??'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
     const aliases={
       date:['transaction date','txn date','tran date','trans date','post date','posting date','value date','date'],
       debit:['debit amount','debit amt','withdrawal amount','withdrawal amt','withdrawal','debit','dr amount','dr amt','dr'],
@@ -2004,120 +1996,71 @@ async function parseStatementFile(file) {
       balance:['closing balance','running balance','available balance','ledger balance','current balance','balance'],
       amount:['transaction amount','txn amount','amount (inr)','amount inr','amount','value','amt'],
       narration:['particulars','transaction details','transaction description','description','narration','remarks','details'],
-      drcr:['dr/cr','dr / cr','cr/dr','debit credit','credit debit','transaction type','txn type','type']
+      drcr:['dr/cr','dr / cr','cr/dr','transaction type','txn type','type']
     };
-
-    const norm=v=>String(v??'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
-    const hasAlias=(v,list)=>{
-      const x=norm(v);
-      return !!x && list.some(a=>x===a || x.includes(a));
-    };
-    const dateLike=v=>{
-      const d=parseDateFlexible(v);
-      return !!(d&&!isNaN(d));
-    };
-    const moneyLike=v=>{
-      if(typeof v==='number')return Number.isFinite(v);
-      const s=String(v??'').trim();
-      if(!s)return false;
-      return /\d/.test(s) && Number.isFinite(parseNumberFlexible(s));
-    };
-
+    const alias=(v,list)=>{const x=norm(v);return !!x&&list.some(a=>x===a||x.includes(a));};
+    const dateLike=v=>{const d=parseDateFlexible(v);return !!(d&&!isNaN(d));};
+    const moneyLike=v=>{if(typeof v==='number')return Number.isFinite(v);const s=String(v??'').trim();return !!s&&/\d/.test(s)&&Number.isFinite(parseNumberFlexible(s));};
     let best=null;
-
     for(const name of wb.SheetNames){
-      const ws=wb.Sheets[name];
-      if(!ws)continue;
-
-      // Do not depend on the worksheet !ref. Use the sparse-cell addresses.
-      // This is the robust part of the original StatementIQ reader.
-      const rows=stmtWorksheetCellsToRows(ws)
-        .map(r=>(r||[]).map(v=>{
-          if(v instanceof Date)return `${String(v.getDate()).padStart(2,'0')}/${String(v.getMonth()+1).padStart(2,'0')}/${v.getFullYear()}`;
-          return String(v??'').trim();
-        }))
-        .filter(r=>r.some(v=>String(v??'').trim()!==''));
-
+      const ws=wb.Sheets[name]; if(!ws)continue;
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:'',blankrows:true});
       if(!rows.length)continue;
-
-      // Find the actual transaction header, not the first row and not a
-      // summary block containing Opening/Closing Balance.
       for(let hr=0;hr<Math.min(rows.length,120);hr++){
         const h=rows[hr]||[];
-        let dc=-1,db=-1,cr=-1,ba=-1,am=-1,nar=-1,flag=-1;
-
+        let date=-1,debit=-1,credit=-1,balance=-1,amount=-1,narration=-1,drcr=-1;
         h.forEach((v,c)=>{
-          if(dc<0&&hasAlias(v,aliases.date))dc=c;
-          if(db<0&&hasAlias(v,aliases.debit))db=c;
-          if(cr<0&&hasAlias(v,aliases.credit))cr=c;
-          if(ba<0&&hasAlias(v,aliases.balance))ba=c;
-          if(am<0&&hasAlias(v,aliases.amount))am=c;
-          if(nar<0&&hasAlias(v,aliases.narration))nar=c;
-          if(flag<0&&hasAlias(v,aliases.drcr))flag=c;
+          if(date<0&&alias(v,aliases.date))date=c;
+          if(debit<0&&alias(v,aliases.debit))debit=c;
+          if(credit<0&&alias(v,aliases.credit))credit=c;
+          if(balance<0&&alias(v,aliases.balance))balance=c;
+          if(amount<0&&alias(v,aliases.amount))amount=c;
+          if(narration<0&&alias(v,aliases.narration))narration=c;
+          if(drcr<0&&alias(v,aliases.drcr))drcr=c;
         });
-
-        if(dc<0 || ba<0)continue;
-        if(db<0&&cr<0&&am<0&&nar<0)continue;
-
-        let dateHits=0,moneyHits=0,validRows=0;
-        for(let r=hr+1;r<Math.min(rows.length,hr+16);r++){
+        if(date<0||balance<0||(debit<0&&credit<0&&amount<0))continue;
+        let dateHits=0,valid=0,moneyHits=0;
+        for(let r=hr+1;r<Math.min(rows.length,hr+21);r++){
           const row=rows[r]||[];
-          if(dateLike(row[dc]))dateHits++;
-          const flowCols=[db,cr,am,ba].filter(c=>c>=0);
-          const mh=flowCols.filter(c=>moneyLike(row[c])).length;
-          if(mh)moneyHits+=mh;
-          if(dateLike(row[dc])&&mh)validRows++;
+          const d=dateLike(row[date]);
+          if(d)dateHits++;
+          const cols=[debit,credit,amount,balance].filter(c=>c>=0);
+          const mh=cols.some(c=>moneyLike(row[c]));
+          if(mh)moneyHits++;
+          if(d&&mh)valid++;
         }
-
-        if(dateHits<2 || validRows<1)continue;
-
-        let score=50+dateHits*4+Math.min(25,moneyHits*2)+validRows*8;
-        if(db>=0)score+=8;
-        if(cr>=0)score+=8;
-        if(ba>=0)score+=10;
-        if(am>=0)score+=4;
-        if(nar>=0)score+=2;
+        if(dateHits<2||valid<1)continue;
+        let score=100+dateHits*5+valid*10+moneyHits*2;
+        if(debit>=0)score+=10;if(credit>=0)score+=10;if(balance>=0)score+=12;if(narration>=0)score+=3;
         const ht=h.map(norm).join(' | ');
-        if(/transaction\s+date|post\s+date|posting\s+date/.test(ht))score+=8;
-        if(/\b(debit|credit)\b/.test(ht))score+=5;
-
-        if(!best||score>best.score){
-          best={
-            sheet:name, rows, headerRow:hr, date:dc, debit:db, credit:cr,
-            balance:ba, amount:am, narration:nar, drcr:flag, score
-          };
-        }
+        if(/opening balance|total debit|total credit|closing balance/.test(ht)&&dateHits===0)score-=50;
+        if(/transaction\s+date|post\s+date|posting\s+date/.test(ht))score+=10;
+        if(!best||score>best.score)best={rows,headerRow:hr,date,debit,credit,balance,amount,narration,drcr,score,sheet:name};
       }
     }
-
-    if(!best) {
-      // Last resort: read the first worksheet normally so the preview can
-      // still expose the source rather than reporting a false "no data".
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',blankrows:false,raw:false});
-      if(!rows.length)throw new Error('The workbook contains no readable worksheet cells.');
-      return stmtNormaliseRows(rows);
+    if(best)return stmtNormaliseRows(best.rows);
+    // Preserve the existing preview/mapping fallback when a bank uses an
+    // unusual header wording; do not fail the upload itself.
+    let bestRows=[];let bestScore=-1;
+    for(const name of wb.SheetNames){
+      const sheet=wb.Sheets[name];if(!sheet)continue;
+      const rows=stmtWorksheetCellsToRows(sheet);
+      const text=rows.slice(0,250).map(r=>(r||[]).join(' | ')).join(' | ').toLowerCase();
+      const score=(/\bpost\s+date\b/.test(text)?5:0)+(/\btransaction\s+date\b/.test(text)?5:0)+(/\bdebit\b/.test(text)?3:0)+(/\bcredit\b/.test(text)?3:0)+(/\bbalance\b/.test(text)?3:0);
+      if(score>bestScore){bestScore=score;bestRows=rows;}
     }
-
-    // Preserve the complete selected worksheet. The mapper will use the
-    // detected transaction header and the actual values.
-    return stmtNormaliseRows(best.rows);
-  };
-
-  if(ext==='xlsx'||ext==='xls'){
-    return await readWorkbookSheets();
+    if(!bestRows.length)throw new Error('The workbook contains no readable worksheet cells.');
+    return stmtNormaliseRows(bestRows);
   }
-
-  if(ext==='csv'){
+  if(ext==='xls'||ext==='csv'){
     const data=await file.arrayBuffer();
-    const wb=XLSX.read(data,{type:'array',cellDates:true,raw:false,WTF:false});
+    const wb=XLSX.read(data,{type:'array',cellDates:true,nodim:true,WTF:false});
     const sheet=wb.Sheets[wb.SheetNames[0]];
     if(!sheet)throw new Error('The worksheet could not be read.');
-    const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:false,defval:'',blankrows:false});
+    const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:'',blankrows:true});
     if(!rows.length)throw new Error('The file contains no readable rows.');
     return stmtNormaliseRows(rows);
   }
-
   if(ext==='json'){
     const text=await file.text();
     let data; try{data=JSON.parse(text);}catch(e){throw new Error('Not valid JSON.');}
@@ -2126,65 +2069,12 @@ async function parseStatementFile(file) {
     const headers=Array.from(data.reduce((set,obj)=>{Object.keys(obj).forEach(k=>set.add(k));return set;},new Set()));
     return [headers,...data.map(obj=>headers.map(h=>obj[h]!==undefined?obj[h]:''))];
   }
-
   if(ext==='pdf'){
     if(!window.pdfjsLib)throw new Error('PDF reader failed to load.');
     const data=await file.arrayBuffer();
     const pdf=await stmtPdfGetDocument(data).promise;
-    let stmtPdfPasswordPending=false;
-    function stmtShowPdfPasswordBox(show=true){
-      const box=document.getElementById('stmtPdfPasswordBox');
-      if(box)box.style.display=show?'block':'none';
-    }
-    function stmtSetPdfPasswordStatus(msg,error=false){
-      const el=document.getElementById('stmtPdfPasswordStatus');
-      if(el){el.textContent=msg;el.style.color=error?'var(--clay)':'';}
-    }
-    function stmtPdfPasswordCallback(updatePassword,reason){
-      stmtShowPdfPasswordBox(true);
-      const input=document.getElementById('stmtPdfPassword');
-      const btn=document.getElementById('stmtPdfUnlockBtn');
-      stmtSetPdfPasswordStatus(reason===1 ? 'Incorrect PDF password. Please try again.' : 'This PDF is password protected. Enter the password and tap Unlock PDF.', reason===1);
-      const submit=()=>{
-        const pw=input?.value||'';
-        if(!pw){stmtSetPdfPasswordStatus('Please enter the PDF password.',true);return;}
-        stmtSetPdfPasswordStatus('Password supplied. Unlocking PDF…');
-        try{updatePassword(pw);}catch(e){stmtSetPdfPasswordStatus('Could not unlock the PDF.',true);}
-      };
-      if(btn)btn.onclick=submit;
-      if(input){
-        input.onkeydown=e=>{if(e.key==='Enter')submit();};
-        input.focus();
-      }
-    }
-    function stmtPdfGetDocument(data){
-      if(!window.pdfjsLib)throw new Error('PDF reader is not available.');
-      return window.pdfjsLib.getDocument({data:data,password:stmtPdfPasswordCallback});
-    }
-    const rows=[];
-    for(let pno=1;pno<=pdf.numPages;pno++){
-      const page=await pdf.getPage(pno), content=await page.getTextContent();
-      const lines=new Map();
-      content.items.forEach(item=>{
-        const y=Math.round(item.transform[5]);
-        if(!lines.has(y))lines.set(y,[]);
-        lines.get(y).push(item);
-      });
-      Array.from(lines.keys()).sort((a,b)=>b-a).forEach(y=>{
-        const items=lines.get(y).sort((a,b)=>a.transform[4]-b.transform[4]);
-        const text=items.map(i=>i.str).join(' ').trim();
-        if(text){
-          const tokens=text.split(/\s{2,}/).map(x=>x.trim()).filter(Boolean);
-          if(tokens.length>1)rows.push(tokens);
-        }
-      });
-    }
-    return rows;
-  }
 
-  throw new Error('Unsupported statement format: '+ext.toUpperCase());
-}
-
+let stmtPdfPasswordPending=false;
 function stmtShowPdfPasswordBox(show=true){
   const box=document.getElementById('stmtPdfPasswordBox');
   if(box)box.style.display=show?'block':'none';
@@ -2485,7 +2375,7 @@ function stmtExtractTransactionsUniversal(raw){
    be calculated.
 ============================================================================ */
 
-/* v6.8 — deterministic bank-statement header detector.
+/* v6.9 — deterministic bank-statement header detector.
    This is intentionally placed before the statistical AI mapper.
    If a real transaction header is present, there is no reason to guess.
 */
@@ -3681,9 +3571,10 @@ function stmtRunCalculation(){
   const ai=window.__stmtAIMap || stmtRunAIMapper();
   let rows=stmtRowsFromAIMap(ai);
   if(!rows.length){
-    // Re-run the complete mapper, including the deterministic transaction-header
-    // detector. Do not bypass it with the older statistical mapper.
-    window.__stmtAIMap=stmtRunAIMapper();
+    // Re-run the universal mapper against the loaded grid before using any
+    // legacy fallback. This avoids stale mappings from a previous upload.
+    window.__stmtAIMap=stmtAIMapStatement(stmtRawRows);
+    stmtAIApplyMapping(window.__stmtAIMap);
     rows=stmtRowsFromAIMap(window.__stmtAIMap);
   }
   if(!rows.length){
@@ -3780,8 +3671,8 @@ document.getElementById('stmtFile').addEventListener('change',async e=>{
     const mappedAI=stmtRowsFromAIMap(ai);
     const mappedFallback=mappedAI.length?mappedAI:(stmtRowsFromKnownBankFormat().length?stmtRowsFromKnownBankFormat():stmtExtractTransactionsUniversal(stmtRawRows));
     status.textContent=mappedFallback.length
-      ? `Loaded "${file.name}" — ${rows.length} worksheet rows. AI detected ${mappedFallback.length} transaction rows.`
-      : `Loaded "${file.name}" — ${rows.length} worksheet rows. No transaction rows were mapped yet.`;
+      ? `Loaded "${file.name}" — ${rows.length} rows. AI detected ${mappedFallback.length} transaction rows.`
+      : `Loaded "${file.name}" — ${rows.length} rows. AI could not confidently map transaction rows.`;
     if(mappedFallback.length){
       const s=document.getElementById('stmtStatus');
       const h=ai?.headerRow>=0?` from header row ${ai.headerRow+1}`:'';
@@ -4080,7 +3971,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v6.8 ---------- */
+/* ---------- Simple Calculator v6.9 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
@@ -4826,5 +4717,204 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
 });
 </script>
 
+<script>
+// StatementIQ working Bank Interest engine transplant for Financial Calculators v7.0
+(function(){
+  const aliasGroups={
+    date:['transaction date','txn date','tran date','value date','posting date','post date','date of transaction','trans date','date'],
+    narration:['transaction details','transaction description','transaction remarks','particulars','description','narration','remarks','details','transaction','memo'],
+    ref:['chq / ref number','chq/ref no','cheque no','ref no','reference number','reference no','instrument no','transaction id','transaction ref','voucher no','voucher','vch no','doc no','utr','ref','chq no'],
+    debit:['withdrawal amt','withdrawal amount','withdrawal (dr)','debit amount','withdrawals','withdrawal','payments','payment','paid','money out','debit','dr amount','dr amt','dr'],
+    credit:['deposit amt','deposit amount','deposit (cr)','credit amount','deposits','deposit','receipts','receipt','received','money in','credit','cr amount','cr amt','cr'],
+    amount:['transaction amount','amount (inr)','amount in inr','amount','value','amt'],
+    drcr:['dr / cr','dr/cr','type','txn type','cr/dr','indicator','debit credit','credit debit'],
+    balance:['closing balance','running balance','available balance','balance (inr)','balance','closing bal','running bal','bal']
+  };
+  const norm=v=>String(v??'').toLowerCase().replace(/[^a-z0-9\/ ]/g,' ').replace(/\s+/g,' ').trim();
+  function role(v){
+    const t=norm(v); if(!t)return null; let best=null,score=-1;
+    for(const r in aliasGroups) for(const a0 of aliasGroups[r]){
+      const a=norm(a0); let s=-1;
+      if(t===a)s=1000+a.length; else if(a.length>2&&t.includes(a))s=a.length; else if(t.length>=5&&a.includes(t))s=t.length-1;
+      if(s>score){score=s;best=r;}
+    }
+    return best;
+  }
+  function isSummary(g,dateRaw){
+    const cells=(g||[]).map(v=>String(v??'').trim()).filter(Boolean);
+    const text=cells.join(' ');
+    return !parseDateFlexible(dateRaw) && (/^(grand\s+)?total(?:\s+amount)?$|^sub[- ]?total$|^opening\s+balance$|^closing\s+balance$|^brought\s+forward$|^carried\s+forward$|^balance\s*(b\/f|c\/f)$|^statement\s+total$/i.test(cells.join('|')) || /\b(grand\s+total|sub[- ]?total|opening\s+balance|closing\s+balance|brought\s+forward|carried\s+forward|statement\s+total|total debit|total credit)\b/i.test(text));
+  }
+  function headerCandidates(raw){
+    let best=null;
+    const limit=Math.min(raw.length,160);
+    for(let i=0;i<limit;i++){
+      const rr=(raw[i]||[]).map(role);
+      const date=rr.indexOf('date');
+      const money=rr.findIndex(x=>['debit','credit','amount','balance'].includes(x));
+      if(date<0||money<0)continue;
+      let hits=rr.filter(Boolean).length;
+      let dataHits=0;
+      for(let j=i+1;j<Math.min(raw.length,i+8);j++){
+        const r=raw[j]||[]; const d=parseDateFlexible(r[date]);
+        if(!d)continue;
+        const mh=rr.some((x,c)=>['debit','credit','amount','balance'].includes(x)&&String(r[c]??'').trim()!=='');
+        if(mh)dataHits++;
+      }
+      if(!dataHits)continue;
+      const txt=(raw[i]||[]).map(norm).join(' | ');
+      let score=hits+dataHits*2;
+      if(/transaction\s+date|post\s+date|posting\s+date/.test(txt))score+=8;
+      if(rr.includes('debit')&&rr.includes('credit'))score+=5;
+      if(rr.includes('balance'))score+=5;
+      if(/opening\s+balance|total debit|total credit|closing\s+balance/.test(txt)&&!rr.includes('date'))score-=30;
+      if(!best||score>best.score)best={row:i,roles:rr,score};
+    }
+    return best;
+  }
+  function inferColumns(raw){
+    const h=headerCandidates(raw);
+    if(h){
+      const out={header:h.row,date:h.roles.indexOf('date'),debit:h.roles.indexOf('debit'),credit:h.roles.indexOf('credit'),amount:h.roles.indexOf('amount'),drcr:h.roles.indexOf('drcr'),balance:h.roles.indexOf('balance'),narration:h.roles.indexOf('narration'),ref:h.roles.indexOf('ref'),confidence:98};
+      return out;
+    }
+    const max=raw.reduce((m,r)=>Math.max(m,(r||[]).length),0);
+    const stats=Array.from({length:max},()=>({date:0,num:0,non:0,changes:0,prev:null,balanceScore:0}));
+    for(const r of raw){ for(let c=0;c<max;c++){
+      const v=r?.[c]; if(String(v??'').trim()!=='')stats[c].non++;
+      const d=parseDateFlexible(v); if(d)stats[c].date++;
+      const n=parseNumberFlexible(v); if(String(v??'').trim()!==''&&Number.isFinite(n))stats[c].num++;
+      if(String(v??'').trim()!==''&&Number.isFinite(n)){ if(stats[c].prev!==null&&Math.abs(n-stats[c].prev)<1e-6)stats[c].changes++; stats[c].prev=n; }
+    }}
+    let date=stats.map((s,i)=>[s.date,i]).sort((a,b)=>b[0]-a[0])[0]?.[1]??-1;
+    if(stats[date]?.date<2)date=-1;
+    let balance=-1,best=-1;
+    for(let c=0;c<max;c++){
+      if(c===date)continue;
+      const s=stats[c]; if(s.num<3)continue;
+      let score=s.num*2+s.non;
+      // Running balances normally have many numeric values and relatively few gaps.
+      if(s.num>=Math.max(3,stats[date]?.date||3))score+=20;
+      if(score>best){best=score;balance=c;}
+    }
+    return {header:-1,date,balance,debit:-1,credit:-1,amount:-1,drcr:-1,narration:-1,ref:-1,confidence:date>=0&&balance>=0?70:0};
+  }
+  function openingClosing(raw,map,rows){
+    let opening=null,closing=null;
+    const find=(patterns)=>{
+      for(let i=0;i<raw.length;i++){
+        const text=(raw[i]||[]).map(v=>String(v??'')).join(' ');
+        if(!patterns.some(p=>p.test(text)))continue;
+        for(const v of raw[i]||[]){const n=parseNumberFlexible(v);if(String(v??'').trim()!==''&&Number.isFinite(n)&&Math.abs(n)>0)return n;}
+        for(let j=i+1;j<=Math.min(i+2,raw.length-1);j++)for(const v of raw[j]||[]){const n=parseNumberFlexible(v);if(String(v??'').trim()!==''&&Number.isFinite(n))return n;}
+      } return null;
+    };
+    opening=find([/\bopening\s+balance\b/i,/\bbrought\s+forward\b/i,/\bbalance\s+brought\s+forward\b/i,/\bb\/f\b/i]);
+    closing=find([/\bclosing\s+balance\b/i,/\bcarried\s+forward\b/i,/\bbalance\s+carried\s+forward\b/i,/\bc\/f\b/i]);
+    if(opening===null && rows.length && rows[0].balance!==null){
+      opening=rows[0].balance-(rows[0].credit||0)+(rows[0].debit||0);
+    }
+    if(closing===null && rows.length)closing=rows[rows.length-1].balance;
+    return {opening,closing};
+  }
+  function parseRows(raw){
+    if(!Array.isArray(raw)||!raw.length)return {rows:[],map:null,opening:null,closing:null};
+    const map=inferColumns(raw); if(!map||map.date<0)return {rows:[],map,opening:null,closing:null};
+    const col=map; const get=(r,k)=>col[k]>=0?(r?.[col[k]]??''):'';
+    const out=[];
+    for(let i=Math.max(0,(col.header>=0?col.header+1:0));i<raw.length;i++){
+      const g=raw[i]||[]; if(!g.some(v=>String(v??'').trim()!==''))continue;
+      const date=parseDateFlexible(get(g,'date'));
+      const dRaw=get(g,'debit'),cRaw=get(g,'credit'),aRaw=get(g,'amount');
+      const hasMoney=[dRaw,cRaw,aRaw].some(v=>String(v??'').trim()!=='');
+      const narr=col.narration>=0?String(get(g,'narration')||'').trim():g.map(v=>String(v??'')).join(' ').trim();
+      if(isSummary(g,get(g,'date')))continue;
+      if(!date && !hasMoney && narr && out.length){out[out.length-1].narration+=' '+narr;continue;}
+      if(!date)continue;
+      const bRaw=get(g,'balance');
+      let balance=col.balance>=0&&String(bRaw??'').trim()!==''?parseNumberFlexible(bRaw):null;
+      let debit=col.debit>=0?Math.abs(parseNumberFlexible(dRaw)):0;
+      let credit=col.credit>=0?Math.abs(parseNumberFlexible(cRaw)):0;
+      if(col.debit<0&&col.credit<0&&col.amount>=0){
+        const a=parseNumberFlexible(aRaw), flag=String(get(g,'drcr')||'').toUpperCase(), au=String(aRaw??'').toUpperCase();
+        if(/\bCR\.?$/.test(au)||/^C/.test(flag))credit=Math.abs(a); else if(/\bDR\.?$/.test(au)||/^D/.test(flag))debit=Math.abs(a); else if(a<0)credit=Math.abs(a); else debit=Math.abs(a);
+      }
+      if(!debit&&!credit&&balance===null)continue;
+      out.push({date,debit,credit,balance,narration:narr||'(no description)',ref:col.ref>=0?String(get(g,'ref')||'').trim():'',sourceRow:i+1});
+    }
+    if(out.length>2){let desc=0,asc=0;for(let i=1;i<out.length;i++){if(out[i].date<out[i-1].date)desc++;else if(out[i].date>out[i-1].date)asc++;}if(desc>asc*2)out.reverse();}
+    const oc=openingClosing(raw,map,out);
+    // If the balance column is missing, reconstruct balances from opening + movements.
+    if(out.some(r=>r.balance===null) && oc.opening!==null){
+      let b=oc.opening;
+      for(const r of out){b += (r.credit||0)-(r.debit||0); if(r.balance===null)r.balance=b;}
+    }
+    // If an explicit opening exists and the first balance is a post-transaction closing,
+    // preserve the supplied transaction balances; the interest engine will use opening.
+    return {rows:out,map,opening:oc.opening,closing:oc.closing};
+  }
+  function applyMap(map){
+    if(!map)return;
+    const set=(id,v)=>{const e=document.getElementById(id);if(e&&v!==undefined)e.value=String(v);};
+    set('mapHeaderRow',map.header>=0?'auto':'no'); set('mapDate',map.date); set('mapDebit',map.debit); set('mapCredit',map.credit); set('mapBalance',map.balance);
+    const card=document.getElementById('stmtAIMapCard'),res=document.getElementById('stmtAIMapResult'),grid=document.getElementById('stmtAIMapGrid');
+    if(card&&res&&grid){
+      const label=c=>c>=0?'Column '+(c+1):'Not identified';
+      res.innerHTML='<b>AI confidence: '+(map.confidence||0)+'%</b> — '+((map.confidence||0)>=80?'High confidence.':(map.confidence||0)>=60?'Good confidence.':'Needs review.')+'<br><span class="hint">StatementIQ working mapper analyses the actual headers and transaction values and does not depend on a particular bank format.</span>';
+      const items=[['Date',map.date],['Balance',map.balance],['Debit',map.debit],['Credit',map.credit],['Amount',map.amount],['DR/CR',map.drcr],['Narration',map.narration],['Reference',map.ref]];
+      grid.innerHTML=items.map(([n,c])=>`<div class="note" style="margin:0"><b>${n}</b><br>${label(c)}</div>`).join('');
+      card.style.display='block';
+    }
+  }
+  function fiqLoadSlabs(){
+    try{const x=JSON.parse(localStorage.getItem('financial_stmt_interest_slabs_v11')||'null');if(Array.isArray(x)&&x.length)return x.map(s=>({to:s.to===null?null:Number(s.to),rate:Number(s.rate)}));}catch(e){}
+    return [{to:300000,rate:5},{to:500000,rate:6},{to:null,rate:7}];
+  }
+  function allocate(balance,slabs){
+    const b=Math.max(0,Number(balance)||0),parts=[];let prev=0;
+    for(const s of slabs){if(b<=prev)break;const upper=s.to===null?Infinity:Number(s.to);const portion=Math.max(0,Math.min(b,upper)-prev);if(portion>0)parts.push({portion,rate:Number(s.rate)||0});if(!isFinite(upper))break;prev=upper;}
+    return parts;
+  }
+  function interestDaily(rows,slabs,openingOverride){
+    const rs=(rows||[]).filter(r=>r.date instanceof Date&&!isNaN(r.date)).sort((a,b)=>a.date-b.date); if(!rs.length)return {days:[],monthly:[],total:0,error:'No dated transactions found.'};
+    const first=new Date(rs[0].date.getFullYear(),rs[0].date.getMonth(),rs[0].date.getDate());
+    const last=new Date(rs[rs.length-1].date.getFullYear(),rs[rs.length-1].date.getMonth(),rs[rs.length-1].date.getDate());
+    let opening=openingOverride;
+    if(opening===null||opening===undefined){const r=rs[0];if(r.balance!==null)opening=Number(r.balance)-Number(r.credit||0)+Number(r.debit||0);}
+    let startDate,firstMonthMode='full';
+    if(opening===null||!Number.isFinite(opening)){
+      if(first.getDate()>1){startDate=first;firstMonthMode='from-first-transaction';opening=Number(rs[0].balance||0);}
+      else {startDate=new Date(first.getFullYear(),first.getMonth(),1);opening=Number(rs[0].balance||0)-Number(rs[0].credit||0)+Number(rs[0].debit||0);firstMonthMode='from-first-day-closing-balance';}
+    }else startDate=new Date(first.getFullYear(),first.getMonth(),1);
+    const byDay={};rs.forEach(r=>{const k=stmtDayKey(r.date);(byDay[k]=byDay[k]||[]).push(r);});
+    const days=[];let balance=opening,currentMonth=null,monthOpening=opening;let d=new Date(startDate);const end=new Date(last.getFullYear(),last.getMonth()+1,0);
+    while(d<=end){const k=stmtDayKey(d),tx=byDay[k]||[],m=stmtMonthKey(d);if(m!==currentMonth){if(currentMonth!==null)balance=Number(days[days.length-1].balance);currentMonth=m;monthOpening=balance;}const openingForDay=balance;if(tx.length){const wb=tx.filter(r=>r.balance!==null&&Number.isFinite(Number(r.balance)));if(wb.length)balance=Number(wb[wb.length-1].balance);else tx.forEach(r=>{balance+=Number(r.credit||0)-Number(r.debit||0);});}days.push({date:new Date(d),month:m,daysInMonth:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),opening:openingForDay,monthOpening,balance,hasTransaction:tx.length>0});d.setDate(d.getDate()+1);}
+    const monthlyMap={};let total=0;
+    days.forEach(x=>{const parts=allocate(x.balance,slabs);let interest=0;parts.forEach(p=>interest+=p.portion/365*p.rate/100);total+=interest;const m=monthlyMap[x.month]||(monthlyMap[x.month]={month:x.month,days:x.daysInMonth,calculatedDays:0,dailyProduct:0,interest:0,slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),actualInterest:0,openingBalance:x.monthOpening,closingBalance:x.balance});m.dailyProduct+=x.balance;m.calculatedDays++;m.interest+=interest;m.closingBalance=x.balance;x.parts=parts;x.interest=interest;parts.forEach((p,i)=>{m.slabProducts[i]+=p.portion;m.slabInterest[i]+=p.portion/365*p.rate/100;});});
+    rs.forEach(r=>{if(r.credit>0&&/(monthly\s+interest|interest\s+(credit|credited|paid|payment)|\bint\.?\s*(credit|credited)|interest)/i.test(r.narration||'')){const k=stmtMonthKey(r.date);const m=monthlyMap[k]||(monthlyMap[k]={month:k,days:new Date(r.date.getFullYear(),r.date.getMonth()+1,0).getDate(),calculatedDays:0,dailyProduct:0,interest:0,slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),actualInterest:0});m.actualInterest+=Number(r.credit||0);}});
+    const monthly=Object.values(monthlyMap).sort((a,b)=>a.month.localeCompare(b.month));
+    return {daily:days,monthly,total,opening:days[0]?.opening??opening,closing:days.at(-1)?.balance??balance,startDate,firstMonthMode,partial:!(first.getDate()===1&&last.getDate()===end.getDate()),calculatedDays:days.length};
+  }
+  // Replace the calculation entry point with the working StatementIQ flow.
+  window.stmtRowsFromMapping=function(){const p=parseRows(stmtRawRows||[]);window.__fiqMapped=p;applyMap(p.map);window.__stmtAIMap=p.map||null;window.__stmtOpeningClosing={opening:p.opening,closing:p.closing};return p.rows;};
+  window.stmtCalculate=function(rows,slabs,manualBankInterest){
+    const p=window.__fiqMapped||{}; const r=interestDaily(rows,slabs,p.opening);
+    if(!r.daily.length)return r;
+    const auto=r.monthly.reduce((a,m)=>a+Number(m.actualInterest||0),0);
+    const bank=manualBankInterest!==null&&!isNaN(manualBankInterest)?manualBankInterest:(auto>0?auto:null);
+    return {...r,autoBankInterest:auto,bankInterest:bank,overallDifference:bank!==null?r.total-bank:null};
+  };
+  window.stmtRunCalculation=function(){
+    if(!stmtRawRows||!stmtRawRows.length){alert('Please upload the bank statement first.');return;}
+    const p=parseRows(stmtRawRows);window.__fiqMapped=p;applyMap(p.map);window.__stmtAIMap=p.map;window.__stmtOpeningClosing={opening:p.opening,closing:p.closing};
+    const rows=p.rows||[];
+    const status=document.getElementById('stmtStatus');if(status){status.style.display='block';status.textContent=rows.length?'Mapped '+rows.length+' transaction rows. Calculating interest…':'No transaction rows could be mapped. Please check the statement preview.';}
+    if(!rows.length){alert('No valid transactions were found.\n\nThe workbook was read, but the working StatementIQ mapper could not identify transaction rows. It checks Date, Debit, Credit, Amount, DR/CR and Balance using both headings and the actual values. Please check the preview.');return;}
+    const slabs=stmtNormaliseSlabs(stmtSlabRows());const errors=stmtValidateSlabs(slabs);if(errors.length){alert(errors.join('\n'));return;}stmtSaveSlabs(slabs);
+    const manual=(document.getElementById('stmtBankInterest')?.value||'').trim();const manualVal=manual===''?null:Number(manual);const result=window.stmtCalculate(rows,slabs,manualVal);stmtRenderResults(result,slabs);if(status)status.textContent=result.error?'Calculation needs attention: '+result.error:'Interest calculated for '+(result.monthly||[]).length+' month(s).';document.getElementById('stmtMenuMonthly')?.removeAttribute('disabled');document.getElementById('stmtMenuDaily')?.removeAttribute('disabled');
+  };
+})();
+
+</script>
 </body>
 </html>
