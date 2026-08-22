@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v5.7</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v5.8</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -978,7 +978,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v5.7</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v5.8</strong>
   </footer>
 </div>
 
@@ -1773,53 +1773,53 @@ function parseDateFlexible(val) {
       if (d) return new Date(d.y,d.m-1,d.d);
     } catch(e){}
   }
-  if (typeof val !== 'string') return null;
-  const s=val.trim();
+  let s=String(val??'').trim();
   if(!s) return null;
-  let m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
-  if(m){
-    let y=Number(m[3]); if(y<100)y+=y>70?1900:2000;
-    const d=new Date(y,Number(m[2])-1,Number(m[1]));
-    return isNaN(d)?null:d;
+  s=s.replace(/\s+/g,' ').replace(/[.]/g,'-');
+  let m;
+  if((m=s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/))) return new Date(+m[1],+m[2]-1,+m[3]);
+  const MON={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,sept:8,oct:9,nov:10,dec:11};
+  if((m=s.match(/^(\d{1,2})[-\/ ]([A-Za-z]{3,9})[-\/ ](\d{2,4})/))){
+    const mo=MON[m[2].slice(0,3).toLowerCase()]; if(mo===undefined)return null;
+    let y=+m[3]; if(y<100)y=y>70?1900+y:2000+y;
+    return new Date(y,mo,+m[1]);
   }
-  m=s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
-  if(m){const d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));return isNaN(d)?null:d;}
-  m=s.match(/^(\d{1,2})[\s\-]([A-Za-z]{3,9})[\s\-](\d{2,4})$/);
-  if(m){
-    let y=Number(m[3]); if(y<100)y+=y>70?1900:2000;
-    const months={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
-    const mi=months[m[2].slice(0,3).toLowerCase()];
-    if(mi!==undefined){const d=new Date(y,mi,Number(m[1]));return isNaN(d)?null:d;}
+  if((m=s.match(/^([A-Za-z]{3,9})[ -](\d{1,2}),? ?(\d{2,4})/))){
+    const mo=MON[m[1].slice(0,3).toLowerCase()]; if(mo===undefined)return null;
+    let y=+m[3]; if(y<100)y=y>70?1900+y:2000+y;
+    return new Date(y,mo,+m[2]);
   }
-  // Handle common bank exports such as "01/01/2026 00:00:00".
+  if((m=s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/))){
+    let d=+m[1],mo=+m[2],y=+m[3]; if(y<100)y=y>70?1900+y:2000+y;
+    if(d>12&&mo<=12)return new Date(y,mo-1,d);
+    if(mo>12&&d<=12)return new Date(y,d-1,mo);
+    return new Date(y,mo-1,d); // Indian bank statements: DD/MM first
+  }
   const dateOnly=s.split(/\s+/)[0];
-  if(dateOnly!==s){
-    const d2=parseDateFlexible(dateOnly);
-    if(d2)return d2;
-  }
-  // Handle ISO timestamps and common bank-export date/time strings.
-  const f=new Date(s);
-  if(!isNaN(f))return f;
-  const m2=s.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
-  if(m2){
-    let y=Number(m2[3]); if(y<100)y+=y>70?1900:2000;
-    const d=new Date(y,Number(m2[2])-1,Number(m2[1]));
-    if(!isNaN(d))return d;
-  }
+  if(dateOnly!==s){const d=parseDateFlexible(dateOnly);if(d&&!isNaN(d))return d;}
+  const f=new Date(s); if(!isNaN(f))return f;
   return null;
 }
 
 function parseNumberFlexible(val) {
-  if(typeof val==='number') return val;
-  if(val===null||val===undefined) return 0;
-  let s=String(val).trim(); if(!s)return 0;
+  if(typeof val==='number') return isNaN(val)?0:val;
+  let s=String(val??'').trim(); if(!s)return 0;
+  let sign=null;
+  const su=s.toUpperCase();
+  if(/(^|[\s-])(DR|DB|D)$/.test(su)||/\bDR\.?$/.test(su))sign='dr';
+  if(/(^|[\s-])(CR|C)$/.test(su)||/\bCR\.?$/.test(su))sign='cr';
   let neg=false;
   if(/^\(.*\)$/.test(s)){neg=true;s=s.slice(1,-1);}
-  if(/\bdr\b/i.test(s))neg=true;
-  s=s.replace(/\b(cr|dr)\b/i,'').replace(/[₹$,\s]/g,'');
-  const n=parseFloat(s);
-  return isNaN(n)?0:(neg?-Math.abs(n):n);
+  s=s.replace(/(DR|CR|DB|Dr|Cr|dr|cr)\.?$/i,'')
+       .replace(/[₹$]|RS\.?|INR|\u20B9/gi,'')
+       .replace(/,/g,'').replace(/\s/g,'').trim();
+  if(s.startsWith('-')){neg=true;s=s.slice(1);}
+  if(s.endsWith('-')){neg=true;s=s.slice(0,-1);}
+  if(!/^\d*\.?\d+$/.test(s))return 0;
+  const n=parseFloat(s); if(isNaN(n))return 0;
+  return neg?-n:n;
 }
+
 
 
 function stmtWorksheetCellsToRows(sheet){
@@ -2175,57 +2175,90 @@ function stmtRowsFromIDFCFormat(){
 
 function stmtExtractTransactionsUniversal(raw){
   if(!Array.isArray(raw)||!raw.length)return [];
-  const norm=v=>String(v??'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
-
-  let header=-1,dateCol=-1,debitCol=-1,creditCol=-1,balanceCol=-1;
-
-  for(let i=0;i<Math.min(raw.length,300);i++){
-    const cells=raw[i]||[];
-    let d=-1,db=-1,cr=-1,ba=-1;
-    cells.forEach((v,c)=>{
-      const x=norm(v);
-      if(d<0&&(/^(post|transaction|txn|posting)\s*date$/.test(x)||x==='date'))d=c;
-      if(db<0&&/^(debit|withdrawal|debit amount|dr amount|dr)$/.test(x))db=c;
-      if(cr<0&&/^(credit|deposit|credit amount|cr amount|cr)$/.test(x))cr=c;
-      if(ba<0&&/^(balance|closing balance|running balance)$/.test(x))ba=c;
-    });
-    if(d>=0&&db>=0&&cr>=0&&ba>=0){
-      header=i;dateCol=d;debitCol=db;creditCol=cr;balanceCol=ba;break;
+  const norm=v=>String(v??'').replace(/[\r\n]+/g,' ').replace(/[^a-z0-9\/ ]/gi,' ').replace(/\s+/g,' ').trim().toLowerCase();
+  const aliases={
+    date:['transaction date','txn date','tran date','value date','posting date','post date','date of transaction','trans date','date'],
+    narration:['transaction details','transaction description','transaction remarks','particulars','description','narration','remarks','details','transaction'],
+    ref:['chq / ref number','chq/ref no','cheque no','ref no','reference number','reference no','instrument no','transaction id','transaction ref','voucher no','voucher','vch no','doc no','utr','ref','chq no'],
+    debit:['withdrawal amt','withdrawal amount','withdrawal (dr)','debit amount','withdrawals','withdrawal','payments','payment','paid','money out','debit','dr amount','dr amt','dr'],
+    credit:['deposit amt','deposit amount','deposit (cr)','credit amount','deposits','deposit','receipts','receipt','received','money in','credit','cr amount','cr amt','cr'],
+    amount:['transaction amount','amount (inr)','amount in inr','amount','value','amt'],
+    drcr:['dr / cr','dr/cr','type','txn type','cr/dr','indicator'],
+    balance:['closing balance','running balance','available balance','balance (inr)','balance']
+  };
+  const roleFor=(v)=>{
+    const t=norm(v); if(!t)return null; let best=null,bestLen=0;
+    for(const role of Object.keys(aliases)) for(const a0 of aliases[role]){
+      const a=norm(a0);
+      if(t===a && a.length+100>bestLen){best=role;bestLen=a.length+100;}
+      else if(t.includes(a)&&a.length>2&&a.length>bestLen){best=role;bestLen=a.length;}
+      else if(a.includes(t)&&t.length>=5&&a.length>bestLen){best=role;bestLen=a.length;}
     }
-  }
+    return best;
+  };
+  const isSummary=(g,dateRaw)=>{
+    const cells=(g||[]).map(v=>String(v??'').trim()).filter(Boolean);
+    const joined=cells.join(' ');
+    return !parseDateFlexible(dateRaw) && (/^(grand\s+)?total(?:\s+amount)?$|^sub[- ]?total$|^opening\s+balance$|^closing\s+balance$|^brought\s+forward$|^carried\s+forward$|^balance\s*(b\/f|c\/f)$|^statement\s+total$/i.test(cells.join('|')) || /\b(grand\s+total|sub[- ]?total|opening\s+balance|closing\s+balance|brought\s+forward|carried\s+forward|statement\s+total)\b/i.test(joined));
+  };
 
-  // Fallback for headers with merged/newline formatting.
-  if(header<0){
-    for(let i=0;i<Math.min(raw.length,300);i++){
-      const cells=(raw[i]||[]).map(norm);
-      const d=cells.findIndex(x=>x.includes('post date')||x.includes('transaction date')||x==='date');
-      const db=cells.findIndex(x=>x.includes('debit')||x.includes('withdrawal'));
-      const cr=cells.findIndex(x=>x.includes('credit')||x.includes('deposit'));
-      const ba=cells.findIndex(x=>x==='balance'||x.includes('closing balance')||x.includes('running balance'));
-      if(d>=0&&db>=0&&cr>=0&&ba>=0){
-        header=i;dateCol=d;debitCol=db;creditCol=cr;balanceCol=ba;break;
-      }
-    }
+  // Find the row with the strongest combination of known roles. This mirrors
+  // StatementIQ: headers may be several rows below the account information.
+  let header=-1, roles=[];
+  let bestScore=0;
+  for(let i=0;i<Math.min(raw.length,80);i++){
+    const rr=(raw[i]||[]).map(roleFor);
+    const score=rr.filter(Boolean).length + (rr.includes('date')?3:0) + (rr.some(x=>['debit','credit','amount','balance'].includes(x))?3:0);
+    if(score>bestScore && rr.includes('date') && rr.some(x=>['debit','credit','amount','balance'].includes(x))){bestScore=score;header=i;roles=rr;}
   }
   if(header<0)return [];
 
-  const result=[];
+  // Keep only the first occurrence of each key role.
+  const col={};
+  roles.forEach((r,i)=>{if(r&&col[r]===undefined)col[r]=i;});
+  if(col.date===undefined || col.balance===undefined || (col.debit===undefined&&col.credit===undefined&&col.amount===undefined))return [];
+  const get=(r,arr)=>col[r]===undefined?'':(arr[col[r]]??'');
+
+  const result=[], errors=[];
   for(let i=header+1;i<raw.length;i++){
-    const r=raw[i]||[];
-    const date=parseDateFlexible(r[dateCol]);
-    if(!date)continue;
-    const debit=Math.abs(parseNumberFlexible(r[debitCol]));
-    const credit=Math.abs(parseNumberFlexible(r[creditCol]));
-    const btxt=String(r[balanceCol]??'').trim();
-    const balance=btxt===''?null:parseNumberFlexible(btxt);
-    if(balance===null&&debit===0&&credit===0)continue;
-    result.push({date,debit,credit,balance,narration:r.map(v=>String(v??'')).join(' ').trim(),sourceRow:i+1});
+    const g=raw[i]||[]; if(!g.some(v=>String(v??'').trim()!==''))continue;
+    const dateRaw=get('date',g); const date=parseDateFlexible(dateRaw);
+    const narr=String(get('narration',g)||'').trim();
+    if(isSummary(g,dateRaw))continue;
+    const d=parseNumberFlexible(get('debit',g));
+    const c=parseNumberFlexible(get('credit',g));
+    const a=parseNumberFlexible(get('amount',g));
+    const btxt=String(get('balance',g)??'').trim();
+    const balance=btxt===''?null:parseNumberFlexible(get('balance',g));
+    const hasMoney=!!(get('debit',g)!==''||get('credit',g)!==''||get('amount',g)!=='');
+
+    // Wrapped narration: no date and no money means continuation of previous row.
+    if(!date&&!hasMoney&&narr&&result.length){result[result.length-1].narration+=' '+narr;continue;}
+    if(!date&&!hasMoney&&!narr)continue;
+    if(!date){errors.push(i+1);continue;}
+
+    let debit=0,credit=0;
+    if(col.debit!==undefined||col.credit!==undefined){
+      debit=Math.abs(d); credit=Math.abs(c);
+    }else if(col.amount!==undefined){
+      const flag=String(get('drcr',g)||'').trim().toUpperCase();
+      const rawAmount=get('amount',g);
+      const upper=String(rawAmount??'').toUpperCase();
+      const isCr=/\bCR\.?$/.test(upper)||flag.startsWith('C');
+      const isDr=/\bDR\.?$/.test(upper)||flag.startsWith('D');
+      if(isCr)credit=Math.abs(a); else if(isDr)debit=Math.abs(a); else if(a<0)credit=Math.abs(a); else debit=Math.abs(a);
+    }
+    if(!debit&&!credit&&!narr)continue;
+    result.push({date,dateRaw,narration:narr||'(no description)',ref:String(get('ref',g)||'').trim(),debit,credit,balance,sourceRow:i+1});
   }
-  result.sort((a,b)=>a.date-b.date);
+
+  // Statements may be newest-first. Downstream interest calculations require
+  // chronological order.
+  if(result.length>2){let desc=0,asc=0;for(let i=1;i<result.length;i++){if(result[i].date<result[i-1].date)desc++;else if(result[i].date>result[i-1].date)asc++;}if(desc>asc*2)result.reverse();}
 
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=String(v);};
-  set('mapHeaderRow','auto');set('mapDate',dateCol);set('mapDebit',debitCol);
-  set('mapCredit',creditCol);set('mapBalance',balanceCol);
+  set('mapHeaderRow','auto');
+  set('mapDate',col.date); if(col.debit!==undefined)set('mapDebit',col.debit); if(col.credit!==undefined)set('mapCredit',col.credit); set('mapBalance',col.balance);
   return result;
 }
 
@@ -2724,7 +2757,7 @@ function stmtRenderResults(result,slabs){
       '. These months are not included in the calculated interest total.</div>';
   }
   document.getElementById('stmtTable').insertAdjacentHTML('afterend',excludedHtml);
-  let note='Daily product × annual rate ÷ 365. Daily product is the applicable balance/slab portion for that date. Monthly product is the sum of daily balances for each complete calendar month.';
+  let note='Daily product × annual slab rate ÷ actual days in that calendar month. Monthly product is the sum of daily applicable slab portions for each complete calendar month.';
   if(result.opening!==null && result.opening!==undefined){
     note += ' Opening / brought-forward balance used for the first day: ₹'+stmtMoney(result.opening)+'.';
   }
@@ -2759,7 +2792,7 @@ function stmtShowDaily(){
   slabs.forEach((s,i)=>h+=`<th>Slab ${i+1} product</th><th>Rate</th><th>Daily interest</th>`);
   h+='<th>Total daily interest</th></tr></thead><tbody>';
   days.forEach(d=>{
-    h+=`<tr><td style="text-align:left">${stmtDate(d.date)}</td><td>${d.daysInMonth}</td><td>₹${stmtMoney(d.balance)}</td><td>₹${stmtMoney(d.balance)}</td><td>365-day basis</td>`;
+    h+=`<tr><td style="text-align:left">${stmtDate(d.date)}</td><td>${d.daysInMonth}</td><td>₹${stmtMoney(d.balance)}</td><td>₹${stmtMoney(d.balance)}</td><td>${d.daysInMonth}-day month</td>`;
     slabs.forEach((s,i)=>{
       const p=d.parts[i]||{portion:0,rate:s.rate};
       const di=p.portion*p.rate/100/365;
@@ -3173,7 +3206,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v5.7 ---------- */
+/* ---------- Simple Calculator v5.8 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
