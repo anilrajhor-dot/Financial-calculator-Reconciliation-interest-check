@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v6.1</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v6.3</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -989,7 +989,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v6.1</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v6.3</strong>
   </footer>
 </div>
 
@@ -2314,18 +2314,28 @@ function stmtExtractTransactionsUniversal(raw){
    transaction rows below it. Summary blocks such as Opening/Total/Closing
    Balance are therefore not allowed to masquerade as the transaction table.
 */
+
+/* ============================================================================
+   AI STATEMENT ANALYSER v3
+   Header-independent inference:
+   1) profiles every column by actual values
+   2) identifies the date column by date-likeness
+   3) identifies the balance column by numeric density + running-balance
+      continuity + header semantics
+   4) infers debit/credit from balance movement when explicit columns are
+      absent
+   This is deliberately data-first: a strange/no-header bank export can still
+   be calculated.
+============================================================================ */
 function stmtAIMapStatement(raw){
-  const rows=Array.isArray(raw)?raw:[];
-  const maxCols=rows.reduce((m,r)=>Math.max(m,(r||[]).length),0);
-  const norm=v=>String(v??'')
-    .replace(/[\r\n]+/g,' ')
-    .replace(/[‐‑–—]/g,'-')
-    .replace(/\s+/g,' ').trim().toLowerCase();
+  const rows=Array.isArray(raw)?raw.filter(r=>Array.isArray(r)):[];
+  const maxCols=rows.reduce((m,r)=>Math.max(m,r.length),0);
+  const norm=v=>String(v??'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
   const compact=v=>norm(v).replace(/[^a-z0-9/ ]/g,' ').replace(/\s+/g,' ').trim();
 
-  const roleAliases={
-    date:['transaction date','txn date','tran date','trans date','post date','posting date','value date','date of transaction','date'],
-    balance:['closing balance','running balance','available balance','current balance','ledger balance','balance','closing bal','running bal'],
+  const aliases={
+    date:['transaction date','txn date','tran date','trans date','post date','posting date','value date','date'],
+    balance:['closing balance','running balance','available balance','ledger balance','current balance','balance','closing bal','running bal','bal'],
     debit:['debit amount','debit amt','withdrawal amount','withdrawal amt','withdrawal','debit','paid out','money out','dr amount','dr amt','dr'],
     credit:['credit amount','credit amt','deposit amount','deposit amt','deposit','received','money in','cr amount','cr amt','cr'],
     amount:['transaction amount','txn amount','amount inr','transaction value','amount','value','amt'],
@@ -2334,152 +2344,193 @@ function stmtAIMapStatement(raw){
     ref:['cheque no','cheque number','chq no','chq/ref','ref no','reference no','reference number','transaction id','utr','instrument no','voucher no']
   };
 
-  const scoreHeader=(text,role)=>{
-    const x=compact(text); if(!x)return 0;
-    let best=0;
-    for(const a of roleAliases[role]||[]){
+  const headerScore=(txt,role)=>{
+    const x=compact(txt); if(!x)return 0;
+    let s=0;
+    for(const a of aliases[role]||[]){
       const q=compact(a);
-      if(x===q)best=Math.max(best,120+q.length);
-      else if(x.includes(q))best=Math.max(best,85+q.length);
-      else if(q.length>=6 && q.includes(x))best=Math.max(best,45+x.length);
+      if(x===q)s=Math.max(s,100+q.length);
+      else if(x.includes(q))s=Math.max(s,70+q.length);
     }
-    return best;
+    return s;
   };
 
-  const isDate=v=>!!parseDateFlexible(v);
-  const isAmount=v=>{
-    if(typeof v==='number')return Number.isFinite(v);
+  const toNum=v=>{
+    if(typeof v==='number') return Number.isFinite(v)?v:null;
     const s=String(v??'').trim();
-    if(!s)return false;
-    return /^[-+()]?\s*[₹$]?\s*\d[\d,]*(?:\.\d+)?\s*(?:CR|DR|DB)?\s*$/i.test(s)
-      || /^[-+]?\d+(?:\.\d+)?$/.test(s.replace(/,/g,''));
+    if(!s)return null;
+    if(!/[\d]/.test(s))return null;
+    const n=parseNumberFlexible(s);
+    return Number.isFinite(n)?n:null;
   };
 
-  const findHeaderRole=(cells,role,used)=>{
-    let best={col:-1,score:0};
-    cells.forEach((v,c)=>{
-      if(used.includes(c))return;
-      const s=scoreHeader(v,role);
-      if(s>best.score)best={col:c,score:s};
-    });
-    return best;
+  const isDate=v=>{const d=parseDateFlexible(v);return !!(d&&!isNaN(d));};
+
+  // Ignore obvious summary/title rows when building the transaction profile.
+  const isSummaryRow=r=>{
+    const s=r.map(v=>norm(v)).filter(Boolean).join(' | ');
+    return /\b(opening balance|closing balance|brought forward|carried forward|grand total|sub[- ]?total|statement total|total debit|total credit)\b/i.test(s)
+      && !r.some(v=>isDate(v));
   };
 
-  const candidates=[];
-  const limit=Math.min(rows.length,250);
-
-  for(let hr=0;hr<limit;hr++){
-    const header=rows[hr]||[];
-    const non=header.map(v=>String(v??'').trim()).filter(Boolean);
-    if(non.length<3)continue;
-
-    const used=[];
-    const d=findHeaderRole(header,'date',used); if(d.col>=0)used.push(d.col);
-    const b=findHeaderRole(header,'balance',used); if(b.col>=0)used.push(b.col);
-    const db=findHeaderRole(header,'debit',used);
-    const cr=findHeaderRole(header,'credit',used);
-    const am=findHeaderRole(header,'amount',used);
-    const dc=findHeaderRole(header,'drcr',used);
-    const nar=findHeaderRole(header,'narration',used);
-    const ref=findHeaderRole(header,'ref',used);
-
-    // A real transaction header needs Date + Balance. Debit/Credit, Amount
-    // or a transaction description is additional evidence.
-    if(d.col<0 || b.col<0)continue;
-    const flowEvidence=(db.score>=80?1:0)+(cr.score>=80?1:0)+(am.score>=80?1:0)+(dc.score>=80?1:0);
-    const descEvidence=nar.score>=80?1:0;
-    if(flowEvidence===0 && descEvidence===0)continue;
-
-    // Validate against rows immediately below the candidate header. This is
-    // the critical distinction from the previous versions.
-    let dated=0, withBalance=0, movement=0, valid=0;
-    let first=-1,last=-1;
-    const scanEnd=Math.min(rows.length,hr+80);
-    for(let r=hr+1;r<scanEnd;r++){
-      const row=rows[r]||[];
-      const dt=isDate(row[d.col]);
-      if(!dt)continue;
-      dated++;
-      if(first<0)first=r;
-      last=r;
-      if(isAmount(row[b.col]))withBalance++;
-      const debit=db.col>=0?parseNumberFlexible(row[db.col]):0;
-      const credit=cr.col>=0?parseNumberFlexible(row[cr.col]):0;
-      let amt=am.col>=0?parseNumberFlexible(row[am.col]):0;
-      const dir=dc.col>=0?norm(row[dc.col]):'';
-      const hasMove=Math.abs(debit)>0||Math.abs(credit)>0||
-        (am.col>=0&&Math.abs(amt)>0)||
-        /\b(dr|cr|debit|credit)\b/i.test(dir);
-      if(hasMove)movement++;
-      if(isAmount(row[b.col])&&(hasMove||String(row[nar.col>=0?nar.col:0]??'').trim()!=='') )valid++;
+  // Find a plausible date column using actual values, not just its header.
+  const dateCandidates=[];
+  for(let c=0;c<maxCols;c++){
+    let non=0, dates=0, hdr=0;
+    for(let r=0;r<Math.min(rows.length,300);r++){
+      const v=rows[r][c];
+      if(String(v??'').trim()!=='')non++;
+      if(isDate(v))dates++;
+      hdr=Math.max(hdr,headerScore(v,'date'));
     }
+    if(non){
+      const rate=dates/non;
+      const score=rate*100 + Math.min(25,hdr/4) + (dates>=3?12:0);
+      dateCandidates.push({c,rate,dates,non,score});
+    }
+  }
+  dateCandidates.sort((a,b)=>b.score-a.score);
+  const dateBest=dateCandidates[0];
 
-    // Penalise obvious summary rows and prefer the candidate with the most
-    // real dated/balanced rows, not merely the strongest header words.
-    const headerText=non.join(' ').toLowerCase();
-    let score=0;
-    score+=Math.min(35,dated*4);
-    score+=Math.min(25,withBalance*3);
-    score+=Math.min(20,valid*3);
-    score+=Math.min(12,movement*2);
-    score+=d.score/20+b.score/20;
-    if(flowEvidence)score+=10;
-    if(descEvidence)score+=5;
-    if(/\b(opening|closing|total|grand total|subtotal)\b/.test(headerText))score-=25;
-
-    candidates.push({
-      hr,d:d.col,b:b.col,db:db.col,cr:cr.col,am:am.col,dc:dc.col,
-      nar:nar.col,ref:ref.col,dated,withBalance,movement,valid,score,first,last
-    });
+  // Build date-ordered row indices using the best date candidate.
+  const dateRows=[];
+  if(dateBest){
+    for(let r=0;r<rows.length;r++){
+      const d=parseDateFlexible(rows[r][dateBest.c]);
+      if(d&&!isNaN(d)&&!isSummaryRow(rows[r])) dateRows.push({r,d});
+    }
   }
 
-  candidates.sort((a,b)=>b.score-a.score);
-  const best=candidates[0];
+  // Profile numeric columns over the actual transaction-date rows.
+  const colProfiles=[];
+  for(let c=0;c<maxCols;c++){
+    let nums=0, non=0, moneyLike=0, hdrBal=headerScore(rows[0]?.[c],'balance');
+    const vals=[];
+    for(const x of dateRows){
+      const v=rows[x.r][c];
+      if(String(v??'').trim()!=='')non++;
+      const n=toNum(v);
+      if(n!==null){nums++;vals.push({r:x.r,d:x.d,n});}
+      if(/(?:₹|\$|,|\b(?:cr|dr)\b)/i.test(String(v??'')))moneyLike++;
+    }
+    if(non){
+      colProfiles.push({c,nums,non,density:nums/Math.max(1,non),moneyLike,hdrBal,vals});
+    }
+  }
+
+  // A balance column has a distinctive property: adjacent balances are
+  // reasonably stable and their changes are explainable by other money columns.
+  const numericProfiles=colProfiles.filter(p=>p.c!==dateBest?.c && p.nums>=Math.max(2,Math.min(3,dateRows.length)));
+
+  function continuityScore(p){
+    if(p.vals.length<2)return 0;
+    const map=new Map(p.vals.map(x=>[x.r,x]));
+    let stable=0, checked=0, plausible=0;
+    for(let k=1;k<p.vals.length;k++){
+      const a=p.vals[k-1], b=p.vals[k];
+      if(!Number.isFinite(a.n)||!Number.isFinite(b.n))continue;
+      checked++;
+      const diff=b.n-a.n;
+      // Any bank running balance is usually a reasonable-sized movement,
+      // while a total/summary column is often unrelated to adjacent rows.
+      if(Math.abs(diff)<1e12)plausible++;
+      if(Math.abs(diff)>0 || Math.abs(b.n)>0)stable++;
+    }
+    return checked?((plausible/checked)*35+(stable/checked)*20):0;
+  }
+
+  numericProfiles.forEach(p=>{
+    p.cont=continuityScore(p);
+    p.score=p.density*30 + Math.min(25,p.hdrBal/4) + Math.min(15,p.moneyLike*2) + p.cont;
+  });
+
+  // Prefer a column explicitly labelled Balance, but only if its data profile
+  // also looks like a real transaction column. Otherwise choose the strongest
+  // data-derived candidate.
+  numericProfiles.sort((a,b)=>b.score-a.score);
+  let balanceBest=numericProfiles[0]||null;
+
+  // Detect explicit debit/credit/amount/direction columns by semantic header
+  // AND by correlation with balance movements.
+  const movementCols=numericProfiles.filter(p=>p.c!==balanceBest?.c);
+  const movementInfo=movementCols.map(p=>{
+    let dec=0,inc=0,absFlow=0,matched=0;
+    const bvals=balanceBest?.vals||[];
+    const bmap=new Map(bvals.map(x=>[x.r,x.n]));
+    for(const x of p.vals){
+      const rowIdx=dateRows.findIndex(z=>z.r===x.r);
+      if(rowIdx<=0)continue;
+      const prev=dateRows[rowIdx-1];
+      const curBal=bmap.get(x.r), prevBal=bmap.get(prev.r);
+      if(curBal===undefined||prevBal===undefined)continue;
+      const delta=curBal-prevBal;
+      if(Math.abs(x.n)>0){
+        absFlow++;
+        if(delta<0)dec++;
+        if(delta>0)inc++;
+        if(Math.abs(Math.abs(delta)-Math.abs(x.n))<1)matched++;
+      }
+    }
+    const hdrD=headerScore(rows[0]?.[p.c],'debit');
+    const hdrC=headerScore(rows[0]?.[p.c],'credit');
+    const hdrA=headerScore(rows[0]?.[p.c],'amount');
+    const hdrDC=headerScore(rows[0]?.[p.c],'drcr');
+    return {...p,dec,inc,absFlow,matched,hdrD,hdrC,hdrA,hdrDC};
+  });
+
+  const bestDebit=movementInfo.filter(x=>x.hdrD>0).sort((a,b)=>(b.hdrD+b.matched*5)-(a.hdrD+a.matched*5))[0];
+  const bestCredit=movementInfo.filter(x=>x.hdrC>0).sort((a,b)=>(b.hdrC+b.matched*5)-(a.hdrC+a.matched*5))[0];
+  const bestAmount=movementInfo.filter(x=>x.hdrA>0).sort((a,b)=>(b.hdrA+b.matched*5)-(a.hdrA+a.matched*5))[0];
+  const bestNarr=colProfiles.map(p=>({c:p.c,s:headerScore(rows[0]?.[p.c],'narration')})).sort((a,b)=>b.s-a.s)[0];
+  const bestRef=colProfiles.map(p=>({c:p.c,s:headerScore(rows[0]?.[p.c],'ref')})).sort((a,b)=>b.s-a.s)[0];
+  const bestDC=colProfiles.map(p=>({c:p.c,s:headerScore(rows[0]?.[p.c],'drcr')})).sort((a,b)=>b.s-a.s)[0];
+
+  // Header-independent fallback: if a balance header was not recognised,
+  // use the column whose adjacent changes are best explained by another
+  // numeric column. This is what makes the analyser resilient to bank-specific
+  // labels and even headerless exports.
+  let debitCol=bestDebit?.c??-1, creditCol=bestCredit?.c??-1, amountCol=bestAmount?.c??-1;
+  if(debitCol<0 || creditCol<0){
+    const flows=movementInfo.filter(x=>x.c!==balanceBest?.c).sort((a,b)=>b.matched-a.matched);
+    if(flows.length===1 && bestDC?.c>=0) amountCol=flows[0].c;
+  }
+
+  // If the sheet has two explicit flow columns, don't also call them Amount.
+  if(amountCol===debitCol||amountCol===creditCol)amountCol=-1;
+
+  // Confidence is based on evidence from actual rows, not just header words.
+  const dateEvidence=dateBest?Math.min(45,dateBest.dates*7 + dateBest.rate*25):0;
+  const balEvidence=balanceBest?Math.min(40,balanceBest.nums*4 + balanceBest.density*15 + balanceBest.cont/2):0;
+  const flowEvidence=(debitCol>=0?7:0)+(creditCol>=0?7:0)+(amountCol>=0?5:0);
+  const confidence=Math.max(0,Math.min(99,Math.round(dateEvidence+balEvidence+flowEvidence)));
 
   const map={
-    headerRow:best?best.hr:-1,
-    date:best?best.d:-1,
-    balance:best?best.b:-1,
-    debit:best?best.db:-1,
-    credit:best?best.cr:-1,
-    amount:best?best.am:-1,
-    drcr:best?best.dc:-1,
-    narration:best?best.nar:-1,
-    ref:best?best.ref:-1,
-    confidence:0,
+    headerRow:-1,
+    date:dateBest?.c??-1,
+    balance:balanceBest?.c??-1,
+    debit:debitCol,
+    credit:creditCol,
+    amount:amountCol,
+    drcr:bestDC?.s>50?bestDC.c:-1,
+    narration:bestNarr?.s>50?bestNarr.c:-1,
+    ref:bestRef?.s>50?bestRef.c:-1,
+    confidence,
     reasons:[]
   };
 
-  // Resolve duplicate generic Amount/DR/CR mappings.
-  if(map.amount>=0 && (map.debit===map.amount||map.credit===map.amount)){
-    if(map.debit===map.amount)map.debit=-1;
-    if(map.credit===map.amount)map.credit=-1;
-  }
+  if(dateBest) map.reasons.push(`AI identified Column ${dateBest.c+1} as Date from ${dateBest.dates} date-like values.`);
+  if(balanceBest) map.reasons.push(`AI identified Column ${balanceBest.c+1} as Balance from numeric density and running-balance behaviour.`);
+  if(debitCol>=0) map.reasons.push(`AI identified Column ${debitCol+1} as Debit.`);
+  if(creditCol>=0) map.reasons.push(`AI identified Column ${creditCol+1} as Credit.`);
+  if(amountCol>=0) map.reasons.push(`AI identified Column ${amountCol+1} as transaction Amount.`);
+  if(!debitCol&&!creditCol&&balanceBest) map.reasons.push('Debit/Credit columns are not required when a reliable running Balance is available; balance movements will be used.');
+  if(!dateBest||!balanceBest) map.reasons.push('AI could not find both a reliable date and balance column.');
 
-  if(best){
-    const enough=best.dated>=1 && best.withBalance>=1 && best.valid>=1;
-    let confidence=0;
-    if(best.dated>=1)confidence+=35;
-    if(best.withBalance>=1)confidence+=40;
-    if(best.debit>=0)confidence+=8;
-    if(best.credit>=0)confidence+=8;
-    if(best.amount>=0)confidence+=5;
-    if(best.drcr>=0&&best.amount>=0)confidence+=4;
-    if(best.nar>=0)confidence+=3;
-    if(best.dated>=3)confidence+=5;
-    if(!enough)confidence=Math.min(confidence,45);
-    map.confidence=Math.min(100,Math.round(confidence));
-
-    map.reasons.push(`Transaction table identified at row ${best.hr+1}.`);
-    map.reasons.push(`Validated ${best.valid} transaction-like row(s) with ${best.withBalance} balance value(s).`);
-    if(best.db>=0||best.cr>=0)map.reasons.push('Separate Debit/Credit columns detected from the transaction header.');
-    else if(best.am>=0&&best.dc>=0)map.reasons.push('Amount + DR/CR structure detected.');
-    else map.reasons.push('Balance column is sufficient for daily-product interest; movements are optional.');
-  }else{
-    map.confidence=0;
-    map.reasons.push('No row containing a usable Date + Balance transaction structure was found.');
-  }
-
+  // The actual transaction rows are not required to sit immediately below a
+  // header. This deliberately avoids the failure mode seen in the uploaded
+  // bank statements.
+  map.dataRows=dateRows.length;
+  map.aiMethod='data-profile + balance-continuity + semantic header scoring';
   return map;
 }
 
@@ -2490,7 +2541,7 @@ function stmtAIApplyMapping(map){
   const card=document.getElementById('stmtAIMapCard'),res=document.getElementById('stmtAIMapResult'),grid=document.getElementById('stmtAIMapGrid');
   if(!card||!res||!grid)return;
   const label=c=>c>=0?'Column '+(c+1):'Not identified';
-  res.innerHTML='<b>AI confidence: '+map.confidence+'%</b> — '+(map.confidence>=80?'High confidence. The statement can be calculated automatically.':map.confidence>=60?'Good confidence. Review the highlighted mapping if desired.':'Low confidence. The app needs your confirmation for the missing role.')+'<br><span class="hint">'+stmtEsc(map.reasons.join(' '))+'</span>';
+  res.innerHTML='<b>AI confidence: '+map.confidence+'%</b> — '+(map.confidence>=80?'High confidence.':map.confidence>=60?'Good confidence.':'Needs review.')+'<br><span class="hint">AI analyses the actual values, date patterns and running-balance behaviour — it does not depend on a bank-specific column name.<br>'+stmtEsc(map.reasons.join(' '))+'</span>';
   const items=[['Date',map.date],['Balance',map.balance],['Debit',map.debit],['Credit',map.credit],['Amount',map.amount],['DR/CR',map.drcr],['Narration',map.narration],['Reference',map.ref]];
   grid.innerHTML=items.map(([n,c])=>`<div class="note" style="margin:0"><b>${n}</b><br>${stmtEsc(label(c))}</div>`).join('');
   card.style.display='block';
@@ -2518,7 +2569,15 @@ function stmtRowsFromAIMap(map){
     }
     const narration=map.narration>=0?String(get(r,map.narration)||'').trim():r.map(v=>String(v??'')).join(' ').trim();
     if(balance===null)continue;
-    if(/\b(total|grand total|subtotal|opening balance|closing balance|brought forward|carried forward|statement total)\b/i.test(narration) && debit===0 && credit===0)continue;
+    if(/\b(total|grand total|subtotal|opening balance|closing balance|brought forward|carried forward|statement total|total debit|total credit)\b/i.test(narration) && debit===0 && credit===0)continue;
+    // Header-independent fallback: infer debit/credit from consecutive
+    // balances when the bank does not expose separate flow columns.
+    if(map.debit<0 && map.credit<0 && out.length){
+      const prev=out[out.length-1].balance;
+      const delta=balance-prev;
+      if(delta>0)credit=delta;
+      else if(delta<0)debit=-delta;
+    }
     out.push({date,debit,credit,balance,narration:narration||'(no description)',ref:map.ref>=0?String(get(r,map.ref)||'').trim():'',sourceRow:i+1});
   }
   out.sort((a,b)=>a.date-b.date);
@@ -2527,7 +2586,10 @@ function stmtRowsFromAIMap(map){
 
 function stmtRunAIMapper(){
   if(!stmtRawRows.length)return null;
-  const map=stmtAIMapStatement(stmtRawRows); stmtAIApplyMapping(map); return map;
+  const map=stmtAIMapStatement(stmtRawRows);
+  stmtAIApplyMapping(map);
+  stmtAIApplyOpeningClosing(stmtRawRows,map);
+  return map;
 }
 
 function stmtRowsFromKnownBankFormat(){
@@ -2714,6 +2776,116 @@ function stmtRowsFromMapping(){
   }
   rows.sort((a,b)=>a.date-b.date);
   return rows;
+}
+
+
+/* ============================================================================
+   OPENING / CLOSING BALANCE AI
+   Finds explicit statement summary balances first, then falls back to the
+   first/last reliable transaction balance. This is independent of bank name.
+============================================================================ */
+function stmtAIExtractOpeningClosing(raw, map){
+  const rows=Array.isArray(raw)?raw.filter(r=>Array.isArray(r)):[];
+  const norm=v=>String(v??'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
+  const num=v=>{
+    if(typeof v==='number') return Number.isFinite(v)?v:null;
+    const s=String(v??'').trim();
+    if(!s || !/\d/.test(s)) return null;
+    const n=parseNumberFlexible(s);
+    return Number.isFinite(n)?n:null;
+  };
+  const labelRow=(r)=>{
+    const text=r.map(v=>norm(v)).filter(Boolean).join(' | ');
+    return text;
+  };
+  const findSummary = (patterns) => {
+    for(let i=0;i<rows.length;i++){
+      const r=rows[i]||[];
+      const text=labelRow(r);
+      if(!patterns.some(p=>p.test(text))) continue;
+      // First prefer a numeric value on the same row.
+      for(let c=0;c<r.length;c++){
+        const n=num(r[c]);
+        if(n!==null) return {value:n,row:i,col:c,explicit:true,label:text};
+      }
+      // Then inspect the next two rows; bank exports often put the labels on
+      // one row and the values on the following row.
+      for(let j=i+1;j<=Math.min(i+2,rows.length-1);j++){
+        const rr=rows[j]||[];
+        for(let c=0;c<rr.length;c++){
+          const n=num(rr[c]);
+          if(n!==null) return {value:n,row:j,col:c,explicit:true,label:text};
+        }
+      }
+    }
+    return null;
+  };
+
+  const opening=findSummary([
+    /\bopening\s+balance\b/i, /\bbalance\s+brought\s+forward\b/i,
+    /\bb\/f\b/i, /\bopening\s+bal\b/i, /\bbrought\s+forward\b/i
+  ]);
+  const closing=findSummary([
+    /\bclosing\s+balance\b/i, /\bbalance\s+carried\s+forward\b/i,
+    /\bc\/f\b/i, /\bclosing\s+bal\b/i, /\bcarried\s+forward\b/i
+  ]);
+
+  let firstTxn=null,lastTxn=null;
+  if(map && map.date>=0 && map.balance>=0){
+    for(let i=0;i<rows.length;i++){
+      const d=parseDateFlexible(rows[i][map.date]);
+      const b=num(rows[i][map.balance]);
+      if(d&&!isNaN(d)&&b!==null){
+        const item={value:b,row:i,date:d};
+        if(!firstTxn)firstTxn=item;
+        lastTxn=item;
+      }
+    }
+  }
+
+  // If an explicit closing balance is absent, the last valid transaction
+  // balance is the closing balance for the statement period.
+  const result={
+    opening: opening || (firstTxn ? {
+      value:firstTxn.value,row:firstTxn.row,col:map?.balance??-1,
+      explicit:false,label:'First transaction balance'
+    }:null),
+    closing: closing || (lastTxn ? {
+      value:lastTxn.value,row:lastTxn.row,col:map?.balance??-1,
+      explicit:false,label:'Last transaction balance'
+    }:null)
+  };
+
+  result.confidence=(result.opening?.explicit?45:25)+(result.closing?.explicit?45:25);
+  if(result.opening && result.closing && firstTxn && lastTxn){
+    // If opening is explicit and first transaction is not the same row,
+    // retain it. Do not overwrite a bank-provided opening balance.
+    result.reasons=[
+      result.opening.explicit
+        ? `Opening balance identified from the statement summary: ${result.opening.value}.`
+        : `Opening balance inferred from the first dated balance: ${result.opening.value}.`,
+      result.closing.explicit
+        ? `Closing balance identified from the statement summary: ${result.closing.value}.`
+        : `Closing balance inferred from the last dated balance: ${result.closing.value}.`
+    ];
+  }else{
+    result.reasons=['Opening/closing balance could not be fully identified from the available data.'];
+  }
+  return result;
+}
+
+function stmtAIApplyOpeningClosing(raw, map){
+  const oc=stmtAIExtractOpeningClosing(raw,map);
+  window.__stmtOpeningClosing=oc;
+  const el=document.getElementById('stmtAIMapResult');
+  if(el && oc){
+    const fmt=v=>v===null||v===undefined?'Not identified':
+      Number(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const extra=`<br><b>Opening Balance:</b> ${fmt(oc.opening?.value)} ${oc.opening?.explicit?'(statement summary)':'(AI inferred)'}`
+      +`<br><b>Closing Balance:</b> ${fmt(oc.closing?.value)} ${oc.closing?.explicit?'(statement summary)':'(AI inferred)'}`;
+    el.innerHTML += extra;
+  }
+  return oc;
 }
 
 function stmtExtractOpening(rows){
@@ -3089,6 +3261,13 @@ function stmtShowDaily(){
   document.getElementById('stmtShowDailyBtn').textContent='Hide daily calculation';
 }
 
+
+function stmtAIEnsureOpeningClosing(){
+  const map=window.__stmtAIMap || (stmtRawRows.length?stmtRunAIMapper():null);
+  if(!map)return null;
+  return window.__stmtOpeningClosing || stmtAIExtractOpeningClosing(stmtRawRows,map);
+}
+
 function stmtRunCalculation(){
   // Always try the bank-statement structural detector first. It explicitly
   // distinguishes a summary block (Opening/Total/Closing) from the real
@@ -3201,7 +3380,9 @@ document.getElementById('stmtFile').addEventListener('change',async e=>{
     if(mappedFallback.length){
       const s=document.getElementById('stmtStatus');
       const h=ai?.headerRow>=0?` from header row ${ai.headerRow+1}`:'';
-      if(s)s.textContent=`Statement ready: AI mapped ${mappedFallback.length} transactions${h}.`;
+      const oc=window.__stmtOpeningClosing || stmtAIExtractOpeningClosing(stmtRawRows,ai);
+      const fmt=v=>v===null||v===undefined?'N/A':Number(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+      if(s)s.textContent=`Statement ready: AI mapped ${mappedFallback.length} transactions${h}. Opening ₹${fmt(oc?.opening?.value)} | Closing ₹${fmt(oc?.closing?.value)}.`;
     }else{
       // Show a useful diagnostic instead of the generic "no transactions"
       // message. This makes file-reading failures immediately identifiable.
@@ -3494,7 +3675,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v6.1 ---------- */
+/* ---------- Simple Calculator v6.3 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
