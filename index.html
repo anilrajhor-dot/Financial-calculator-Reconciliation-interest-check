@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v6.3</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v6.4</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -989,7 +989,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v6.3</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v6.4</strong>
   </footer>
 </div>
 
@@ -1778,15 +1778,34 @@ function stmtDaysInYear(y){
 
 function parseDateFlexible(val) {
   if (val instanceof Date && !isNaN(val)) return val;
-  if (typeof val === 'number') {
-    try {
-      const d = XLSX.SSF.parse_date_code(val);
-      if (d) return new Date(d.y,d.m-1,d.d);
-    } catch(e){}
+  if (typeof val === 'number' && Number.isFinite(val)) {
+    // Excel serial dates can arrive as numbers OR as numeric strings when
+    // the mobile/direct XLSX reader reads the worksheet XML.
+    if (val >= 20000 && val <= 80000) {
+      try {
+        const d = XLSX.SSF.parse_date_code(val);
+        if (d) return new Date(d.y,d.m-1,d.d);
+      } catch(e){}
+    }
   }
   let s=String(val??'').trim();
+  // Critical mobile-XLSX fix: the direct XML reader returns <v> values as
+  // strings. If a cell is an Excel date serial (e.g. 46100), convert it
+  // before trying textual date patterns. Do NOT treat YYYYMMDD as a serial.
+  if (/^\d+(?:\.\d+)?$/.test(s)) {
+    const n=Number(s);
+    if (n >= 20000 && n <= 80000 && !/^\d{8}$/.test(s)) {
+      try {
+        const d = XLSX.SSF.parse_date_code(n);
+        if (d) return new Date(d.y,d.m-1,d.d);
+      } catch(e){}
+    }
+  }
   if(!s) return null;
-  s=s.replace(/\s+/g,' ').replace(/[.]/g,'-');
+  s=s.replace(/\u00a0/g,' ').replace(/\s+/g,' ').replace(/[.]/g,'-');
+  // Handle timestamps such as 31/07/2026 00:00:00 and ISO strings.
+  const datePrefix=s.match(/^(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})(?:\s|T|$)/);
+  if(datePrefix) s=datePrefix[1];
   let m;
   if((m=s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/))) return new Date(+m[1],+m[2]-1,+m[3]);
   const MON={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,sept:8,oct:9,nov:10,dec:11};
@@ -2518,7 +2537,7 @@ function stmtAIMapStatement(raw){
     reasons:[]
   };
 
-  if(dateBest) map.reasons.push(`AI identified Column ${dateBest.c+1} as Date from ${dateBest.dates} date-like values.`);
+  if(dateBest) map.reasons.push(`AI identified Column ${dateBest.c+1} as Date from ${dateBest.dates} date-like values (including Excel serial dates where applicable).`);
   if(balanceBest) map.reasons.push(`AI identified Column ${balanceBest.c+1} as Balance from numeric density and running-balance behaviour.`);
   if(debitCol>=0) map.reasons.push(`AI identified Column ${debitCol+1} as Debit.`);
   if(creditCol>=0) map.reasons.push(`AI identified Column ${creditCol+1} as Credit.`);
@@ -3382,7 +3401,7 @@ document.getElementById('stmtFile').addEventListener('change',async e=>{
       const h=ai?.headerRow>=0?` from header row ${ai.headerRow+1}`:'';
       const oc=window.__stmtOpeningClosing || stmtAIExtractOpeningClosing(stmtRawRows,ai);
       const fmt=v=>v===null||v===undefined?'N/A':Number(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
-      if(s)s.textContent=`Statement ready: AI mapped ${mappedFallback.length} transactions${h}. Opening ₹${fmt(oc?.opening?.value)} | Closing ₹${fmt(oc?.closing?.value)}.`;
+      if(s)s.textContent=`Statement ready: AI mapped ${mappedFallback.length} transactions${h}. AI confidence ${ai?.confidence??0}%. Opening ₹${fmt(oc?.opening?.value)} | Closing ₹${fmt(oc?.closing?.value)}.`;
     }else{
       // Show a useful diagnostic instead of the generic "no transactions"
       // message. This makes file-reading failures immediately identifiable.
@@ -3675,7 +3694,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v6.3 ---------- */
+/* ---------- Simple Calculator v6.4 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
