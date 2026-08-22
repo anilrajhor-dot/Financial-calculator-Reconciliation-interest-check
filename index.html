@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v7.3</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v7.5</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -989,7 +989,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v7.3</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v7.5</strong>
   </footer>
 </div>
 
@@ -1738,7 +1738,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculators v7.4 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculators v7.5 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -3372,6 +3372,9 @@ function stmtRenderSlabs(slabs){
 function stmtPersistSlabs(){
   const slabs=stmtNormaliseSlabs(stmtSlabRows());
   stmtSaveSlabs(slabs);
+  stmtLastResult=null;
+  document.getElementById('stmtMenuMonthly')?.setAttribute('disabled','disabled');
+  document.getElementById('stmtMenuDaily')?.setAttribute('disabled','disabled');
   stmtRenderSlabs(slabs);
 }
 function stmtAddSlab(){
@@ -3473,16 +3476,16 @@ function stmtRenderResults(result,slabs){
   const totalBank=result.bankInterest;
   const diff=result.overallDifference;
   const bankAvailable=totalBank!==null&&totalBank!==undefined;
-  const bankSource=(document.getElementById('stmtBankInterest').value.trim()!=='')?'Manual / entered':'Detected from interest-credit transactions';
+  const bankSource=(document.getElementById('stmtBankInterest').value.trim()!=='')?'Manual / entered':'Detected from interest debit/credit transactions';
   document.getElementById('stmtSummary').innerHTML=[
     {label:'Calculated interest',value:'₹ '+stmtMoney(result.total),cls:''},
-    {label:'Bank interest credited',value:bankAvailable?'₹ '+stmtMoney(totalBank):'Not detected',cls:''},
+    {label:'Bank interest charged/credited',value:bankAvailable?'₹ '+stmtMoney(totalBank):'Not detected',cls:''},
     {label:'Difference',value:bankAvailable?((diff>=0?'+':'−')+'₹ '+stmtMoney(Math.abs(diff||0))):'—',cls:bankAvailable?(Math.abs(diff||0)<0.01?'stmt-good':'stmt-review'):''},
     {label:'Days calculated',value:String((result.calculatedDays??(result.daily||[]).length)),cls:''}
   ].map(s=>`<div class="stat"><div class="stat-label">${s.label}</div><div class="stat-value ${s.cls}">${s.value}</div></div>`).join('');
   document.getElementById('stmtLedgerSub').textContent=
     `${months.length} complete calendar month(s) · ${(result.calculatedDays??(result.daily||[]).length)} day(s) calculated · bank figure: ${bankSource}`;
-  let h='<thead><tr><th style="text-align:left">Month</th><th>Calendar days</th><th>Calculated days</th><th>Daily product</th><th>Calculated interest</th><th>Bank interest credited</th><th>Difference</th><th>Status</th></tr></thead><tbody>';
+  let h='<thead><tr><th style="text-align:left">Month</th><th>Calendar days</th><th>Calculated days</th><th>Daily product</th><th>Calculated interest</th><th>Bank interest charged/credited</th><th>Difference</th><th>Status</th></tr></thead><tbody>';
   months.forEach(m=>{
     const b=Number(m.actualInterest||0);
     const d=b?m.interest-b:null;
@@ -3496,7 +3499,13 @@ function stmtRenderResults(result,slabs){
       result.excludedMonths.map(x=>stmtMonthLabel(x.month)+' — '+x.availableDays+' of '+x.expectedDays+' days available').join('; ')+
       '. These months are not included in the calculated interest total.</div>';
   }
-  document.getElementById('stmtTable').insertAdjacentHTML('afterend',excludedHtml);
+  document.getElementById('stmtExcludedMonthsNote')?.remove();
+if(excludedHtml){
+  const holder=document.createElement('div');
+  holder.innerHTML=excludedHtml;
+  const note=holder.firstElementChild;
+  if(note){note.id='stmtExcludedMonthsNote';document.getElementById('stmtTable').after(note);}
+}
   let note='Daily product × annual slab rate ÷ actual days in that calendar month. Monthly product is the sum of daily applicable slab portions for each complete calendar month.';
   if(result.opening!==null && result.opening!==undefined){
     note += ' Opening / brought-forward balance used for the first day: ₹'+stmtMoney(result.opening)+'.';
@@ -4754,7 +4763,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
 </script>
 
 <script>
-// StatementIQ working Bank Interest engine transplant for Financial Calculators v7.4
+// StatementIQ working Bank Interest engine transplant for Financial Calculators v7.5
 (function(){
   const aliasGroups={
     date:['transaction date','txn date','tran date','value date','posting date','post date','date of transaction','trans date','date'],
@@ -4912,33 +4921,124 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
     return parts;
   }
   function interestDaily(rows,slabs,openingOverride){
-    const rs=(rows||[]).filter(r=>r.date instanceof Date&&!isNaN(r.date)).sort((a,b)=>a.date-b.date); if(!rs.length)return {days:[],monthly:[],total:0,error:'No dated transactions found.'};
+    const rs=(rows||[]).filter(r=>r.date instanceof Date&&!isNaN(r.date)).sort((a,b)=>a.date-b.date);
+    if(!rs.length)return {days:[],monthly:[],total:0,error:'No dated transactions found.'};
+
     const first=new Date(rs[0].date.getFullYear(),rs[0].date.getMonth(),rs[0].date.getDate());
     const last=new Date(rs[rs.length-1].date.getFullYear(),rs[rs.length-1].date.getMonth(),rs[rs.length-1].date.getDate());
+
     let opening=openingOverride;
-    if(opening===null||opening===undefined){const r=rs[0];if(r.balance!==null)opening=Number(r.balance)-Number(r.credit||0)+Number(r.debit||0);}
-    let startDate,firstMonthMode='full';
+    if(opening===null||opening===undefined){
+      const r=rs[0];
+      if(r.balance!==null)opening=Number(r.balance)-Number(r.credit||0)+Number(r.debit||0);
+    }
+
+    let startDate,firstMonthMode='from-opening-balance';
     if(opening===null||!Number.isFinite(opening)){
-      if(first.getDate()>1){startDate=first;firstMonthMode='from-first-transaction';opening=Number(rs[0].balance||0);}
-      else {startDate=new Date(first.getFullYear(),first.getMonth(),1);opening=Number(rs[0].balance||0)-Number(rs[0].credit||0)+Number(rs[0].debit||0);firstMonthMode='from-first-day-closing-balance';}
-    }else startDate=new Date(first.getFullYear(),first.getMonth(),1);
-    const byDay={};rs.forEach(r=>{const k=stmtDayKey(r.date);(byDay[k]=byDay[k]||[]).push(r);});
-    const days=[];let balance=opening,currentMonth=null,monthOpening=opening;let d=new Date(startDate);const end=new Date(last.getFullYear(),last.getMonth()+1,0);
-    while(d<=end){const k=stmtDayKey(d),tx=byDay[k]||[],m=stmtMonthKey(d);if(m!==currentMonth){if(currentMonth!==null)balance=Number(days[days.length-1].balance);currentMonth=m;monthOpening=balance;}const openingForDay=balance;if(tx.length){const wb=tx.filter(r=>r.balance!==null&&Number.isFinite(Number(r.balance)));if(wb.length)balance=Number(wb[wb.length-1].balance);else tx.forEach(r=>{balance+=Number(r.credit||0)-Number(r.debit||0);});}days.push({date:new Date(d),month:m,daysInMonth:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),opening:openingForDay,monthOpening,balance,hasTransaction:tx.length>0});d.setDate(d.getDate()+1);}
-    const monthlyMap={};let total=0;
-    days.forEach(x=>{const parts=allocate(x.balance,slabs);let interest=0;parts.forEach(p=>interest+=p.portion/365*p.rate/100);total+=interest;const m=monthlyMap[x.month]||(monthlyMap[x.month]={month:x.month,days:x.daysInMonth,calculatedDays:0,dailyProduct:0,interest:0,slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),actualInterest:0,openingBalance:x.monthOpening,closingBalance:x.balance});m.dailyProduct+=x.balance;m.calculatedDays++;m.interest+=interest;m.closingBalance=x.balance;x.parts=parts;x.interest=interest;parts.forEach((p,i)=>{m.slabProducts[i]+=p.portion;m.slabInterest[i]+=p.portion/365*p.rate/100;});});
-    rs.forEach(r=>{if(r.credit>0&&/(monthly\s+interest|interest\s+(credit|credited|paid|payment)|\bint\.?\s*(credit|credited)|interest)/i.test(r.narration||'')){const k=stmtMonthKey(r.date);const m=monthlyMap[k]||(monthlyMap[k]={month:k,days:new Date(r.date.getFullYear(),r.date.getMonth()+1,0).getDate(),calculatedDays:0,dailyProduct:0,interest:0,slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),actualInterest:0});m.actualInterest+=Number(r.credit||0);}});
-    const monthly=Object.values(monthlyMap).sort((a,b)=>a.month.localeCompare(b.month));
-    return {daily:days,monthly,total,opening:days[0]?.opening??opening,closing:days.at(-1)?.balance??balance,startDate,firstMonthMode,partial:!(first.getDate()===1&&last.getDate()===end.getDate()),calculatedDays:days.length};
+      if(first.getDate()>1){
+        startDate=first; opening=Number(rs[0].balance||0);
+        firstMonthMode='from-first-transaction';
+      }else{
+        startDate=new Date(first.getFullYear(),first.getMonth(),1);
+        opening=Number(rs[0].balance||0);
+        firstMonthMode='from-first-day-closing-balance';
+      }
+    }else{
+      startDate=new Date(first.getFullYear(),first.getMonth(),1);
+    }
+
+    const byDay={};
+    rs.forEach(r=>{const k=stmtDayKey(r.date);(byDay[k]=byDay[k]||[]).push(r);});
+
+    const days=[];
+    let balance=opening,currentMonth=null,monthOpening=opening;
+    const end=new Date(last.getFullYear(),last.getMonth()+1,0);
+
+    for(let d=new Date(startDate);d<=end;d.setDate(d.getDate()+1)){
+      const k=stmtDayKey(d),tx=byDay[k]||[],m=stmtMonthKey(d);
+      if(m!==currentMonth){
+        if(currentMonth!==null)balance=Number(days[days.length-1].balance);
+        currentMonth=m;monthOpening=balance;
+      }
+      const openingForDay=balance;
+      if(tx.length){
+        const wb=tx.filter(r=>r.balance!==null&&Number.isFinite(Number(r.balance)));
+        if(wb.length){
+          // Exclude the interest credit/debit itself from that day's
+          // interest-bearing closing balance when a pre-interest balance exists.
+          const interestTx=tx.filter(r=>/interest|int\.?\s*(credit|credited|debit|debited|charge|charged|paid|payment)/i.test(r.narration||''));
+          balance=interestTx.length&&wb.length>=2
+            ?Number(wb[wb.length-2].balance)
+            :Number(wb[wb.length-1].balance);
+        }else{
+          tx.forEach(r=>{balance+=Number(r.credit||0)-Number(r.debit||0);});
+        }
+      }
+      days.push({date:new Date(d),month:m,daysInMonth:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),
+        opening:openingForDay,monthOpening,balance,hasTransaction:tx.length>0,txCount:tx.length});
+    }
+
+    const firstMonth=stmtMonthKey(first),lastMonth=stmtMonthKey(last);
+    const lastDay=new Date(last.getFullYear(),last.getMonth()+1,0).getDate();
+    const firstComplete=startDate.getDate()===1;
+    const lastComplete=last.getDate()===lastDay;
+
+    const monthlyMap={};
+    days.forEach(x=>{
+      const m=monthlyMap[x.month]??={month:x.month,days:x.daysInMonth,calculatedDays:0,dailyProduct:0,interest:0,
+        slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),actualInterest:0,
+        openingBalance:x.monthOpening,closingBalance:x.balance};
+      const parts=stmtAllocate(x.balance,slabs);
+      x.parts=parts;
+      x.interest=parts.reduce((a,p)=>a+p.portion*p.rate/100/x.daysInMonth,0);
+      m.dailyProduct+=x.balance;m.calculatedDays++;m.interest+=x.interest;m.closingBalance=x.balance;
+      parts.forEach((p,i)=>{m.slabProducts[i]+=p.portion;m.slabInterest[i]+=p.portion*p.rate/100/x.daysInMonth;});
+    });
+
+    // Detect actual bank interest, whether credited or charged/debited.
+    rs.forEach(r=>{
+      const narration=String(r.narration||'');
+      if((r.credit>0||r.debit>0)&&/interest|int\.?\s*(credit|credited|debit|debited|charge|charged|paid|payment)/i.test(narration)){
+        const k=stmtMonthKey(r.date);
+        const m=monthlyMap[k]??={month:k,days:new Date(r.date.getFullYear(),r.date.getMonth()+1,0).getDate(),
+          calculatedDays:0,dailyProduct:0,interest:0,slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),
+          actualInterest:0,openingBalance:null,closingBalance:null};
+        m.actualInterest += Number(r.credit||0)-Number(r.debit||0);
+      }
+    });
+
+    const all=Object.values(monthlyMap).sort((a,b)=>a.month.localeCompare(b.month));
+    const excludedMonths=[];
+    if(!firstComplete){
+      const m=all.find(x=>x.month===firstMonth);
+      if(m)excludedMonths.push({month:firstMonth,availableDays:first.getDate(),expectedDays:m.days});
+    }
+    if(!lastComplete&&lastMonth!==firstMonth){
+      const m=all.find(x=>x.month===lastMonth);
+      if(m)excludedMonths.push({month:lastMonth,availableDays:last.getDate(),expectedDays:m.days});
+    }
+    const excluded=new Set(excludedMonths.map(x=>x.month));
+    const monthly=all.filter(m=>!excluded.has(m.month));
+    const total=monthly.reduce((a,m)=>a+m.interest,0);
+    const autoBank=monthly.reduce((a,m)=>a+Math.abs(Number(m.actualInterest||0)),0);
+
+    return {daily:days,monthly,allMonthly:all,excludedMonths,total,autoBankInterest:autoBank,
+      bankSignedInterest:monthly.reduce((a,m)=>a+Number(m.actualInterest||0),0),
+      opening:days[0]?.opening??opening,closing:days.at(-1)?.balance??balance,
+      startDate,firstMonthMode,partial:excludedMonths.length>0,
+      calculatedDays:monthly.reduce((a,m)=>a+m.calculatedDays,0)};
   }
+
   // Replace the calculation entry point with the working StatementIQ flow.
   window.stmtRowsFromMapping=function(){const p=parseRows(stmtRawRows||[]);window.__fiqMapped=p;applyMap(p.map);window.__stmtAIMap=p.map||null;window.__stmtOpeningClosing={opening:p.opening,closing:p.closing};return p.rows;};
   window.stmtCalculate=function(rows,slabs,manualBankInterest){
-    const p=window.__fiqMapped||{}; const r=interestDaily(rows,slabs,p.opening);
+    const p=window.__fiqMapped||{};
+    const r=interestDaily(rows,slabs,p.opening);
     if(!r.daily.length)return r;
-    const auto=r.monthly.reduce((a,m)=>a+Number(m.actualInterest||0),0);
-    const bank=manualBankInterest!==null&&!isNaN(manualBankInterest)?manualBankInterest:(auto>0?auto:null);
-    return {...r,autoBankInterest:auto,bankInterest:bank,overallDifference:bank!==null?r.total-bank:null};
+    const bank=manualBankInterest!==null&&!isNaN(manualBankInterest)
+      ?Number(manualBankInterest)
+      :(r.autoBankInterest>0?r.autoBankInterest:null);
+    return {...r,bankInterest:bank,overallDifference:bank!==null?r.total-bank:null};
   };
   window.stmtRunCalculation=function(){
     if((!stmtRawRows||!stmtRawRows.length) && Array.isArray(window.__statementRows)) stmtRawRows=window.__statementRows;
