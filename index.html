@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v6.6</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v6.7</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -989,7 +989,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v6.6</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v6.7</strong>
   </footer>
 </div>
 
@@ -2346,6 +2346,73 @@ function stmtExtractTransactionsUniversal(raw){
    This is deliberately data-first: a strange/no-header bank export can still
    be calculated.
 ============================================================================ */
+
+/* v6.7 — deterministic bank-statement header detector.
+   This is intentionally placed before the statistical AI mapper.
+   If a real transaction header is present, there is no reason to guess.
+*/
+function stmtDeterministicStatementMap(raw){
+  const rows=Array.isArray(raw)?raw.filter(r=>Array.isArray(r)):[];
+  if(!rows.length)return null;
+
+  const norm=v=>String(v??'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
+  const match=(v,arr)=>{
+    const x=norm(v);
+    return arr.some(a=>x===a || x.includes(a));
+  };
+  const roles={
+    date:['transaction date','txn date','tran date','trans date','post date','posting date','value date','date'],
+    debit:['debit amount','debit amt','withdrawal amount','withdrawal amt','withdrawal','debit','dr amount','dr amt'],
+    credit:['credit amount','credit amt','deposit amount','deposit amt','deposit','credit','cr amount','cr amt'],
+    balance:['closing balance','running balance','available balance','ledger balance','current balance','balance','closing bal','running bal','bal'],
+    amount:['transaction amount','txn amount','amount (inr)','amount inr','amount','value','amt'],
+    drcr:['dr/cr','dr / cr','cr/dr','debit credit','credit debit','transaction type','txn type','type','indicator'],
+    narration:['particulars','transaction details','transaction description','description','narration','remarks','details','memo'],
+    ref:['cheque no','cheque number','chq no','chq/ref','ref no','reference no','reference number','transaction id','utr','instrument no','voucher no']
+  };
+  const isDate=v=>{try{const d=parseDateFlexible(v);return !!(d&&!isNaN(d));}catch(e){return false;}};
+  const isNum=v=>{
+    if(typeof v==='number')return Number.isFinite(v);
+    const s=String(v??'').trim();
+    if(!s || !/\d/.test(s))return false;
+    try{return Number.isFinite(parseNumberFlexible(s));}catch(e){return false;}
+  };
+
+  let best=null;
+  for(let r=0;r<Math.min(rows.length,300);r++){
+    const row=rows[r]||[];
+    const cols={date:-1,debit:-1,credit:-1,balance:-1,amount:-1,drcr:-1,narration:-1,ref:-1};
+    Object.keys(cols).forEach(role=>{
+      for(let c=0;c<row.length;c++){
+        if(cols[role]<0 && match(row[c],roles[role])){cols[role]=c;break;}
+      }
+    });
+
+    // A genuine transaction header must have Date + Balance and at least
+    // one flow field, and the rows immediately below must contain data.
+    if(cols.date<0 || cols.balance<0)continue;
+    if(cols.debit<0 && cols.credit<0 && cols.amount<0 && cols.narration<0)continue;
+
+    let dateHits=0, moneyHits=0;
+    for(let rr=r+1;rr<Math.min(rows.length,r+9);rr++){
+      if(isDate(rows[rr]?.[cols.date]))dateHits++;
+      [cols.debit,cols.credit,cols.amount,cols.balance].forEach(c=>{
+        if(c>=0 && isNum(rows[rr]?.[c]))moneyHits++;
+      });
+    }
+    if(dateHits<1 || moneyHits<1)continue;
+
+    let score=100+dateHits*4+Math.min(20,moneyHits*2);
+    if(cols.debit>=0)score+=8;
+    if(cols.credit>=0)score+=8;
+    if(cols.balance>=0)score+=8;
+    if(norm(row[cols.date]).includes('transaction')||norm(row[cols.date]).includes('post'))score+=5;
+
+    if(!best || score>best.score)best={headerRow:r,score,...cols};
+  }
+  return best;
+}
+
 function stmtAIMapStatement(raw){
   const rows=Array.isArray(raw)?raw.filter(r=>Array.isArray(r)):[];
   const maxCols=rows.reduce((m,r)=>Math.max(m,r.length),0);
@@ -2407,8 +2474,8 @@ function stmtAIMapStatement(raw){
   for(let r=0;r<Math.min(rows.length,160);r++){
     const cells=rows[r]||[];
     const text=cells.map(v=>compact(v)).join(' | ');
-    const hasDate=/(^|\\| )date( |\\|)|transaction date|txn date|tran date|post date|posting date|value date/.test(text);
-    const hasBal=/(^|\\| )balance( |\\|)|closing balance|running balance|available balance|ledger balance/.test(text);
+    const hasDate=/\bdate\b|transaction date|txn date|tran date|post date|posting date|value date/.test(text);
+    const hasBal=/\bbalance\b|closing balance|running balance|available balance|ledger balance/.test(text);
     const hasFlow=/(debit|withdrawal|credit|deposit|\\bdr\\b|\\bcr\\b)/.test(text);
     const hasNarr=/(narration|description|particulars|transaction details|remarks|details)/.test(text);
     if(hasDate&&hasBal&&(hasFlow||hasNarr)){
@@ -2426,8 +2493,8 @@ function stmtAIMapStatement(raw){
       rows[r]?.[c],rows[r+1]?.[c],rows[r+2]?.[c]
     ].filter(v=>String(v??'').trim()!=='').join(' '));
     const text=virtual.map(v=>compact(v)).join(' | ');
-    const hasDate=/(^|\\| )date( |\\|)|transaction date|txn date|tran date|post date|posting date|value date/.test(text);
-    const hasBal=/(^|\\| )balance( |\\|)|closing balance|running balance|available balance|ledger balance/.test(text);
+    const hasDate=/\bdate\b|transaction date|txn date|tran date|post date|posting date|value date/.test(text);
+    const hasBal=/\bbalance\b|closing balance|running balance|available balance|ledger balance/.test(text);
     const hasFlow=/(debit|withdrawal|credit|deposit|\\bdr\\b|\\bcr\\b)/.test(text);
     const hasNarr=/(narration|description|particulars|transaction details|remarks|details)/.test(text);
     if(hasDate&&hasBal&&(hasFlow||hasNarr))
@@ -2702,7 +2769,7 @@ function stmtAIApplyMapping(map){
   const card=document.getElementById('stmtAIMapCard'),res=document.getElementById('stmtAIMapResult'),grid=document.getElementById('stmtAIMapGrid');
   if(!card||!res||!grid)return;
   const label=c=>c>=0?'Column '+(c+1):'Not identified';
-  res.innerHTML='<b>AI confidence: '+map.confidence+'%</b> — '+(map.confidence>=80?'High confidence.':map.confidence>=60?'Good confidence.':'Needs review.')+'<br><span class="hint">AI analyses the actual values, date patterns and running-balance behaviour — it does not depend on a bank-specific column name.<br>'+stmtEsc(map.reasons.join(' '))+'</span>';
+  res.innerHTML='<b>AI confidence: '+map.confidence+'%</b> — '+(map.confidence>=80?'High confidence.':map.confidence>=60?'Good confidence.':'Needs review.')+'<br><span class="hint">StatementIQ first checks the actual transaction-header structure, then uses value/date/balance analysis as fallback.<br>'+stmtEsc(map.reasons.join(' '))+'</span>';
   const items=[['Date',map.date],['Balance',map.balance],['Debit',map.debit],['Credit',map.credit],['Amount',map.amount],['DR/CR',map.drcr],['Narration',map.narration],['Reference',map.ref]];
   grid.innerHTML=items.map(([n,c])=>`<div class="note" style="margin:0"><b>${n}</b><br>${stmtEsc(label(c))}</div>`).join('');
   card.style.display='block';
@@ -2752,7 +2819,42 @@ function stmtRowsFromAIMap(map){
 
 function stmtRunAIMapper(){
   if(!stmtRawRows.length)return null;
-  const map=stmtAIMapStatement(stmtRawRows);
+
+  const d=stmtDeterministicStatementMap(stmtRawRows);
+  if(d){
+    const map={
+      headerRow:d.headerRow,
+      date:d.date,
+      balance:d.balance,
+      debit:d.debit,
+      credit:d.credit,
+      amount:d.amount,
+      drcr:d.drcr,
+      narration:d.narration,
+      ref:d.ref,
+      confidence:98,
+      reasons:[
+        `Transaction header detected on row ${d.headerRow+1}.`,
+        'Date and Balance were identified from the actual header.',
+        'Debit/Credit/Amount structure was verified against rows immediately below the header.'
+      ]
+    };
+    stmtAIApplyMapping(map);
+    stmtAIApplyOpeningClosing(stmtRawRows,map);
+    return map;
+  }
+
+  let map;
+  try{
+    map=stmtAIMapStatement(stmtRawRows);
+  }catch(err){
+    console.error('Statement AI mapper error',err);
+    map={
+      headerRow:-1,date:-1,balance:-1,debit:-1,credit:-1,amount:-1,drcr:-1,
+      narration:-1,ref:-1,confidence:0,
+      reasons:['AI mapper error: '+(err?.message||String(err))]
+    };
+  }
   stmtAIApplyMapping(map);
   stmtAIApplyOpeningClosing(stmtRawRows,map);
   return map;
@@ -3841,7 +3943,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v6.6 ---------- */
+/* ---------- Simple Calculator v6.7 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
