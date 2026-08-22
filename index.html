@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v7.7</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v7.8</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -791,7 +791,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="module" id="module-statement">
     <div class="eyebrow">LEDGER &middot; 04 STATEMENT INTEREST</div>
     <h1 class="page-title">Bank Statement Interest Calculator</h1>
-    <p class="lede">Upload a bank statement, map its columns, then compare the bank's interest credit with independently calculated daily-product interest using progressive slabs and the actual calendar days of each month.</p>
+    <p class="lede">Upload a bank statement, map its columns, then compare the bank's interest credit with independently calculated daily-product interest using progressive slabs, with daily interest calculated using a 365-day annual divisor.</p>
 <div id="statementSubMenu" class="row" style="margin:14px 0 18px;gap:8px;flex-wrap:wrap">
   <button id="stmtMenuCalculate" class="btn primary" type="button">🧮 Calculate Interest</button>
   <button id="stmtMenuMonthly" class="btn" type="button" disabled>📊 Month-wise Interest</button>
@@ -864,7 +864,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
     <div class="card input-card" id="stmtSlabCard" style="display:block;">
       <div class="stub-title">⚙ Interest Settings — Slabs &amp; Rates</div>
       <div class="stub-sub" style="margin:4px 0 14px;color:var(--muted)">
-        Each day's closing balance is progressively split across these slabs. Daily interest = daily product × annual rate ÷ actual calendar days in that month. The slab amount, not the full balance, earns the slab rate.
+        Each day's closing balance is progressively split across these slabs. Daily interest = daily product × annual rate ÷ 365. The slab amount, not the full balance, earns the slab rate. The calendar month only determines the number of daily products; it does not replace 365 as the divisor.
       </div>
       <div class="note">
         Example: if the closing balance is &#8377;8,00,000, a &#8377;3,00,000 first slab is calculated at its rate, the next slab only on the next portion, and so on.
@@ -989,7 +989,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v7.7</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v7.8</strong>
   </footer>
 </div>
 
@@ -1738,7 +1738,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculators v7.7 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculators v7.8 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -3426,9 +3426,9 @@ function stmtCalculate(rows,slabs,manualBankInterest){
   daily.days.forEach(x=>{
     const parts=stmtAllocate(x.balance,slabs);
     let interest=0;
-    // Interest is calculated using the actual number of calendar days in the
-    // month: balance × applicable slab rate ÷ 28/29/30/31.
-    parts.forEach(p=>interest += p.portion*p.rate/100/x.daysInMonth);
+    // Interest is calculated every day as: daily product × applicable annual slab rate ÷ 365.
+    // Calendar days only determine how many daily products are included.
+    parts.forEach(p=>interest += p.portion*p.rate/100/365);
     total+=interest;
     out.push({...x,parts,interest});
   });
@@ -3547,7 +3547,7 @@ function stmtRenderResults(result,slabs){
     const note=holder.firstElementChild;if(note){note.id='stmtExcludedMonthsNote';document.getElementById('stmtTable').after(note);}
   }
 
-  let note='Daily product × annual slab rate ÷ actual days in that calendar month. Every month in the uploaded statement is shown in the month-wise table, including partial first/last months.';
+  let note='Daily product × annual slab rate ÷ 365. The number of calendar days in each month determines how many daily products are accumulated. Every month in the uploaded statement is shown in the month-wise table, including partial first/last months.';
   if(result.opening!==null && result.opening!==undefined) note += ' Opening / brought-forward balance used for the first day: ₹'+stmtMoney(result.opening)+'.';
   if(result.firstMonthMode==='from-first-transaction') note += ' No brought-forward balance was available, so the first available month starts on '+stmtDate(result.startDate)+' using the first transaction-day closing balance.';
   else if(result.firstMonthMode==='from-first-day-closing-balance') note += ' The first transaction is on the 1st and no separate brought-forward balance was available, so its supplied closing balance is used as the 1st-day balance.';
@@ -3573,10 +3573,10 @@ function stmtShowDaily(){
   slabs.forEach((s,i)=>h+=`<th>Slab ${i+1} product</th><th>Rate</th><th>Daily interest</th>`);
   h+='<th>Total daily interest</th></tr></thead><tbody>';
   days.forEach(d=>{
-    h+=`<tr><td style="text-align:left">${stmtDate(d.date)}</td><td>${d.daysInMonth}</td><td>₹${stmtMoney(d.balance)}</td><td>₹${stmtMoney(d.balance)}</td><td>${d.daysInMonth}-day month</td>`;
+    h+=`<tr><td style="text-align:left">${stmtDate(d.date)}</td><td>${d.daysInMonth}</td><td>₹${stmtMoney(d.balance)}</td><td>₹${stmtMoney(d.balance)}</td><td>365-day annual divisor</td>`;
     slabs.forEach((s,i)=>{
       const p=d.parts[i]||{portion:0,rate:s.rate};
-      const di=p.portion*p.rate/100/d.daysInMonth;
+      const di=p.portion*p.rate/100/365;
       h+=`<td>₹${stmtMoney(p.portion)}</td><td>${Number(p.rate).toFixed(2)}%</td><td>₹${stmtMoney(di)}</td>`;
     });
     h+=`<td><b>₹${stmtMoney(d.interest)}</b></td></tr>`;
@@ -3593,8 +3593,8 @@ function stmtShowDaily(){
   document.getElementById('stmtDailyTable').innerHTML=h;
   const exampleInterest=(300000*5/100/365)+(200000*6/100/365)+(200000*7/100/365);
   document.getElementById('stmtDailyTotals').innerHTML=
-    `<div class="summary" style="margin-top:16px"><div class="stat"><div class="stat-label">Total daily product</div><div class="stat-value">₹${stmtMoney(totalProduct)}</div></div><div class="stat"><div class="stat-label">Total daily interest</div><div class="stat-value">₹${stmtMoney(totalInterest)}</div></div><div class="stat"><div class="stat-label">Days in complete months</div><div class="stat-value">${days.length}</div></div></div>
-     <div class="note" style="margin-top:14px"><b>Slab example:</b> If daily product is ₹7,00,000 and slabs are ₹3,00,000 @ 5%, next ₹2,00,000 @ 6%, and balance @ 7%, the daily interest is calculated using the actual number of days in that month. This example uses 365 only as an illustrative annual-day convention; the statement calculation above uses 28/29/30/31 days.</div>`;
+    `<div class="summary" style="margin-top:16px"><div class="stat"><div class="stat-label">Total daily product</div><div class="stat-value">₹${stmtMoney(totalProduct)}</div></div><div class="stat"><div class="stat-label">Total daily interest</div><div class="stat-value">₹${stmtMoney(totalInterest)}</div></div><div class="stat"><div class="stat-label">Calendar days covered</div><div class="stat-value">${days.length}</div></div></div>
+     <div class="note" style="margin-top:14px"><b>Slab example:</b> If daily product is ₹7,00,000 and slabs are ₹3,00,000 @ 5%, next ₹2,00,000 @ 6%, and balance @ 7%, each day's interest is calculated using the 365-day divisor. The statement calculation uses the same 365-day annual divisor for every day.</div>`;
   box.style.display='block';
   document.getElementById('stmtShowDailyBtn').textContent='Hide daily calculation';
 }
@@ -4837,7 +4837,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
 </script>
 
 <script>
-// StatementIQ working Bank Interest engine transplant for Financial Calculators v7.7
+// StatementIQ working Bank Interest engine transplant for Financial Calculators v7.8
 (function(){
   const aliasGroups={
     date:['transaction date','txn date','tran date','value date','posting date','post date','date of transaction','trans date','date'],
@@ -5064,9 +5064,9 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
         openingBalance:x.monthOpening,closingBalance:x.balance};
       const parts=stmtAllocate(x.balance,slabs);
       x.parts=parts;
-      x.interest=parts.reduce((a,p)=>a+p.portion*p.rate/100/x.daysInMonth,0);
+      x.interest=parts.reduce((a,p)=>a+p.portion*p.rate/100/365,0);
       m.dailyProduct+=x.balance;m.calculatedDays++;m.interest+=x.interest;m.closingBalance=x.balance;
-      parts.forEach((p,i)=>{m.slabProducts[i]+=p.portion;m.slabInterest[i]+=p.portion*p.rate/100/x.daysInMonth;});
+      parts.forEach((p,i)=>{m.slabProducts[i]+=p.portion;m.slabInterest[i]+=p.portion*p.rate/100/365;});
     });
 
     // Detect actual bank interest, whether credited or charged/debited.
@@ -5092,7 +5092,9 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
       if(m)excludedMonths.push({month:lastMonth,availableDays:last.getDate(),expectedDays:m.days});
     }
     const excluded=new Set(excludedMonths.map(x=>x.month));
-    const monthly=all.filter(m=>!excluded.has(m.month));
+    // Never suppress partial first/last months. The statement may legitimately
+    // begin or end mid-month, and those available days must be included.
+    const monthly=all;
     const total=monthly.reduce((a,m)=>a+m.interest,0);
     const autoBank=monthly.reduce((a,m)=>a+Math.abs(Number(m.actualInterest||0)),0);
 
