@@ -2149,7 +2149,8 @@ function stmtHeaderInfo(rows){
 }
 
 function populateStatementPreview(rows){
-  stmtRawRows=rows;
+  stmtRawRows=Array.isArray(rows)?rows:[];
+  window.__statementRows=stmtRawRows;
   const maxCols=rows.reduce((m,r)=>Math.max(m,r.length),0);
   const info=stmtHeaderInfo(rows);
   const headers=info.headers;
@@ -3613,22 +3614,38 @@ function stmtScrollTo(id){
   const el=document.getElementById(id);
   if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
 }
-function stmtMenuCalculate(){
-  // Do not rely on the HTML file input after upload. On iOS/Safari the
-  // input's FileList can be cleared or become unavailable even though the
-  // statement has already been parsed successfully into stmtRawRows.
-  // stmtRawRows is the actual source used by the calculator.
-  if(!stmtRawRows || !stmtRawRows.length){
+async function stmtEnsureStatementLoaded(){
+  if(Array.isArray(window.__statementRows) && window.__statementRows.length){
+    stmtRawRows=window.__statementRows;
+    return true;
+  }
+  if(Array.isArray(stmtRawRows) && stmtRawRows.length) return true;
+  const input=document.getElementById('stmtFile');
+  const file=input && input.files && input.files[0];
+  if(!file) return false;
+  const status=document.getElementById('stmtStatus');
+  if(status){status.style.display='block';status.textContent='Reading the uploaded statement…';}
+  try{
+    const rows=await parseStatementFile(file);
+    if(!rows || !rows.length) throw new Error('No rows detected in the uploaded statement.');
+    populateStatementPreview(rows);
+    try{stmtRunAIMapper();}catch(e){console.warn('AI mapper:',e);}
+    return true;
+  }catch(e){
+    if(status)status.textContent='Could not read the uploaded statement: '+e.message;
+    return false;
+  }
+}
+
+async function stmtMenuCalculate(){
+  if(stmtLastResult){ stmtScrollTo('stmtResults'); return; }
+  const loaded=await stmtEnsureStatementLoaded();
+  if(!loaded){
     stmtScrollTo('stmtFile');
     const s=document.getElementById('stmtStatus');
-    if(s){s.style.display='block';s.textContent='Please upload a bank statement first.';}
+    if(s){s.style.display='block';s.textContent='Please upload/select a bank statement first.';}
     return;
   }
-  if(stmtLastResult){
-    stmtScrollTo('stmtResults');
-    return;
-  }
-  // Calculate directly using the detected/mapped columns.
   stmtRunCalculation();
 }
 document.getElementById('stmtMenuCalculate')?.addEventListener('click',stmtMenuCalculate);
@@ -4908,7 +4925,8 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
     return {...r,autoBankInterest:auto,bankInterest:bank,overallDifference:bank!==null?r.total-bank:null};
   };
   window.stmtRunCalculation=function(){
-    if(!stmtRawRows||!stmtRawRows.length){alert('Please upload the bank statement first.');return;}
+    if((!stmtRawRows||!stmtRawRows.length) && Array.isArray(window.__statementRows)) stmtRawRows=window.__statementRows;
+    if(!stmtRawRows||!stmtRawRows.length){alert('Please upload/select the bank statement first.');return;}
     const p=parseRows(stmtRawRows);window.__fiqMapped=p;applyMap(p.map);window.__stmtAIMap=p.map;window.__stmtOpeningClosing={opening:p.opening,closing:p.closing};
     const rows=p.rows||[];
     const status=document.getElementById('stmtStatus');if(status){status.style.display='block';status.textContent=rows.length?'Mapped '+rows.length+' transaction rows. Calculating interest…':'No transaction rows could be mapped. Please check the statement preview.';}
