@@ -4297,6 +4297,71 @@ function openAskMe(){
   askMeLastAutoQuestion='';
   setTimeout(()=>input?.focus(),120);
 }
+
+/* v8.1: immediate spoken arithmetic for simple voice/text commands. */
+function askMeImmediateArithmetic(text){
+  const s=String(text||'').toLowerCase()
+    .replace(/[₹,]/g,'')
+    .replace(/\bmultiplied\s+by\b/g,'*')
+    .replace(/\bmultiply\s+(?:by\s+)?/g,'*')
+    .replace(/\btimes\b/g,'*')
+    .replace(/\bdivided\s+by\b/g,'/')
+    .replace(/\bdivide\s+(?:by\s+)?/g,'/')
+    .replace(/\bplus\b/g,'+')
+    .replace(/\bminus\b/g,'-')
+    .replace(/\badd\b/g,'+')
+    .replace(/\bsubtract\b/g,'-')
+    .replace(/\bover\b/g,'/')
+    .replace(/\bx\b/g,'*')
+    .replace(/\s+/g,' ').trim();
+
+  // Strip natural-language wrappers.
+  let q=s
+    .replace(/^(what\s+is|calculate|compute|please\s+calculate|tell\s+me)\s+/,'')
+    .replace(/^(the\s+)?answer\s+(of|to)\s+/,'')
+    .replace(/\?$/,'').trim();
+
+  // Convert common spoken number words, including hundreds/thousands/lakh/crore.
+  const small={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,
+    eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,
+    eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,
+    eighty:80,ninety:90};
+  const numberWords=/\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|lakh|lakhs|lac|crore|crores)\b/g;
+  function wordsToNumber(match){
+    const ws=match.trim().split(/\s+/), units={hundred:100,thousand:1000,lakh:100000,lac:100000,crore:10000000};
+    let total=0,current=0;
+    for(const w of ws){
+      if(small[w]!=null){current+=small[w];}
+      else if(w==='hundred'){current=(current||1)*100;}
+      else if(units[w]){
+        total += (current||1)*units[w]; current=0;
+      }
+    }
+    return String(total+current);
+  }
+  q=q.replace(numberWords, m=>wordsToNumber(m));
+
+  // Only intercept a pure arithmetic expression. This prevents EMI and other
+  // questions from being misclassified.
+  if(!/^[\d\s()+\-*/%.]+$/.test(q)) return null;
+  if(!/[+\-*/]/.test(q)) return null;
+  try{
+    // Percentage operator: 10% of 500.
+    const pct=q.match(/^(\d+(?:\.\d+)?)%\s*of\s*(\d+(?:\.\d+)?)$/);
+    let value;
+    if(pct)value=Number(pct[1])*Number(pct[2])/100;
+    else{
+      // Safe arithmetic evaluator: expression has already been restricted to
+      // digits/operators/parentheses/decimal/percent only.
+      const expr=q.replace(/(\d+(?:\.\d+)?)%/g,'($1/100)');
+      value=Function('"use strict";return ('+expr+')')();
+    }
+    if(!Number.isFinite(value))return null;
+    const pretty=Number.isInteger(value)?value.toLocaleString('en-IN'):value.toLocaleString('en-IN',{maximumFractionDigits:10});
+    return {value,pretty,spoken:`The answer is ${pretty}.`};
+  }catch(e){return null;}
+}
+
 function closeAppModal(id){
   const el=document.getElementById(id);
   if(id==='askMeModal'){
@@ -4338,6 +4403,18 @@ function askMeNumberPhrase(s){
   return has ? total+current : null;
 }
 function askMeMoney(q){
+  const immediateArithmetic=askMeImmediateArithmetic(userText);
+  if(immediateArithmetic){
+    const answerText=immediateArithmetic.spoken;
+    // Use the same display element used by the existing Ask Me response.
+    if(typeof askMeShowAnswer==='function') askMeShowAnswer(answerText);
+    else if(typeof askMeDisplay==='function') askMeDisplay(answerText);
+    // Auto Reply speaks immediately; no Ask button is required.
+    if(typeof askMeAutoSpeak==='function') askMeAutoSpeak(answerText);
+    else if(typeof speakText==='function' && (document.getElementById('askAutoReply')?.checked || window.askAutoReplyOn)) speakText(answerText);
+    return answerText;
+  }
+
   const s=String(q||'').toLowerCase().replace(/,/g,' ').trim();
 
   // 1) Explicitly labelled amount: "loan amount five lakhs", "amount ₹5 lakh".
@@ -4496,76 +4573,86 @@ function speakAskMeAnswer(){
 
 
 function askMeArithmeticNumberPhrase(s){
-  s=String(s||'').toLowerCase().replace(/,/g,' ').trim();
+  s=String(s||'').toLowerCase().replace(/,/g,' ').replace(/\band\b/g,' ').replace(/\s+/g,' ').trim();
   if(!s)return null;
-  const direct=s.match(/^\s*([0-9]+(?:\.[0-9]+)?)\s*(lakh|lac|lacs|lakhs|crore|crores|cr|thousand|hundred)?\s*$/i);
+  const direct=s.match(/^([0-9]+(?:\.[0-9]+)?)\s*(lakh|lac|lacs|lakhs|crore|crores|cr|million|mn|thousand|hundred)?$/i);
   if(direct){
-    let n=parseFloat(direct[1]), u=(direct[2]||'').toLowerCase();
-    if(u==='hundred')n*=100;
-    else if(u==='thousand')n*=1000;
-    else if(['lakh','lac','lacs','lakhs'].includes(u))n*=100000;
-    else if(['crore','crores','cr'].includes(u))n*=10000000;
+    let n=parseFloat(direct[1]),u=(direct[2]||'').toLowerCase();
+    const mult={hundred:100,thousand:1000,lakh:100000,lac:100000,lacs:100000,lakhs:100000,crore:10000000,crores:10000000,cr:10000000,million:1000000,mn:1000000};
+    if(u)n*=mult[u]||1;
     return isFinite(n)?n:null;
   }
-
-  const ones={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,
-    eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,
-    eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,
-    eighty:80,ninety:90};
-  const tokens=s.split(/\s+/).filter(Boolean);
-  let total=0,current=0,has=false;
+  const ones={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90};
+  const tokens=s.split(/\s+/).filter(Boolean); let total=0,current=0,has=false;
   for(const tok of tokens){
-    if(tok==='and')continue;
     if(Object.prototype.hasOwnProperty.call(ones,tok)){current+=ones[tok];has=true;continue;}
     if(tok==='hundred'){current=(current||1)*100;has=true;continue;}
     if(tok==='thousand'){total+=(current||1)*1000;current=0;has=true;continue;}
     if(['lakh','lac','lacs','lakhs'].includes(tok)){total+=(current||1)*100000;current=0;has=true;continue;}
     if(['crore','crores','cr'].includes(tok)){total+=(current||1)*10000000;current=0;has=true;continue;}
+    if(['million','mn'].includes(tok)){total+=(current||1)*1000000;current=0;has=true;continue;}
     return null;
   }
   return has?total+current:null;
 }
-
 function askMeArithmeticExpression(q){
   let s=String(q||'').toLowerCase().trim();
-  s=s.replace(/[₹,]/g,' ');
-  s=s.replace(/\bwhat\s+is\b/g,' ').replace(/\btell\s+me\b/g,' ')
-   .replace(/\bwhat's\b/g,' ').replace(/\bcalculate\b/g,' ')
+  // Normalise currency/thousands punctuation and common question wording.
+  s=s.replace(/[₹$€£]/g,' ').replace(/,/g,' ')
+   .replace(/\bwhat\s+(?:is|will\s+be)\b/g,' ')
+   .replace(/\btell\s+me\b/g,' ').replace(/\bcalculate\b/g,' ')
    .replace(/\bplease\b/g,' ').replace(/\bcan\s+you\b/g,' ')
    .replace(/\bcould\s+you\b/g,' ').replace(/\bcompute\b/g,' ')
-   .replace(/\bgive\s+me\b/g,' ').replace(/\bwhat\s+will\s+be\b/g,' ');
-  s=s.replace(/\bdivided\s+by\b/g,' / ').replace(/\bdivide\s+by\b/g,' / ')
-   .replace(/\bover\b/g,' / ').replace(/\bmultiplied\s+by\b/g,' * ')
-   .replace(/\bmultiply\s+by\b/g,' * ').replace(/\btimes\b/g,' * ')
-   .replace(/\bplus\b/g,' + ').replace(/\bminus\b/g,' - ')
-   .replace(/\bsubtract\b/g,' - ').replace(/\badd\b/g,' + ')
-   .replace(/\b×/g,' * ').replace(/÷/g,' / ').replace(/−/g,' - ');
+   .replace(/\bgive\s+me\b/g,' ').replace(/\bwhat's\b/g,' ')
+   .replace(/\bhow\s+much\s+is\b/g,' ');
 
-  // "X percent of Y" means X/100 × Y.
-  let pct=s.match(/^\s*(.+?)\s+percent\s+of\s+(.+?)\s*$/);
-  if(pct)s='('+pct[1]+')/100*('+pct[2]+')';
-  else s=s.replace(/\bpercent\b/g,'%');
+  // Percentage phrases: 5% of 200, 5 percent of 200.
+  s=s.replace(/\bpercent\s+of\b/g,' %of ')
+       .replace(/\bpercentage\s+of\b/g,' %of ');
 
-  // Convert each operand independently, so "50 + hundred + 200",
-  // "five hundred + 200", and "one hundred twenty five + 75" all work.
-  const parts=s.split(/([+\-*/%()])/);
-  let out='';
-  for(let i=0;i<parts.length;i++){
-    const part=parts[i];
-    if(!part)continue;
-    if(/^[+\-*/%()]$/.test(part)){out+=part;continue;}
-    const phrase=part.trim();
-    if(!phrase)continue;
-    if(/^[0-9]+(?:\.[0-9]+)?$/.test(phrase)){out+=phrase;continue;}
-    const n=askMeArithmeticNumberPhrase(phrase);
+  // Operators, including natural speech.
+  s=s.replace(/\bdivided\s+by\b/g,' / ')
+   .replace(/\bdivide\s+by\b/g,' / ')
+   .replace(/\bover\b/g,' / ')
+   .replace(/\bmultiplied\s+by\b/g,' * ')
+   .replace(/\bmultiply\s+by\b/g,' * ')
+   .replace(/\btimes\b/g,' * ')
+   .replace(/\bplus\b/g,' + ')
+   .replace(/\bminus\b/g,' - ')
+   .replace(/\bsubtract\b/g,' - ')
+   .replace(/\badd\b/g,' + ')
+   .replace(/\bfrom\b/g,' - ')
+   .replace(/\bmodulo\b/g,' % ')
+   .replace(/\bmod\b/g,' % ')
+   .replace(/\bopen\s+parenthesis\b|\bopen\s+bracket\b/g,' ( ')
+   .replace(/\bclose\s+parenthesis\b|\bclose\s+bracket\b/g,' ) ')
+   .replace(/×/g,' * ').replace(/÷/g,' / ').replace(/−/g,' - ');
+
+  // Convert standalone percentage operands (5% -> 0.05).
+  s=s.replace(/(\d+(?:\.\d+)?)\s*%/g,'($1/100)');
+
+  // Tokenise operators/parentheses first, then parse each natural-language number phrase.
+  // This avoids the old bug where "fifty hundred" or "one hundred twenty five"
+  // was split incorrectly.
+  const tokens=s.split(/(\%of|[+\-*/%()])/).map(x=>x.trim()).filter(Boolean);
+  let out=[];
+  for(let i=0;i<tokens.length;i++){
+    const t=tokens[i];
+    if(/^(?:\%of|[+\-*/%()])$/.test(t)){out.push(t);continue;}
+    // A number phrase may contain spaces. It remains intact because only operators split tokens.
+    if(/^\d+(?:\.\d+)?$/.test(t)){out.push(t);continue;}
+    const n=askMeArithmeticNumberPhrase(t);
     if(n===null)return null;
-    out+=String(n);
+    out.push(String(n));
   }
-  out=out.replace(/\s+/g,'').trim();
-  if(!/^[0-9+\-*/%.()]+$/.test(out)||!/[+\-*/%]/.test(out))return null;
-  out=out.replace(/(\d+(?:\.\d+)?)%/g,'($1/100)');
+  // Handle X %of Y as (X/100)*Y, including word-number operands.
+  let expr=out.join('');
+  expr=expr.replace(/(\d+(?:\.\d+)?)%of(\d+(?:\.\d+)?)/g,'($1/100)*$2');
+  expr=expr.replace(/(\d+(?:\.\d+)?)%of\(([^()]*)\)/g,'($1/100)*($2)');
+  if(!/^[0-9+\-*/().%]+$/.test(expr)||!/[+\-*/%]/.test(expr))return null;
+  expr=expr.replace(/(\d+(?:\.\d+)?)%/g,'($1/100)');
   try{
-    const value=Function('"use strict";return ('+out+')')();
+    const value=Function('"use strict";return ('+expr+')')();
     return (typeof value==='number'&&isFinite(value))?value:null;
   }catch(e){return null;}
 }
@@ -4660,7 +4747,7 @@ function askMeAutoAnswer(){
 function askMeScheduleAutoAnswer(){
   if(!askMeAutoVoice)return;
   clearTimeout(askMeAutoReplyTimer);
-  askMeAutoReplyTimer=setTimeout(()=>askMeAutoAnswer(),1200);
+  askMeAutoReplyTimer=setTimeout(()=>askMeAutoAnswer(),500);
 }
 
 
@@ -4755,6 +4842,12 @@ function askMeSlabEmiAnswer(principal,months,slabs,calc){
     '<button class="btn askme-speak" type="button" onclick="speakAskMeAnswer()">🔊 Read answer aloud</button>';
 }
 
+function askMeSpeakEmiAmount(emi){
+  if(!askMeAutoVoice)return;
+  const amount=askMeINR(emi);
+  setTimeout(()=>askMeSpeakText('Your monthly EMI is '+amount),80);
+}
+
 function answerAskMe(isAutoReply=false){
   const input=document.getElementById('askMeInput'),a=document.getElementById('askMeAnswer');
   const q=(input?.value||'').trim(),ql=q.toLowerCase();
@@ -4782,7 +4875,7 @@ function answerAskMe(isAutoReply=false){
       });
       a.innerHTML=askMeSlabEmiAnswer(principal,months,clean,calc);
       a.classList.add('show');
-      if(askMeAutoVoice)setTimeout(()=>askMeSpeakText(a.innerText),120);
+      if(askMeAutoVoice)askMeSpeakEmiAmount(calc.installment);
       return;
     }
     a.innerHTML='<div class="ask-result-title">Slab-wise EMI</div><div>Please give the <b>loan amount, tenure and slab rates</b>.<br><br>Example: <b>Calculate slab EMI for ₹7 lakh for 60 months: first ₹3 lakh at 5%, next ₹2 lakh at 6%, balance at 7%.</b></div>';
@@ -4805,7 +4898,9 @@ function answerAskMe(isAutoReply=false){
         '<div class="ask-result-row"><span>Total interest</span><b>'+askMeINR(interest)+'</b></div>'+
         '<div class="ask-note">Standard reducing-balance EMI using one annual interest rate.</div>'+
         '<button class="btn askme-speak" type="button" onclick="speakAskMeAnswer()">🔊 Read answer aloud</button>';
-      a.classList.add('show');return;
+      a.classList.add('show');
+      if(askMeAutoVoice)askMeSpeakEmiAmount(emi);
+      return;
     }
     if(/slab|progressive/.test(ql))
       a.innerHTML='<div class="ask-result-title">Slab-wise EMI</div><div>Use the <b>Slab-wise Term Loan EMI</b> calculator and enter the outstanding-balance slabs and annual rates.</div>';
@@ -4823,7 +4918,7 @@ function answerAskMe(isAutoReply=false){
   else
     a.innerHTML='<div class="ask-result-title">I can calculate that</div><div>Try <b>10 + 20</b>, <b>100 × 5</b>, <b>200 ÷ 4</b>, or speak: <b>“125 plus 75 divided by 5”</b>.</div>';
   a.classList.add('show');
-  askMeSpeakText(a.innerText);
+  if(askMeAutoVoice)setTimeout(()=>askMeSpeakText(a.innerText),120);
 }
 </script>
 <script>
