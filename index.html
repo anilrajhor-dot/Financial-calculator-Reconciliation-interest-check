@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v8.1</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v8.2</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -989,7 +989,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.1</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.2</strong>
   </footer>
 </div>
 
@@ -1738,7 +1738,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculators v8.1 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculators v8.2 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -4298,9 +4298,10 @@ function openAskMe(){
   setTimeout(()=>input?.focus(),120);
 }
 
-/* v8.1: immediate spoken arithmetic for simple voice/text commands. */
+/* v8.2: immediate spoken arithmetic for simple voice/text commands. */
 function askMeImmediateArithmetic(text){
-  const s=String(text||'').toLowerCase()
+  const original=String(text||'').trim();
+  let q=original.toLowerCase()
     .replace(/[₹,]/g,'')
     .replace(/\bmultiplied\s+by\b/g,'*')
     .replace(/\bmultiply\s+(?:by\s+)?/g,'*')
@@ -4313,54 +4314,56 @@ function askMeImmediateArithmetic(text){
     .replace(/\bsubtract\b/g,'-')
     .replace(/\bover\b/g,'/')
     .replace(/\bx\b/g,'*')
+    .replace(/\bpercent(?:age)?\s+of\b/g,'%of%')
     .replace(/\s+/g,' ').trim();
 
-  // Strip natural-language wrappers.
-  let q=s
-    .replace(/^(what\s+is|calculate|compute|please\s+calculate|tell\s+me)\s+/,'')
-    .replace(/^(the\s+)?answer\s+(of|to)\s+/,'')
-    .replace(/\?$/,'').trim();
+  q=q.replace(/^(what\s+is|calculate|compute|please\s+calculate|tell\s+me|find)\s+/,'')
+      .replace(/^(the\s+)?answer\s+(of|to)\s+/,'')
+      .replace(/\?$/,'').trim();
 
-  // Convert common spoken number words, including hundreds/thousands/lakh/crore.
   const small={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,
     eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,
     eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,
     eighty:80,ninety:90};
-  const numberWords=/\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|lakh|lakhs|lac|crore|crores)\b/g;
-  function wordsToNumber(match){
-    const ws=match.trim().split(/\s+/), units={hundred:100,thousand:1000,lakh:100000,lac:100000,crore:10000000};
-    let total=0,current=0;
-    for(const w of ws){
-      if(small[w]!=null){current+=small[w];}
-      else if(w==='hundred'){current=(current||1)*100;}
-      else if(units[w]){
-        total += (current||1)*units[w]; current=0;
-      }
+  const scales={hundred:100,thousand:1000,lakh:100000,lac:100000,crore:10000000};
+  function wordNumber(s){
+    let total=0,cur=0;
+    for(const w of s.trim().split(/\s+/)){
+      if(small[w]!=null)cur+=small[w];
+      else if(w==='hundred')cur=(cur||1)*100;
+      else if(scales[w]){ total+=(cur||1)*scales[w];cur=0; }
     }
-    return String(total+current);
+    return total+cur;
   }
-  q=q.replace(numberWords, m=>wordsToNumber(m));
+  q=q.replace(/\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|lakh|lac|crore)(?:\s+(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|lakh|lac|crore))*\b/g,m=>String(wordNumber(m)));
 
-  // Only intercept a pure arithmetic expression. This prevents EMI and other
-  // questions from being misclassified.
-  if(!/^[\d\s()+\-*/%.]+$/.test(q)) return null;
-  if(!/[+\-*/]/.test(q)) return null;
-  try{
-    // Percentage operator: 10% of 500.
-    const pct=q.match(/^(\d+(?:\.\d+)?)%\s*of\s*(\d+(?:\.\d+)?)$/);
-    let value;
-    if(pct)value=Number(pct[1])*Number(pct[2])/100;
-    else{
-      // Safe arithmetic evaluator: expression has already been restricted to
-      // digits/operators/parentheses/decimal/percent only.
+  // Percent forms: "50 percent of 100", "50% of 100", and "50 percentage 100".
+  let value=null;
+  let m=q.match(/^(-?\d+(?:\.\d+)?)\s*%\s*of\s*(-?\d+(?:\.\d+)?)$/);
+  if(m) value=Number(m[1])*Number(m[2])/100;
+  if(value===null){
+    m=q.match(/^(-?\d+(?:\.\d+)?)\s*%of%\s*(-?\d+(?:\.\d+)?)$/);
+    if(m) value=Number(m[1])*Number(m[2])/100;
+  }
+
+  // Plain arithmetic. Require at least one arithmetic operator and only allow
+  // mathematical characters, preventing EMI questions from being intercepted.
+  if(value===null && /^[\d\s()+\-*/%.]+$/.test(q) && /[+\-*/]/.test(q)){
+    try{
       const expr=q.replace(/(\d+(?:\.\d+)?)%/g,'($1/100)');
       value=Function('"use strict";return ('+expr+')')();
-    }
-    if(!Number.isFinite(value))return null;
-    const pretty=Number.isInteger(value)?value.toLocaleString('en-IN'):value.toLocaleString('en-IN',{maximumFractionDigits:10});
-    return {value,pretty,spoken:`The answer is ${pretty}.`};
-  }catch(e){return null;}
+    }catch(e){ value=null; }
+  }
+  if(value===null || !Number.isFinite(value))return null;
+
+  const pretty=Number.isInteger(value)
+    ?value.toLocaleString('en-IN')
+    :value.toLocaleString('en-IN',{maximumFractionDigits:10});
+
+  // IMPORTANT: speech text is ONLY the answer, never the question.
+  return {value,pretty,spoken:pretty};
 }
+
 
 function closeAppModal(id){
   const el=document.getElementById(id);
@@ -4405,13 +4408,27 @@ function askMeNumberPhrase(s){
 function askMeMoney(q){
   const immediateArithmetic=askMeImmediateArithmetic(userText);
   if(immediateArithmetic){
-    const answerText=immediateArithmetic.spoken;
-    // Use the same display element used by the existing Ask Me response.
+    const answerText=immediateArithmetic.pretty;
+    // Display answer only.
     if(typeof askMeShowAnswer==='function') askMeShowAnswer(answerText);
     else if(typeof askMeDisplay==='function') askMeDisplay(answerText);
-    // Auto Reply speaks immediately; no Ask button is required.
-    if(typeof askMeAutoSpeak==='function') askMeAutoSpeak(answerText);
-    else if(typeof speakText==='function' && (document.getElementById('askAutoReply')?.checked || window.askAutoReplyOn)) speakText(answerText);
+
+    // Auto Reply: speak ONLY the result, never the question or explanatory text.
+    const autoOn = !!(window.askAutoReplyOn ||
+      document.getElementById('askAutoReply')?.checked ||
+      document.getElementById('askAutoReplyToggle')?.checked ||
+      document.querySelector('[data-ask-auto-reply]')?.checked);
+    if(autoOn){
+      if(typeof window.speechSynthesis!=='undefined'){
+        try{
+          window.speechSynthesis.cancel();
+          const u=new SpeechSynthesisUtterance(answerText);
+          u.lang=(navigator.language||'en-IN');
+          window.speechSynthesis.speak(u);
+        }catch(e){}
+      }else if(typeof askMeAutoSpeak==='function') askMeAutoSpeak(answerText);
+      else if(typeof speakText==='function') speakText(answerText);
+    }
     return answerText;
   }
 
@@ -4932,7 +4949,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
 </script>
 
 <script>
-// StatementIQ working Bank Interest engine transplant for Financial Calculators v8.1
+// StatementIQ working Bank Interest engine transplant for Financial Calculators v8.2
 (function(){
   const aliasGroups={
     date:['transaction date','txn date','tran date','value date','posting date','post date','date of transaction','trans date','date'],
