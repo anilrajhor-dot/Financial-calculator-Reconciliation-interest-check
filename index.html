@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v5.8</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v5.9</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -978,7 +978,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v5.8</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v5.9</strong>
   </footer>
 </div>
 
@@ -2202,14 +2202,48 @@ function stmtExtractTransactionsUniversal(raw){
     return !parseDateFlexible(dateRaw) && (/^(grand\s+)?total(?:\s+amount)?$|^sub[- ]?total$|^opening\s+balance$|^closing\s+balance$|^brought\s+forward$|^carried\s+forward$|^balance\s*(b\/f|c\/f)$|^statement\s+total$/i.test(cells.join('|')) || /\b(grand\s+total|sub[- ]?total|opening\s+balance|closing\s+balance|brought\s+forward|carried\s+forward|statement\s+total)\b/i.test(joined));
   };
 
-  // Find the row with the strongest combination of known roles. This mirrors
-  // StatementIQ: headers may be several rows below the account information.
+  // Find the ACTUAL transaction header, not a summary header.
+  // Some bank XLSX files place an Opening Balance / Total Debit / Total Credit /
+  // Closing Balance table above the transaction table. That row can score highly
+  // if we only count column names, so a candidate must also have transaction-like
+  // data immediately below it: a readable date plus at least one debit/credit/
+  // amount/balance value. This is the critical fix for IDFC FIRST and Central Bank.
   let header=-1, roles=[];
-  let bestScore=0;
-  for(let i=0;i<Math.min(raw.length,80);i++){
-    const rr=(raw[i]||[]).map(roleFor);
-    const score=rr.filter(Boolean).length + (rr.includes('date')?3:0) + (rr.some(x=>['debit','credit','amount','balance'].includes(x))?3:0);
-    if(score>bestScore && rr.includes('date') && rr.some(x=>['debit','credit','amount','balance'].includes(x))){bestScore=score;header=i;roles=rr;}
+  let bestScore=-1;
+  const moneyRoles=['debit','credit','amount','balance'];
+  const headerLooksLikeSummary=(rr,row)=>{
+    const txt=(row||[]).map(v=>String(v??'').trim().toLowerCase()).join(' | ');
+    return /opening\s+balance|total\s+debit|total\s+credit|closing\s+balance|statement\s+total|grand\s+total/.test(txt) && !/transaction\s+date|post\s+date|posting\s+date/.test(txt);
+  };
+  for(let i=0;i<Math.min(raw.length,120);i++){
+    const row=raw[i]||[];
+    const rr=row.map(roleFor);
+    const hasDate=rr.includes('date');
+    const hasMoney=rr.some(x=>moneyRoles.includes(x));
+    if(!hasDate || !hasMoney || headerLooksLikeSummary(rr,row)) continue;
+
+    // Validate that this really precedes transaction rows. Search a few rows
+    // ahead because banks may insert one blank row after the header.
+    let dataHits=0;
+    for(let j=i+1;j<Math.min(raw.length,i+6);j++){
+      const r=raw[j]||[];
+      const d=parseDateFlexible(r[rr.findIndex(x=>x==='date')]);
+      if(!d) continue;
+      let money=false;
+      rr.forEach((role,c)=>{ if(moneyRoles.includes(role) && String(r[c]??'').trim()!=='') money=true; });
+      if(money) dataHits++;
+    }
+    if(dataHits===0) continue;
+
+    // Prefer a header that explicitly says Transaction Date/Post Date and that
+    // has the full Debit + Credit + Balance structure.
+    const text=row.map(v=>String(v??'').trim().toLowerCase()).join(' | ');
+    let score=rr.filter(Boolean).length;
+    if(/transaction\s+date|post\s+date|posting\s+date/.test(text)) score+=8;
+    if(rr.includes('debit')&&rr.includes('credit')) score+=4;
+    if(rr.includes('balance')) score+=4;
+    score+=dataHits*2;
+    if(score>bestScore){bestScore=score;header=i;roles=rr;}
   }
   if(header<0)return [];
 
@@ -2819,10 +2853,12 @@ function stmtShowDaily(){
 }
 
 function stmtRunCalculation(){
-  // Re-run the known-format detector every time so a changed mapping or
-  // newly uploaded statement cannot leave stale column selections behind.
-  const universal=stmtExtractTransactionsUniversal(stmtRawRows);
-  const rows=universal.length?universal:stmtRowsFromMapping();
+  // Always try the bank-statement structural detector first. It explicitly
+  // distinguishes a summary block (Opening/Total/Closing) from the real
+  // transaction header. Universal detection is only the fallback.
+  const known=stmtRowsFromKnownBankFormat();
+  const universal=known.length?[]:stmtExtractTransactionsUniversal(stmtRawRows);
+  const rows=known.length?known:(universal.length?universal:stmtRowsFromMapping());
   const mapStatus=document.getElementById('stmtStatus');
   if(mapStatus){
     mapStatus.style.display='block';
@@ -2909,13 +2945,14 @@ document.getElementById('stmtFile').addEventListener('change',async e=>{
     const rows=await parseStatementFile(file);
     if(!rows.length)throw new Error('No rows detected in the file.');
     populateStatementPreview(rows);
-    const mapped=stmtExtractTransactionsUniversal(stmtRawRows);
-    status.textContent=mapped.length
-      ? `Loaded "${file.name}" — ${rows.length} rows. Detected ${mapped.length} transaction rows.`
+    const mapped=stmtRowsFromKnownBankFormat();
+    const mappedFallback=mapped.length?mapped:stmtExtractTransactionsUniversal(stmtRawRows);
+    status.textContent=mappedFallback.length
+      ? `Loaded "${file.name}" — ${rows.length} rows. Detected ${mappedFallback.length} transaction rows.`
       : `Loaded "${file.name}" — ${rows.length} rows. Review the column mapping before calculating.`;
-    if(mapped.length){
+    if(mappedFallback.length){
       const s=document.getElementById('stmtStatus');
-      if(s)s.textContent=`Statement ready: ${mapped.length} transactions detected (Date / Debit / Credit / Balance).`;
+      if(s)s.textContent=`Statement ready: ${mappedFallback.length} transactions detected (Date / Debit / Credit / Balance).`;
     }else{
       // Show a useful diagnostic instead of the generic "no transactions"
       // message. This makes file-reading failures immediately identifiable.
@@ -3206,7 +3243,7 @@ try{openLoanMenu('standard');}catch(e){console.warn('Loan calculator menu init:'
 </script>
 
 <script>
-/* ---------- Simple Calculator v5.8 ---------- */
+/* ---------- Simple Calculator v5.9 ---------- */
 let simpleCalcRecognition=null;
 let simpleCalcListening=false;
 let simpleCalcLastResult=null;
