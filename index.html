@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calculator with Bank Interest Comparison</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v8.10</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v8.11</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -914,7 +914,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
 
       <div class="card" id="stmtDailyCard" style="display:none;">
         <div class="stub-title">Daily product calculation</div>
-        <div class="stub-sub" style="margin:4px 0 10px;color:var(--muted)">For each included complete calendar month, every day, closing balance, slab allocation, rate and daily interest are shown below.</div>
+        <div class="stub-sub" style="margin:4px 0 10px;color:var(--muted)">For each month, the summary shows the accumulated daily product (sum of each day’s closing balance), slab-wise products, rates, calculated interest, bank interest entries and other charges. Use “Show daily calculation” for the individual day-by-day products.</div>
         <div class="table-scroll"><table id="stmtDailyTable"></table></div>
         <div id="stmtBalanceSchedule" class="tblwrap" style="margin-top:12px"></div>
 <div id="stmtDailyTotals"></div>
@@ -1012,7 +1012,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.10</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.11</strong>
   </footer>
 </div>
 
@@ -1761,7 +1761,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculator with Bank Interest Comparison v8.10 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculator with Bank Interest Comparison v8.11 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -3427,47 +3427,64 @@ function stmtResetSlabs(){
   stmtSaveSlabs(s);stmtRenderSlabs(s);
 }
 
-function stmtInterestTx(r){
-  const n=String(r?.narration||'').toLowerCase()
+
+function stmtNarrationText(r){
+  return String(r?.narration||'').toLowerCase()
     .replace(/[.\-_/]+/g,' ')
     .replace(/\s+/g,' ')
     .trim();
+}
+function stmtInterestTx(r, previousRow){
+  const n=stmtNarrationText(r);
+  const hasInterest=/\binterest\b|\bint\b|\bintt\b|\bintrest\b|\bloan\s+interest\b|\binterest\s*(debit|credit|charged|debited|credited|applied)\b/.test(n);
+  if(!hasInterest)return {isInterest:false,credit:0,debit:0,net:0,amount:0,type:''};
 
-  // Covers common bank narrations: INTEREST, INT, INTT, INT DEBIT,
-  // INT CHARGED, LOAN INTEREST, INTEREST DEBIT/CREDIT, etc.
-  const hasInterest=/\binterest\b|\bint\b|\bintt\b|\binterest\s*(debit|credit|charged|debited|credited|applied)\b/.test(n);
-  if(!hasInterest)return {isInterest:false,credit:0,debit:0,net:0};
+  let credit=Math.abs(Number(r?.credit||0));
+  let debit=Math.abs(Number(r?.debit||0));
 
-  const creditWords=/\bcredit(?:ed|ing)?\b|\bcr\b|\binterest\s*credit\b|\bint\s*cr\b/.test(n);
-  const debitWords=/\bdebit(?:ed|ing)?\b|\bdr\b|\bcharge(?:d)?\b|\bpaid\b|\binterest\s*debit\b|\bint\s*(dr|debit)\b/.test(n);
-  let credit=Number(r?.credit||0),debit=Number(r?.debit||0);
+  // If the statement exposes only an amount/DR-CR style field and the
+  // mapper could not establish direction, use the running-balance movement.
+  if(credit===0 && debit===0 && previousRow &&
+     r?.balance!=null && previousRow?.balance!=null){
+    const delta=Number(r.balance)-Number(previousRow.balance);
+    if(delta>0) credit=delta;
+    else if(delta<0) debit=-delta;
+  }
 
-  if(credit>0 && debit===0 && !debitWords)return {isInterest:true,credit,debit:0,net:credit};
-  if(debit>0 && credit===0 && !creditWords)return {isInterest:true,credit:0,debit,net:-debit};
+  // Narration direction has priority where it is explicit.
+  const creditWords=/\bcredit(?:ed|ing)?\b|\bcr\b|\binterest\s*credit\b|\bint\s*cr\b|\bcredited\s+by\b/.test(n);
+  const debitWords=/\bdebit(?:ed|ing)?\b|\bdr\b|\binterest\s*debit\b|\bint\s*(dr|debit)\b|\binterest\s+charged\b|\binterest\s+debited\b|\bcharged\s+interest\b/.test(n);
 
-  // If both sides are populated, use explicit narration direction.
-  if(debit>0 && debitWords && !creditWords)return {isInterest:true,credit:0,debit,net:-debit};
-  if(credit>0 && creditWords && !debitWords)return {isInterest:true,credit,debit:0,net:credit};
+  if(debitWords && debit===0 && credit>0){ debit=credit; credit=0; }
+  if(creditWords && credit===0 && debit>0){ credit=debit; debit=0; }
 
-  // Final safe fallback: a plain interest narration with only one amount.
-  if(debit>0 && credit===0)return {isInterest:true,credit:0,debit,net:-debit};
-  if(credit>0 && debit===0)return {isInterest:true,credit,debit:0,net:credit};
+  // If there is still only one side, accept it regardless of narration.
+  if(debit>0 && credit===0)return {isInterest:true,credit:0,debit,net:-debit,amount:debit,type:'Interest charged'};
+  if(credit>0 && debit===0)return {isInterest:true,credit,debit:0,net:credit,amount:credit,type:'Interest credited'};
 
-  return {isInterest:true,credit:0,debit:0,net:0};
+  // Both sides should not normally occur; explicit narration decides.
+  if(debitWords && debit>0)return {isInterest:true,credit:0,debit,net:-debit,amount:debit,type:'Interest charged'};
+  if(creditWords && credit>0)return {isInterest:true,credit,debit:0,net:credit,amount:credit,type:'Interest credited'};
+
+  return {isInterest:true,credit:0,debit:0,net:0,amount:0,type:'Interest — direction unresolved'};
 }
 
-function stmtChargeTx(r){
-  const n=String(r?.narration||'').toLowerCase()
-    .replace(/[.\-_/]+/g,' ')
-    .replace(/\s+/g,' ')
-    .trim();
-  if(!n || stmtInterestTx(r).isInterest)return {isCharge:false,amount:0};
+function stmtChargeTx(r, previousRow){
+  const n=stmtNarrationText(r);
+  if(!n || stmtInterestTx(r, previousRow).isInterest)return {isCharge:false,amount:0,type:''};
 
-  // Keep non-interest bank debits outside interest: quarterly charges,
-  // folio/ledger charges, GST, NeSL, processing/penal charges, etc.
-  const isCharge=/\bcharge\b|\bcharges\b|\bfee\b|\bfees\b|\bgst\b|\bne?sl\b|\bfolio\b|\bfol\s*chg\b|\bpenal\b|\bprocessing\b|\bservice\s*charge\b|\bledger\s*charge\b|\bquarterly\s*charge\b|\bannual\s*charge\b|\bmaintenance\s*charge\b/.test(n);
-  const amount=Number(r?.debit||0);
-  return isCharge && amount>0 ? {isCharge:true,amount}: {isCharge:false,amount:0};
+  const isCharge=/\bcharge\b|\bcharges\b|\bfee\b|\bfees\b|\bgst\b|\bne?sl\b|\bfolio\b|\bfol\s*chg\b|\bpenal\b|\bprocessing\b|\bservice\s*charge\b|\bledger\s*charge\b|\bquarterly\s*charge\b|\bannual\s*charge\b|\bmaintenance\s*charge\b|\bbank\s*charge\b|\bother\s*charge\b|\bcommission\b|\bcommission\s*charge\b|\bcommitment\s*charge\b/.test(n);
+  if(!isCharge)return {isCharge:false,amount:0,type:''};
+
+  let amount=Math.abs(Number(r?.debit||0));
+  if(amount===0 && Number(r?.credit||0)>0) amount=Math.abs(Number(r.credit));
+
+  if(amount===0 && previousRow && r?.balance!=null && previousRow?.balance!=null){
+    const delta=Number(r.balance)-Number(previousRow.balance);
+    // Charges are normally debits; only use a falling balance as a safe fallback.
+    if(delta<0) amount=-delta;
+  }
+  return amount>0 ? {isCharge:true,amount,type:'Other charge'} : {isCharge:false,amount:0,type:''};
 }
 
 function stmtRenderMonthlyProductInterest(result){
@@ -3475,9 +3492,9 @@ function stmtRenderMonthlyProductInterest(result){
   if(!el||!result)return;
   const rows=result.monthly||[], slabs=result.slabs||[];
 
-  let h='<thead><tr><th style="text-align:left">Month</th><th>Calendar days</th><th>Calculated days</th><th>Opening balance</th><th>Daily product</th>';
+  let h='<thead><tr><th style="text-align:left">Month</th><th>Calendar days</th><th>Calculated days</th><th>Opening balance</th><th>Daily product</th><th>Bank interest</th><th>Other charges</th><th>Total calculated interest</th><th>Difference</th>';
   slabs.forEach((s,i)=>h+=`<th>Slab ${i+1} product</th><th>Slab ${i+1} rate</th><th>Slab ${i+1} interest</th>`);
-  h+='<th>Total calculated interest</th><th>Bank interest</th><th>Other charges</th><th>Difference</th></tr></thead><tbody>';
+  h+='</tr></thead><tbody>';
 
   rows.forEach(m=>{
     const bankCredit=Number(m.bankInterestCredited||0);
@@ -3486,9 +3503,9 @@ function stmtRenderMonthlyProductInterest(result){
     const calc=Number(m.interest||0);
     const diff=calc-bank;
 
-    h+=`<tr><td style="text-align:left">${stmtMonthLabel(m.month)}</td><td>${m.days}</td><td>${m.calculatedDays}</td><td>${m.openingBalance==null?'—':'₹'+stmtMoney(m.openingBalance)}</td><td>₹${stmtMoney(m.dailyProduct||0)}</td>`;
+    h+=`<tr><td style="text-align:left">${stmtMonthLabel(m.month)}</td><td>${m.days}</td><td>${m.calculatedDays}</td><td>${m.openingBalance==null?'—':'₹'+stmtMoney(m.openingBalance)}</td><td><b>₹${stmtMoney(m.dailyProduct||0)}</b></td><td>${bank?'₹'+stmtMoney(bank):'—'}</td><td>${m.bankCharges?'₹'+stmtMoney(m.bankCharges):'—'}</td><td><b>₹${stmtMoney(calc)}</b></td><td>${bank?(diff>=0?'+':'−')+'₹'+stmtMoney(Math.abs(diff)):'—'}</td>`;
     slabs.forEach((s,i)=>h+=`<td>₹${stmtMoney((m.slabProducts||[])[i]||0)}</td><td>${Number(s.rate||0).toFixed(2)}%</td><td>₹${stmtMoney((m.slabInterest||[])[i]||0)}</td>`);
-    h+=`<td><b>₹${stmtMoney(calc)}</b></td><td>${bank?'₹'+stmtMoney(bank):'—'}</td><td>${m.bankCharges?'₹'+stmtMoney(m.bankCharges):'—'}</td><td>${bank?(diff>=0?'+':'−')+'₹'+stmtMoney(Math.abs(diff)):'—'}</td></tr>`;
+    h+='</tr>';
   });
 
   const totalProduct=rows.reduce((a,m)=>a+Number(m.dailyProduct||0),0);
@@ -3502,11 +3519,12 @@ function stmtRenderMonthlyProductInterest(result){
 
   h+='<tfoot><tr><th style="text-align:left">TOTAL</th><th></th><th>'+
     rows.reduce((a,m)=>a+Number(m.calculatedDays||0),0)+
-    '</th><th></th><th>₹'+stmtMoney(totalProduct)+'</th>';
-
+    '</th><th></th><th>₹'+stmtMoney(totalProduct)+'</th><th>'+
+    (totalBank?'₹'+stmtMoney(totalBank):'—')+'</th><th>'+
+    (totalCharges?'₹'+stmtMoney(totalCharges):'—')+'</th><th>₹'+stmtMoney(totalCalc)+'</th><th>'+
+    (totalBank?(totalDiff>=0?'+':'−')+'₹'+stmtMoney(Math.abs(totalDiff)):'—')+'</th>';
   slabs.forEach((s,i)=>h+=`<th>₹${stmtMoney(rows.reduce((a,m)=>a+Number((m.slabProducts||[])[i]||0),0))}</th><th>${Number(s.rate||0).toFixed(2)}%</th><th>₹${stmtMoney(rows.reduce((a,m)=>a+Number((m.slabInterest||[])[i]||0),0))}</th>`);
-
-  h+=`<th>₹${stmtMoney(totalCalc)}</th><th>${totalBank?'₹'+stmtMoney(totalBank):'—'}</th><th>${totalCharges?'₹'+stmtMoney(totalCharges):'—'}</th><th>${totalBank?(totalDiff>=0?'+':'−')+'₹'+stmtMoney(Math.abs(totalDiff)):'—'}</th></tr></tfoot>`;
+  h+='</tr></tfoot>';
   el.innerHTML=h;
 }
 
@@ -3609,36 +3627,47 @@ function stmtCalculate(rows,slabs,manualBankInterest){
     });
   });
 
-  // Read the bank's own interest entry from the CURRENT statement only.
-  // Supports Central Bank-style narrations such as INT CR / INTEREST CREDITED
-  // as well as debit/charge variants.  It never carries a previous bank's
-  // detected interest into a newly uploaded statement.
+  // Read and classify bank entries from THIS uploaded statement only.
+  // Interest and other charges are kept separate. Direction is taken from
+  // Debit/Credit first, then from narration, then from running-balance movement.
   let bankInterestCredited=0, bankInterestCharged=0, bankCharges=0;
-  (rows||[]).forEach(r=>{
-    const k=stmtMonthKey(r.date);
-    const m=by[k]??={month:k,days:new Date(r.date.getFullYear(),r.date.getMonth()+1,0).getDate(),
-      calculatedDays:0,dailyProduct:0,interest:0,slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),
-      actualInterest:0,bankInterestCredited:0,bankInterestCharged:0,bankCharges:0,openingBalance:null,closingBalance:null};
+  const bankEntries=[];
+  const sortedRows=[...(rows||[])].sort((a,b)=>a.date-b.date || Number(a.sourceRow||0)-Number(b.sourceRow||0));
 
-    const it=stmtInterestTx(r);
+  sortedRows.forEach((r,idx)=>{
+    const prev=idx>0?sortedRows[idx-1]:null;
+    const k=stmtMonthKey(r.date);
+    const m=by[k]??={
+      month:k,days:new Date(r.date.getFullYear(),r.date.getMonth()+1,0).getDate(),
+      calculatedDays:0,dailyProduct:0,interest:0,
+      slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),
+      actualInterest:0,bankInterestCredited:0,bankInterestCharged:0,bankCharges:0,
+      openingBalance:null,closingBalance:null
+    };
+
+    const it=stmtInterestTx(r,prev);
     if(it.isInterest){
       if(it.credit>0){
         bankInterestCredited+=it.credit;
         m.bankInterestCredited+=it.credit;
         m.actualInterest+=it.credit;
-      }
-      if(it.debit>0){
+        bankEntries.push({date:r.date,narration:r.narration,amount:it.credit,type:'Interest credited'});
+      }else if(it.debit>0){
         bankInterestCharged+=it.debit;
         m.bankInterestCharged+=it.debit;
         m.actualInterest-=it.debit;
+        bankEntries.push({date:r.date,narration:r.narration,amount:it.debit,type:'Interest charged'});
+      }else{
+        bankEntries.push({date:r.date,narration:r.narration,amount:0,type:'Interest — direction unresolved'});
       }
       return;
     }
 
-    const ch=stmtChargeTx(r);
+    const ch=stmtChargeTx(r,prev);
     if(ch.isCharge){
       bankCharges+=ch.amount;
       m.bankCharges+=ch.amount;
+      bankEntries.push({date:r.date,narration:r.narration,amount:ch.amount,type:'Other charge'});
     }
   });
 
@@ -3674,6 +3703,7 @@ function stmtCalculate(rows,slabs,manualBankInterest){
     bankCharges,
     slabs:slabs.map(s=>({...s})),
     bankInterestNet:detectedNet,
+    bankEntries,
     bankInterest,
     overallDifference:bankInterest!==null?total-bankInterest:null,
     calculatedDays:out.length,
@@ -3713,6 +3743,25 @@ function stmtRenderResults(result,slabs){
   });
   h+=`</tbody><tfoot><tr><th style="text-align:left">TOTAL</th><th></th><th>${months.reduce((a,m)=>a+m.calculatedDays,0)}</th><th>₹${stmtMoney(months.reduce((a,m)=>a+m.dailyProduct,0))}</th><th>₹${stmtMoney(result.total)}</th><th>₹${stmtMoney(result.bankInterestCredited||0)}</th><th>₹${stmtMoney(result.bankInterestCharged||0)}</th><th>${bankAvailable?'₹'+stmtMoney(totalBank):'—'}</th><th>${bankAvailable?((diff>=0?'+':'−')+'₹'+stmtMoney(Math.abs(diff||0))):'—'}</th><th></th></tr></tfoot>`;
   document.getElementById('stmtTable').innerHTML=h;
+
+
+  const be=document.getElementById('stmtBankEntriesTable');
+  if(be){
+    const entries=result.bankEntries||[];
+    let eh='<thead><tr><th style="text-align:left">Date</th><th style="text-align:left">Bank narration</th><th>Type</th><th>Amount</th></tr></thead><tbody>';
+    if(!entries.length){
+      eh+='<tr><td colspan="4" style="text-align:left">No interest or charge entries were detected in the uploaded statement.</td></tr>';
+    }else{
+      entries.forEach(ehrow=>{
+        eh+=`<tr><td style="text-align:left">${stmtDate(ehrow.date)}</td><td style="text-align:left">${stmtEsc(ehrow.narration||'')}</td><td>${stmtEsc(ehrow.type)}</td><td>${ehrow.amount?'₹'+stmtMoney(ehrow.amount):'—'}</td></tr>`;
+      });
+    }
+    const ic=entries.filter(e=>e.type==='Interest credited').reduce((a,e)=>a+e.amount,0);
+    const id=entries.filter(e=>e.type==='Interest charged').reduce((a,e)=>a+e.amount,0);
+    const oc=entries.filter(e=>e.type==='Other charge').reduce((a,e)=>a+e.amount,0);
+    eh+=`</tbody><tfoot><tr><th colspan="2" style="text-align:left">Detected totals</th><th>Interest / Charges</th><th>Credit ₹${stmtMoney(ic)} · Debit ₹${stmtMoney(id)} · Other charges ₹${stmtMoney(oc)}</th></tr></tfoot>`;
+    be.innerHTML=eh;
+  }
 
   stmtRenderMonthlyProductInterest(result);
   stmtRenderLoanComparison(result);
@@ -5131,7 +5180,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
 </script>
 
 <script>
-// StatementIQ working Bank Interest engine transplant for Financial Calculator with Bank Interest Comparison v8.10
+// StatementIQ working Bank Interest engine transplant for Financial Calculator with Bank Interest Comparison v8.11
 (function(){
   const aliasGroups={
     date:['transaction date','txn date','tran date','value date','posting date','post date','date of transaction','trans date','date'],
