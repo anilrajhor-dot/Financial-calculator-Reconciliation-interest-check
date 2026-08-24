@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v8.4</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v8.6</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -791,11 +791,12 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="module" id="module-statement">
     <div class="eyebrow">LEDGER &middot; 04 STATEMENT INTEREST</div>
     <h1 class="page-title">Bank Statement Interest Calculator</h1>
-    <p class="lede">Upload a bank statement, map its columns, then compare the bank's interest credit with independently calculated daily-product interest using progressive slabs, with daily interest calculated using a 365-day annual divisor.</p>
+    <p class="lede">Upload a bank or loan statement. The app identifies the transaction columns, separates bank interest from charges, calculates daily-product interest using progressive slabs and a 365-day divisor, and compares the bank's actual interest month by month.</p>
 <div id="statementSubMenu" class="row" style="margin:14px 0 18px;gap:8px;flex-wrap:wrap">
   <button id="stmtMenuCalculate" class="btn primary" type="button">🧮 Calculate Interest</button>
   <button id="stmtMenuMonthly" class="btn" type="button" disabled>📊 Month-wise Interest</button>
   <button id="stmtMenuDaily" class="btn" type="button" disabled>📅 Daily Product</button>
+  <button id="stmtMenuLoan" class="btn" type="button" disabled>🏦 Loan Interest Comparison</button>
   <button id="stmtMenuSettings" class="btn" type="button">⚙ Interest Settings</button>
   <button id="stmtMenuReset" class="btn" type="button">↺ Reset</button>
 </div>
@@ -881,9 +882,33 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
     <div id="stmtResults" style="display:none;">
       <div class="summary" id="stmtSummary"></div>
 
+      <div class="card input-card" id="stmtLoanComparisonCard" style="display:none;margin-bottom:24px;">
+        <div class="stub-title">🏦 Loan statement interest comparison</div>
+        <div class="stub-sub" style="margin:4px 0 14px;color:var(--muted)">
+          The app separates interest charged by the bank from other charges, calculates independent daily-product interest, compares both month by month, and derives the effective annual rate implied by the bank's interest debits.
+        </div>
+        <div id="stmtLoanComparisonSummary" class="summary"></div>
+        <div id="stmtLoanComparisonNote" class="note" style="margin-top:14px"></div>
+
+        <div class="stub-title" style="margin-top:22px">📊 Slab-wise rate of interest applied</div>
+        <div class="stub-sub" style="margin:4px 0 12px;color:var(--muted)">
+          The outstanding balance is split progressively across the configured slabs. Each slab earns only its own rate. Interest is calculated daily using the applicable slab rate and divided by 365.
+        </div>
+        <div class="table-scroll">
+          <table id="stmtLoanSlabTable"></table>
+        </div>
+
+        <div class="table-scroll" style="margin-top:14px">
+          <table id="stmtLoanComparisonTable"></table>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button id="stmtApplyInferredRateBtn" class="btn" type="button">↻ Use inferred bank rate for recalculation</button>
+        </div>
+      </div>
+
       <div class="card ledger">
         <div class="stub">
-          <div class="stub-title">Month-wise interest — complete months only</div>
+          <div class="stub-title">Month-wise interest — every available month</div>
           <div class="stub-sub" id="stmtLedgerSub"></div>
         </div>
         <div class="table-scroll"><table id="stmtTable"></table></div>
@@ -989,7 +1014,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.4</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.6</strong>
   </footer>
 </div>
 
@@ -1738,7 +1763,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculators v8.4 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculators v8.6 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -3373,8 +3398,10 @@ function stmtPersistSlabs(){
   const slabs=stmtNormaliseSlabs(stmtSlabRows());
   stmtSaveSlabs(slabs);
   stmtLastResult=null;
+  document.getElementById('stmtLoanComparisonCard')?.style.setProperty('display','none');
   document.getElementById('stmtMenuMonthly')?.setAttribute('disabled','disabled');
   document.getElementById('stmtMenuDaily')?.setAttribute('disabled','disabled');
+  document.getElementById('stmtMenuLoan')?.setAttribute('disabled','disabled');
   stmtRenderSlabs(slabs);
 }
 function stmtAddSlab(){
@@ -3417,6 +3444,91 @@ function stmtInterestTx(r){
   return {isInterest:true,credit:0,debit:0,net:0};
 }
 
+
+function stmtChargeTx(r){
+  const n=String(r?.narration||'').toLowerCase().replace(/[.\-_/]+/g,' ').replace(/\s+/g,' ').trim();
+  if(!n || stmtInterestTx(r).isInterest) return {isCharge:false,amount:0};
+  const isCharge=/\bcharge\b|\bcharges\b|\bfee\b|\bfees\b|\bgst\b|\bne?sl\b|\bfolio\b|\bfol\s*chg\b|\bpenal\b|\bprocessing\b/.test(n);
+  if(!isCharge) return {isCharge:false,amount:0};
+  const amount=Number(r?.debit||0);
+  return amount>0?{isCharge:true,amount}: {isCharge:false,amount:0};
+}
+
+function stmtRenderLoanComparison(result){
+  const card=document.getElementById('stmtLoanComparisonCard');
+  if(!card || !result || result.error){ if(card)card.style.display='none'; return; }
+
+  const rows=result.monthly||[];
+  const bankCharged=Number(result.bankInterestCharged||0);
+  const calc=Number(result.total||0);
+  const diff=calc-bankCharged;
+  const product=rows.reduce((a,m)=>a+Number(m.dailyProduct||0),0);
+  const inferred=bankCharged>0 && product>0 ? bankCharged*365/product*100 : null;
+  const totalCharges=Number(result.bankCharges||0);
+  const opening=result.opening!==null&&result.opening!==undefined?result.opening:null;
+  const closing=result.closing!==null&&result.closing!==undefined?result.closing:null;
+
+  const summary=[
+    {label:'Bank interest charged',value:'₹ '+stmtMoney(bankCharged)},
+    {label:'Calculated interest',value:'₹ '+stmtMoney(calc)},
+    {label:'Difference',value:(diff>=0?'+':'−')+'₹ '+stmtMoney(Math.abs(diff))},
+    {label:'Effective rate implied by bank',value:inferred===null?'—':inferred.toFixed(4)+'% p.a.'},
+    {label:'Other bank charges',value:'₹ '+stmtMoney(totalCharges)},
+    {label:'Days calculated',value:String(result.calculatedDays||0)}
+  ];
+  document.getElementById('stmtLoanComparisonSummary').innerHTML=summary.map(s=>
+    `<div class="stat"><div class="stat-label">${s.label}</div><div class="stat-value">${s.value}</div></div>`).join('');
+
+  const tolerance=Math.max(0.50, bankCharged*0.0005);
+  const match=Math.abs(diff)<=tolerance;
+  document.getElementById('stmtLoanComparisonNote').innerHTML=
+    `<b>${match?'Close match':'Review required'}.</b> `+
+    `Interest debits containing terms such as “Interest” are treated as bank interest. `+
+    `GST, folio/quarterly charges, NeSL and other fee entries are kept outside interest. `+
+    (inferred!==null?`The bank's actual interest debits imply an effective blended rate of <b>${inferred.toFixed(4)}% p.a.</b> based on total daily product and the 365-day formula. The independent calculation below uses the configured slab rates separately. `:'')+
+    (opening!==null?`Opening balance used: <b>₹${stmtMoney(opening)}</b>. `:'')+
+    (closing!==null?`Closing balance: <b>₹${stmtMoney(closing)}</b>.`:'');
+
+  let h='<thead><tr><th style="text-align:left">Month</th><th>Days</th><th>Opening balance</th><th>Closing balance</th><th>Daily product</th><th>Calculated interest</th><th>Bank interest charged</th><th>Difference</th><th>Other charges</th><th>Implied rate</th></tr></thead><tbody>';
+  rows.forEach(m=>{
+    const b=Number(m.bankInterestCharged||0);
+    const c=Number(m.interest||0);
+    const p=Number(m.dailyProduct||0);
+    const d=c-b;
+    const rate=b>0&&p>0 ? b*365/p*100 : null;
+    h+=`<tr><td style="text-align:left">${stmtMonthLabel(m.month)}</td><td>${m.calculatedDays}</td><td>${m.openingBalance===null||m.openingBalance===undefined?'—':'₹'+stmtMoney(m.openingBalance)}</td><td>${m.closingBalance===null||m.closingBalance===undefined?'—':'₹'+stmtMoney(m.closingBalance)}</td><td>₹${stmtMoney(p)}</td><td>₹${stmtMoney(c)}</td><td>${b?'₹'+stmtMoney(b):'—'}</td><td>${b?(d>=0?'+':'−')+'₹'+stmtMoney(Math.abs(d)):'—'}</td><td>${m.bankCharges?'₹'+stmtMoney(m.bankCharges):'—'}</td><td>${rate===null?'—':rate.toFixed(4)+'%'}</td></tr>`;
+  });
+  h+='</tbody><tfoot><tr><th style="text-align:left">TOTAL</th><th>'+rows.reduce((a,m)=>a+Number(m.calculatedDays||0),0)+'</th><th></th><th></th><th>₹'+stmtMoney(product)+'</th><th>₹'+stmtMoney(calc)+'</th><th>₹'+stmtMoney(bankCharged)+'</th><th>'+(diff>=0?'+':'−')+'₹'+stmtMoney(Math.abs(diff))+'</th><th>₹'+stmtMoney(totalCharges)+'</th><th>'+(inferred===null?'—':inferred.toFixed(4)+'%')+'</th></tr></tfoot>';
+  document.getElementById('stmtLoanComparisonTable').innerHTML=h;
+
+  // Slab-wise rate/product/interest summary across the complete statement.
+  const slabRows=(result.slabs||[]).map((slab,i)=>{
+    const product=rows.reduce((a,m)=>a+Number((m.slabProducts||[])[i]||0),0);
+    const interest=rows.reduce((a,m)=>a+Number((m.slabInterest||[])[i]||0),0);
+    const lower=i===0?0:Number((result.slabs||[])[i-1]?.to||0);
+    const upper=slab.to===null?'Above '+(i?('₹'+stmtMoney(lower)):'₹0'):'₹'+stmtMoney(slab.to);
+    return {i,range:i===0&&slab.to!==null?'₹0 – ₹'+stmtMoney(slab.to):upper,rate:Number(slab.rate||0),product,interest};
+  });
+  let sh='<thead><tr><th style="text-align:left">Slab</th><th>Balance range</th><th>Rate p.a.</th><th>Daily product</th><th>Calculated interest</th></tr></thead><tbody>';
+  slabRows.forEach(x=>{
+    sh+=`<tr><td style="text-align:left">Slab ${x.i+1}</td><td>${x.range}</td><td><b>${x.rate.toFixed(2)}%</b></td><td>₹${stmtMoney(x.product)}</td><td>₹${stmtMoney(x.interest)}</td></tr>`;
+  });
+  sh+=`</tbody><tfoot><tr><th style="text-align:left">TOTAL</th><th></th><th></th><th>₹${stmtMoney(slabRows.reduce((a,x)=>a+x.product,0))}</th><th>₹${stmtMoney(slabRows.reduce((a,x)=>a+x.interest,0))}</th></tr></tfoot>`;
+  document.getElementById('stmtLoanSlabTable').innerHTML=sh;
+  card.style.display='block';
+
+  const btn=document.getElementById('stmtApplyInferredRateBtn');
+  if(btn){
+    btn.disabled=inferred===null;
+    btn.onclick=()=>{
+      if(inferred===null)return;
+      const one=[{to:null,rate:Number(inferred.toFixed(6))}];
+      stmtSaveSlabs(one); stmtRenderSlabs(one);
+      stmtRunCalculation();
+    };
+  }
+}
+
 function stmtCalculate(rows,slabs,manualBankInterest){
   const daily=stmtBuildDaily(rows);
   if(!daily.days.length)return {...daily,monthly:[],total:0};
@@ -3438,7 +3550,7 @@ function stmtCalculate(rows,slabs,manualBankInterest){
     const m=by[x.month]??={
       month:x.month,days:x.daysInMonth,calculatedDays:0,dailyProduct:0,interest:0,
       slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),
-      actualInterest:0,bankInterestCredited:0,bankInterestCharged:0,
+      actualInterest:0,bankInterestCredited:0,bankInterestCharged:0,bankCharges:0,
       openingBalance:x.openingBalance??null,closingBalance:x.balance
     };
     m.dailyProduct+=x.balance;
@@ -3462,7 +3574,7 @@ function stmtCalculate(rows,slabs,manualBankInterest){
     const k=stmtMonthKey(r.date);
     const m=by[k]??={month:k,days:new Date(r.date.getFullYear(),r.date.getMonth()+1,0).getDate(),
       calculatedDays:0,dailyProduct:0,interest:0,slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),
-      actualInterest:0,bankInterestCredited:0,bankInterestCharged:0,openingBalance:null,closingBalance:null};
+      actualInterest:0,bankInterestCredited:0,bankInterestCharged:0,bankCharges:0,openingBalance:null,closingBalance:null};
     if(it.credit>0){
       bankInterestCredited+=it.credit;
       m.bankInterestCredited+=it.credit;
@@ -3477,6 +3589,12 @@ function stmtCalculate(rows,slabs,manualBankInterest){
 
   const monthly=Object.values(by).sort((a,b)=>a.month.localeCompare(b.month));
   monthly.forEach(m=>{
+    const firstDay=out.find(x=>x.month===m.month);
+    if(firstDay){
+      const prev=new Date(firstDay.date); prev.setDate(prev.getDate()-1);
+      const prevDay=out.find(x=>stmtDayKey(x.date)===stmtDayKey(prev));
+      m.openingBalance=prevDay?prevDay.balance:(firstDay.openingBalance??firstDay.balance);
+    }
     m.bankInterestNet=(m.bankInterestCredited||0)-(m.bankInterestCharged||0);
     m.bankInterestMagnitude=Math.abs(m.bankInterestNet);
     // A partial first/last month is retained in the table; it is not silently
@@ -3498,6 +3616,8 @@ function stmtCalculate(rows,slabs,manualBankInterest){
     autoBankInterest:detectedMagnitude,
     bankInterestCredited:bankInterestCredited,
     bankInterestCharged:bankInterestCharged,
+    bankCharges,
+    slabs:slabs.map(x=>({...x})),
     bankInterestNet:detectedNet,
     bankInterest,
     overallDifference:bankInterest!==null?total-bankInterest:null,
@@ -3538,6 +3658,8 @@ function stmtRenderResults(result,slabs){
   });
   h+=`</tbody><tfoot><tr><th style="text-align:left">TOTAL</th><th></th><th>${months.reduce((a,m)=>a+m.calculatedDays,0)}</th><th>₹${stmtMoney(months.reduce((a,m)=>a+m.dailyProduct,0))}</th><th>₹${stmtMoney(result.total)}</th><th>₹${stmtMoney(result.bankInterestCredited||0)}</th><th>₹${stmtMoney(result.bankInterestCharged||0)}</th><th>${bankAvailable?'₹'+stmtMoney(totalBank):'—'}</th><th>${bankAvailable?((diff>=0?'+':'−')+'₹'+stmtMoney(Math.abs(diff||0))):'—'}</th><th></th></tr></tfoot>`;
   document.getElementById('stmtTable').innerHTML=h;
+
+  stmtRenderLoanComparison(result);
 
   document.getElementById('stmtExcludedMonthsNote')?.remove();
   const partialMonths=months.filter(m=>m.partial);
@@ -3648,6 +3770,7 @@ function stmtRunCalculation(){
     : `Interest calculated for ${(result.monthly||[]).length} complete month(s).`;
   document.getElementById('stmtMenuMonthly')?.removeAttribute('disabled');
   document.getElementById('stmtMenuDaily')?.removeAttribute('disabled');
+  document.getElementById('stmtMenuLoan')?.removeAttribute('disabled');
 }
 
 
@@ -3697,6 +3820,10 @@ document.getElementById('stmtMenuMonthly')?.addEventListener('click',()=>{
   }
   stmtScrollTo('stmtResults');
 });
+document.getElementById('stmtMenuLoan')?.addEventListener('click',()=>{
+  const c=document.getElementById('stmtLoanComparisonCard');
+  if(c){c.scrollIntoView({behavior:'smooth',block:'start'});}
+});
 document.getElementById('stmtMenuDaily')?.addEventListener('click',()=>{
   if(!stmtLastResult){
     stmtMenuCalculate();
@@ -3732,6 +3859,7 @@ document.getElementById('stmtFile').addEventListener('change',async e=>{
   if(bankInterestInput) bankInterestInput.value='';
   document.getElementById('stmtMenuMonthly')?.setAttribute('disabled','disabled');
   document.getElementById('stmtMenuDaily')?.setAttribute('disabled','disabled');
+  document.getElementById('stmtMenuLoan')?.setAttribute('disabled','disabled');
 
   stmtShowPdfPasswordBox(/\.pdf$/i.test((e.target.files&&e.target.files[0]&&e.target.files[0].name)||''));
   const file=e.target.files[0]; if(!file)return;
@@ -3815,6 +3943,7 @@ document.getElementById('stmtResetBtn').addEventListener('click',()=>{
   document.getElementById('stmtBankInterest').value='';
   document.getElementById('stmtMenuMonthly')?.setAttribute('disabled','disabled');
   document.getElementById('stmtMenuDaily')?.setAttribute('disabled','disabled');
+  document.getElementById('stmtMenuLoan')?.setAttribute('disabled','disabled');
 });
 stmtRenderSlabs(stmtLoadSlabs());
 
@@ -4946,7 +5075,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
 </script>
 
 <script>
-// StatementIQ working Bank Interest engine transplant for Financial Calculators v8.4
+// StatementIQ working Bank Interest engine transplant for Financial Calculators v8.6
 (function(){
   const aliasGroups={
     date:['transaction date','txn date','tran date','value date','posting date','post date','date of transaction','trans date','date'],
@@ -5234,6 +5363,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
     if(!rows.length){alert('No valid transactions were found.\n\nThe workbook was read, but the working StatementIQ mapper could not identify transaction rows. It checks Date, Debit, Credit, Amount, DR/CR and Balance using both headings and the actual values. Please check the preview.');return;}
     const slabs=stmtNormaliseSlabs(stmtSlabRows());const errors=stmtValidateSlabs(slabs);if(errors.length){alert(errors.join('\n'));return;}stmtSaveSlabs(slabs);
     const manual=(document.getElementById('stmtBankInterest')?.value||'').trim();const manualVal=manual===''?null:Number(manual);const result=window.stmtCalculate(rows,slabs,manualVal);stmtRenderResults(result,slabs);if(status)status.textContent=result.error?'Calculation needs attention: '+result.error:'Interest calculated for '+(result.monthly||[]).length+' month(s).';document.getElementById('stmtMenuMonthly')?.removeAttribute('disabled');document.getElementById('stmtMenuDaily')?.removeAttribute('disabled');
+  document.getElementById('stmtMenuLoan')?.removeAttribute('disabled');
   };
 })();
 
