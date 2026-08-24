@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calculator with Bank Interest Comparison</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v8.11</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v8.12</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -1012,7 +1012,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.11</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.12</strong>
   </footer>
 </div>
 
@@ -1761,7 +1761,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculator with Bank Interest Comparison v8.11 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculator with Bank Interest Comparison v8.12 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -3720,6 +3720,7 @@ function stmtRenderResults(result,slabs){
   }
   const months=result.monthly||[];
   const totalBank=result.bankInterest;
+  const bankCharged=Number(result.bankInterestCharged||0), bankCredited=Number(result.bankInterestCredited||0);
   const diff=result.overallDifference;
   const bankAvailable=totalBank!==null&&totalBank!==undefined;
   const bankSource=(document.getElementById('stmtBankInterest').value.trim()!=='')?'Manual / entered':'Detected from CURRENT statement interest transactions';
@@ -3727,6 +3728,7 @@ function stmtRenderResults(result,slabs){
     {label:'Calculated interest',value:'₹ '+stmtMoney(result.total),cls:''},
     {label:'Bank interest credited',value:'₹ '+stmtMoney(result.bankInterestCredited||0),cls:''},
     {label:'Bank interest charged',value:'₹ '+stmtMoney(result.bankInterestCharged||0),cls:''},
+    {label:'Other bank charges',value:'₹ '+stmtMoney(result.bankCharges||0),cls:''},
     {label:'Net bank interest',value:bankAvailable?'₹ '+stmtMoney(totalBank):'Not detected',cls:''},
     {label:'Difference',value:bankAvailable?((diff>=0?'+':'−')+'₹ '+stmtMoney(Math.abs(diff||0))):'—',cls:bankAvailable?(Math.abs(diff||0)<0.01?'stmt-good':'stmt-review'):''},
     {label:'Days calculated',value:String((result.calculatedDays??(result.daily||[]).length)),cls:''}
@@ -3779,7 +3781,7 @@ function stmtRenderResults(result,slabs){
   if(result.firstMonthMode==='from-first-transaction') note += ' No brought-forward balance was available, so the first available month starts on '+stmtDate(result.startDate)+' using the first transaction-day closing balance.';
   else if(result.firstMonthMode==='from-first-day-closing-balance') note += ' The first transaction is on the 1st and no separate brought-forward balance was available, so its supplied closing balance is used as the 1st-day balance.';
   else if(result.firstMonthMode==='from-opening-balance'||result.firstMonthMode==='full') note += ' The available opening / brought-forward balance is used to establish the daily balances.';
-  note += ' Bank interest is detected from the current statement narration and current credit/debit amounts only; previous uploads are not used.';
+  note += ' Bank interest and other charges are detected from the current statement transaction narration, Debit/Credit/Amount/DR-CR and running-balance movement; previous uploads are not used. Interest and charges are kept separate.';
   document.getElementById('stmtLedgerSub').insertAdjacentHTML('afterend',`<div class="note" style="margin:10px 20px">${stmtEsc(note)}</div>`);
   document.getElementById('stmtResults').style.display='block';
   document.getElementById('stmtDailyCard').style.display='none';
@@ -5180,7 +5182,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
 </script>
 
 <script>
-// StatementIQ working Bank Interest engine transplant for Financial Calculator with Bank Interest Comparison v8.11
+// StatementIQ working Bank Interest engine transplant for Financial Calculator with Bank Interest Comparison v8.12
 (function(){
   const aliasGroups={
     date:['transaction date','txn date','tran date','value date','posting date','post date','date of transaction','trans date','date'],
@@ -5353,16 +5355,12 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
     let startDate,firstMonthMode='from-opening-balance';
     if(opening===null||!Number.isFinite(opening)){
       if(first.getDate()>1){
-        startDate=first; opening=Number(rs[0].balance||0);
-        firstMonthMode='from-first-transaction';
+        startDate=first; opening=Number(rs[0].balance||0); firstMonthMode='from-first-transaction';
       }else{
         startDate=new Date(first.getFullYear(),first.getMonth(),1);
-        opening=Number(rs[0].balance||0);
-        firstMonthMode='from-first-day-closing-balance';
+        opening=Number(rs[0].balance||0); firstMonthMode='from-first-day-closing-balance';
       }
-    }else{
-      startDate=new Date(first.getFullYear(),first.getMonth(),1);
-    }
+    }else startDate=new Date(first.getFullYear(),first.getMonth(),1);
 
     const byDay={};
     rs.forEach(r=>{const k=stmtDayKey(r.date);(byDay[k]=byDay[k]||[]).push(r);});
@@ -5373,22 +5371,25 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
 
     for(let d=new Date(startDate);d<=end;d.setDate(d.getDate()+1)){
       const k=stmtDayKey(d),tx=byDay[k]||[],m=stmtMonthKey(d);
-      if(m!==currentMonth){
-        if(currentMonth!==null)balance=Number(days[days.length-1].balance);
-        currentMonth=m;monthOpening=balance;
-      }
+      if(m!==currentMonth){ currentMonth=m; monthOpening=balance; }
       const openingForDay=balance;
       if(tx.length){
         const wb=tx.filter(r=>r.balance!==null&&Number.isFinite(Number(r.balance)));
         if(wb.length){
-          // Exclude the interest credit/debit itself from that day's
-          // interest-bearing closing balance when a pre-interest balance exists.
-          const interestTx=tx.filter(r=>/interest|int\.?\s*(credit|credited|debit|debited|charge|charged|paid|payment)/i.test(r.narration||''));
-          balance=interestTx.length&&wb.length>=2
-            ?Number(wb[wb.length-2].balance)
-            :Number(wb[wb.length-1].balance);
+          // Interest/charges posted on a day must not earn interest on that same day.
+          // Use the last balance before those non-interest-bearing bank postings.
+          let operational=wb;
+          const special=tx.filter(r=>stmtInterestTx(r).isInterest||stmtChargeTx(r).isCharge);
+          if(special.length&&wb.length>=2) operational=wb.slice(0,-1);
+          balance=Number((operational.length?operational[operational.length-1]:wb[wb.length-1]).balance);
         }else{
-          tx.forEach(r=>{balance+=Number(r.credit||0)-Number(r.debit||0);});
+          tx.forEach(r=>{
+            const special=stmtInterestTx(r).isInterest||stmtChargeTx(r).isCharge;
+            balance += Number(r.credit||0)-Number(r.debit||0);
+            // The posted charge/interest remains part of the running balance for
+            // subsequent days, but not for the current day's interest basis.
+            if(special) balance -= Number(r.credit||0)-Number(r.debit||0);
+          });
         }
       }
       days.push({date:new Date(d),month:m,daysInMonth:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),
@@ -5397,55 +5398,70 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
 
     const firstMonth=stmtMonthKey(first),lastMonth=stmtMonthKey(last);
     const lastDay=new Date(last.getFullYear(),last.getMonth()+1,0).getDate();
-    const firstComplete=startDate.getDate()===1;
-    const lastComplete=last.getDate()===lastDay;
+    const firstComplete=startDate.getDate()===1, lastComplete=last.getDate()===lastDay;
 
     const monthlyMap={};
     days.forEach(x=>{
       const m=monthlyMap[x.month]??={month:x.month,days:x.daysInMonth,calculatedDays:0,dailyProduct:0,interest:0,
-        slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),actualInterest:0,
+        slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),
+        actualInterest:0,bankInterestCredited:0,bankInterestCharged:0,bankCharges:0,
         openingBalance:x.monthOpening,closingBalance:x.balance};
-      const parts=stmtAllocate(x.balance,slabs);
+      const parts=allocate(x.balance,slabs);
       x.parts=parts;
       x.interest=parts.reduce((a,p)=>a+p.portion*p.rate/100/365,0);
-      m.dailyProduct+=x.balance;m.calculatedDays++;m.interest+=x.interest;m.closingBalance=x.balance;
-      parts.forEach((p,i)=>{m.slabProducts[i]+=p.portion;m.slabInterest[i]+=p.portion*p.rate/100/365;});
+      m.dailyProduct+=x.balance; m.calculatedDays++; m.interest+=x.interest; m.closingBalance=x.balance;
+      parts.forEach((p,i)=>{
+        m.slabProducts[i]+=p.portion;
+        m.slabInterest[i]+=p.portion*p.rate/100/365;
+      });
     });
 
-    // Detect actual bank interest, whether credited or charged/debited.
-    rs.forEach(r=>{
-      const narration=String(r.narration||'');
-      if((r.credit>0||r.debit>0)&&/interest|int\.?\s*(credit|credited|debit|debited|charge|charged|paid|payment)/i.test(narration)){
-        const k=stmtMonthKey(r.date);
-        const m=monthlyMap[k]??={month:k,days:new Date(r.date.getFullYear(),r.date.getMonth()+1,0).getDate(),
-          calculatedDays:0,dailyProduct:0,interest:0,slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),
-          actualInterest:0,openingBalance:null,closingBalance:null};
-        m.actualInterest += Number(r.credit||0)-Number(r.debit||0);
+    // Capture the actual bank entries from THIS statement. Interest and charges
+    // are deliberately separated so a quarterly fee is never treated as interest.
+    let bankInterestCredited=0,bankInterestCharged=0,bankCharges=0;
+    const bankEntries=[];
+    rs.forEach((r,i)=>{
+      const prev=i?rs[i-1]:null;
+      const k=stmtMonthKey(r.date);
+      const m=monthlyMap[k]??={month:k,days:new Date(r.date.getFullYear(),r.date.getMonth()+1,0).getDate(),
+        calculatedDays:0,dailyProduct:0,interest:0,slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),
+        actualInterest:0,bankInterestCredited:0,bankInterestCharged:0,bankCharges:0,openingBalance:null,closingBalance:null};
+      const it=stmtInterestTx(r,prev);
+      if(it.isInterest){
+        if(it.credit>0){
+          bankInterestCredited+=it.credit; m.bankInterestCredited+=it.credit; m.actualInterest+=it.credit;
+          bankEntries.push({date:r.date,narration:r.narration,amount:it.credit,type:'Interest credited'});
+        }else if(it.debit>0){
+          bankInterestCharged+=it.debit; m.bankInterestCharged+=it.debit; m.actualInterest-=it.debit;
+          bankEntries.push({date:r.date,narration:r.narration,amount:it.debit,type:'Interest charged'});
+        }else bankEntries.push({date:r.date,narration:r.narration,amount:0,type:'Interest — direction unresolved'});
+        return;
+      }
+      const ch=stmtChargeTx(r,prev);
+      if(ch.isCharge){
+        bankCharges+=ch.amount; m.bankCharges+=ch.amount;
+        bankEntries.push({date:r.date,narration:r.narration,amount:ch.amount,type:'Other charge'});
       }
     });
 
     const all=Object.values(monthlyMap).sort((a,b)=>a.month.localeCompare(b.month));
-    const excludedMonths=[];
-    if(!firstComplete){
-      const m=all.find(x=>x.month===firstMonth);
-      if(m)excludedMonths.push({month:firstMonth,availableDays:first.getDate(),expectedDays:m.days});
-    }
-    if(!lastComplete&&lastMonth!==firstMonth){
-      const m=all.find(x=>x.month===lastMonth);
-      if(m)excludedMonths.push({month:lastMonth,availableDays:last.getDate(),expectedDays:m.days});
-    }
-    const excluded=new Set(excludedMonths.map(x=>x.month));
-    // Never suppress partial first/last months. The statement may legitimately
-    // begin or end mid-month, and those available days must be included.
-    const monthly=all;
-    const total=monthly.reduce((a,m)=>a+m.interest,0);
-    const autoBank=monthly.reduce((a,m)=>a+Math.abs(Number(m.actualInterest||0)),0);
-
-    return {daily:days,monthly,allMonthly:all,excludedMonths,total,autoBankInterest:autoBank,
-      bankSignedInterest:monthly.reduce((a,m)=>a+Number(m.actualInterest||0),0),
+    all.forEach(m=>{
+      m.bankInterestNet=(m.bankInterestCredited||0)-(m.bankInterestCharged||0);
+      m.bankInterestMagnitude=Math.abs(m.bankInterestNet);
+      m.partial=m.calculatedDays>0&&m.calculatedDays<m.days;
+    });
+    const total=all.reduce((a,m)=>a+m.interest,0);
+    const detectedNet=bankInterestCredited-bankInterestCharged;
+    const detectedMagnitude=Math.abs(detectedNet);
+    return {
+      daily:days,monthly:all,allMonthly:all,total,
+      autoBankInterest:detectedMagnitude,
+      bankInterestCredited,bankInterestCharged,bankCharges,
+      bankInterestNet:detectedNet,bankEntries,
       opening:days[0]?.opening??opening,closing:days.at(-1)?.balance??balance,
-      startDate,firstMonthMode,partial:excludedMonths.length>0,
-      calculatedDays:monthly.reduce((a,m)=>a+m.calculatedDays,0)};
+      startDate,firstMonthMode,partial:!firstComplete||!lastComplete,
+      calculatedDays:all.reduce((a,m)=>a+m.calculatedDays,0)
+    };
   }
 
   // Replace the calculation entry point with the working StatementIQ flow.
