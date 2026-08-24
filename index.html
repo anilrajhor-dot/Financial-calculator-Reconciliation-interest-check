@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calendar &amp; Calculators</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v8.7</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v8.8</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -1012,7 +1012,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.7</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.8</strong>
   </footer>
 </div>
 
@@ -1761,7 +1761,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculators v8.7 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculators v8.8 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -3452,6 +3452,27 @@ function stmtChargeTx(r){
   return amount>0?{isCharge:true,amount}: {isCharge:false,amount:0};
 }
 
+
+function stmtRenderMonthlyProductInterest(result){
+  const el=document.getElementById('stmtMonthlyTable');
+  if(!el||!result)return;
+  const rows=result.monthly||[], slabs=result.slabs||[];
+  let h='<thead><tr><th style="text-align:left">Month</th><th>Days</th><th>Calculated days</th><th>Opening balance</th><th>Daily product</th>';
+  slabs.forEach((s,i)=>h+=`<th>Slab ${i+1} product</th><th>Slab ${i+1} rate</th><th>Slab ${i+1} interest</th>`);
+  h+='<th>Total interest</th><th>Bank interest</th><th>Difference</th></tr></thead><tbody>';
+  rows.forEach(m=>{
+    const bank=Number(m.bankInterestCharged||0)+Number(m.bankInterestCredited||0), calc=Number(m.interest||0), diff=calc-bank;
+    h+=`<tr><td style="text-align:left">${stmtMonthLabel(m.month)}</td><td>${m.days}</td><td>${m.calculatedDays}</td><td>${m.openingBalance==null?'—':'₹'+stmtMoney(m.openingBalance)}</td><td>₹${stmtMoney(m.dailyProduct||0)}</td>`;
+    slabs.forEach((s,i)=>h+=`<td>₹${stmtMoney((m.slabProducts||[])[i]||0)}</td><td>${Number(s.rate||0).toFixed(2)}%</td><td>₹${stmtMoney((m.slabInterest||[])[i]||0)}</td>`);
+    h+=`<td><b>₹${stmtMoney(calc)}</b></td><td>${bank?'₹'+stmtMoney(bank):'—'}</td><td>${bank?(diff>=0?'+':'−')+'₹'+stmtMoney(Math.abs(diff)):'—'}</td></tr>`;
+  });
+  const totalProduct=rows.reduce((a,m)=>a+Number(m.dailyProduct||0),0), totalCalc=rows.reduce((a,m)=>a+Number(m.interest||0),0), totalBank=rows.reduce((a,m)=>a+Number(m.bankInterestCharged||0)+Number(m.bankInterestCredited||0),0), totalDiff=totalCalc-totalBank;
+  h+='<tfoot><tr><th style="text-align:left">TOTAL</th><th></th><th>'+rows.reduce((a,m)=>a+Number(m.calculatedDays||0),0)+'</th><th></th><th>₹'+stmtMoney(totalProduct)+'</th>';
+  slabs.forEach((s,i)=>h+=`<th>₹${stmtMoney(rows.reduce((a,m)=>a+Number((m.slabProducts||[])[i]||0),0))}</th><th>${Number(s.rate||0).toFixed(2)}%</th><th>₹${stmtMoney(rows.reduce((a,m)=>a+Number((m.slabInterest||[])[i]||0),0))}</th>`);
+  h+=`<th>₹${stmtMoney(totalCalc)}</th><th>${totalBank?'₹'+stmtMoney(totalBank):'—'}</th><th>${totalBank?(totalDiff>=0?'+':'−')+'₹'+stmtMoney(Math.abs(totalDiff)):'—'}</th></tr></tfoot>`;
+  el.innerHTML=h;
+}
+
 function stmtRenderLoanComparison(result){
   const card=document.getElementById('stmtLoanComparisonCard');
   if(!card || !result || result.error){ if(card)card.style.display='none'; return; }
@@ -3660,6 +3681,7 @@ function stmtRenderResults(result,slabs){
   h+=`</tbody><tfoot><tr><th style="text-align:left">TOTAL</th><th></th><th>${months.reduce((a,m)=>a+m.calculatedDays,0)}</th><th>₹${stmtMoney(months.reduce((a,m)=>a+m.dailyProduct,0))}</th><th>₹${stmtMoney(result.total)}</th><th>₹${stmtMoney(result.bankInterestCredited||0)}</th><th>₹${stmtMoney(result.bankInterestCharged||0)}</th><th>${bankAvailable?'₹'+stmtMoney(totalBank):'—'}</th><th>${bankAvailable?((diff>=0?'+':'−')+'₹'+stmtMoney(Math.abs(diff||0))):'—'}</th><th></th></tr></tfoot>`;
   document.getElementById('stmtTable').innerHTML=h;
 
+  stmtRenderMonthlyProductInterest(result);
   stmtRenderLoanComparison(result);
 
   document.getElementById('stmtExcludedMonthsNote')?.remove();
@@ -5076,7 +5098,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
 </script>
 
 <script>
-// StatementIQ working Bank Interest engine transplant for Financial Calculators v8.7
+// StatementIQ working Bank Interest engine transplant for Financial Calculators v8.8
 (function(){
   const aliasGroups={
     date:['transaction date','txn date','tran date','value date','posting date','post date','date of transaction','trans date','date'],
