@@ -856,6 +856,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <button id="stmtMenuMonthly" class="btn" type="button" disabled>📊 Month-wise Interest</button>
   <button id="stmtMenuDaily" class="btn" type="button" disabled>📅 Daily Product</button>
   <button id="stmtMenuLoan" class="btn" type="button" disabled>🏦 Loan Interest Comparison</button>
+  <button id="stmtMenuShare" class="btn" type="button" disabled>📤 Share</button>
   <button id="stmtMenuSettings" class="btn" type="button">⚙ Interest Settings</button>
   <button id="stmtMenuReset" class="btn" type="button">↺ Reset</button>
 </div>
@@ -947,6 +948,18 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
         <span id="stmtSlabTotal" class="hint"></span>
       </div>
       <div id="stmtSlabSave" class="hint" style="margin-top:8px;color:var(--green)">✓ Slab settings are saved automatically on this device and will not change when a statement is reloaded or recalculated. Use <b>Reset built-in slabs</b> to replace them.</div>
+    </div>
+
+    <div class="card input-card" id="stmtShareCard" style="display:none;">
+      <div class="stub-title">📤 Share Daily &amp; Monthly Product</div>
+      <div class="stub-sub" style="margin:4px 0 14px;color:var(--muted)">
+        Share the calculated day-wise or month-wise product tables as a CSV file — via WhatsApp, Mail, Files, or any app on your device. If sharing isn't available, the file downloads instead.
+      </div>
+      <div class="row" style="gap:10px;flex-wrap:wrap">
+        <button id="stmtShareDailyBtn" class="btn primary" type="button">📅 Share Daily Product</button>
+        <button id="stmtShareMonthlyBtn" class="btn primary" type="button">📊 Share Monthly Product</button>
+      </div>
+      <div id="stmtShareStatus" class="hint" style="margin-top:10px"></div>
     </div>
 
     <div id="stmtResults" style="display:none;">
@@ -1856,6 +1869,104 @@ function stmtMoneySigned(n){
   // conventional Indian-banking "Dr"/"Cr" suffix instead of a minus sign.
   const v=Number(n||0);
   return stmtMoney(Math.abs(v))+(v<0?' Dr':(v>0?' Cr':''));
+}
+
+/* ---------- Share: Daily & Monthly product as CSV ---------- */
+function stmtCsvNum(n){
+  // Plain numeric value (no ₹ symbol, no thousands separator, no Dr/Cr suffix)
+  // so the exported CSV opens as real numbers in Excel/Sheets, not text.
+  return (Math.round(Number(n||0)*100)/100).toFixed(2);
+}
+function stmtCsvEscape(v){
+  const s=String(v??'');
+  return /[",\r\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+function stmtRowsToCsv(rows){
+  return rows.map(r=>r.map(stmtCsvEscape).join(',')).join('\r\n');
+}
+function stmtDailyProductCsv(result){
+  const acctType=result.accountType==='loan'?'loan':'deposit';
+  const rows=[['Date','Days in month','Closing balance','Balance type','Eligible for interest','Daily product (₹)','Daily interest (₹)']];
+  (result.daily||[]).forEach(d=>{
+    const actual=d.actualBalance!==undefined?d.actualBalance:d.balance;
+    rows.push([
+      stmtDate(d.date),
+      d.daysInMonth,
+      stmtCsvNum(Math.abs(actual)),
+      d.balanceType==='dr'?'Dr':(d.balanceType==='cr'?'Cr':''),
+      d.eligible===false?'No':'Yes',
+      stmtCsvNum(d.balance||0),
+      stmtCsvNum(d.interest||0)
+    ]);
+  });
+  const totalProduct=(result.daily||[]).reduce((a,d)=>a+Number(d.balance||0),0);
+  const totalInterest=(result.daily||[]).reduce((a,d)=>a+Number(d.interest||0),0);
+  rows.push(['TOTAL','','','','',stmtCsvNum(totalProduct),stmtCsvNum(totalInterest)]);
+  rows.push([]);
+  rows.push(['Account type',acctType==='loan'?'Loan / OD / CC (debit balance)':'Deposit / Savings (credit balance)']);
+  if(result.excludedDayCount) rows.push(['Days excluded',result.excludedDayCount,'Excluded balance total (₹)',stmtCsvNum(result.excludedBalanceTotal||0)]);
+  return stmtRowsToCsv(rows);
+}
+function stmtMonthlyProductCsv(result){
+  const acctType=result.accountType==='loan'?'loan':'deposit';
+  const rows=[['Month','Calendar days','Calculated days','Excluded days','Opening balance','Closing balance','Daily product (₹)','Calculated interest (₹)','Bank interest credited (₹)','Bank interest charged (₹)','Other bank charges (₹)']];
+  (result.monthly||[]).forEach(m=>{
+    rows.push([
+      stmtMonthLabel(m.month),
+      m.days,
+      m.calculatedDays,
+      m.excludedDays||0,
+      m.openingBalance==null?'':stmtCsvNum(Math.abs(m.openingBalance))+' '+(m.openingBalance<0?'Dr':m.openingBalance>0?'Cr':''),
+      m.closingBalance==null?'':stmtCsvNum(Math.abs(m.closingBalance))+' '+(m.closingBalance<0?'Dr':m.closingBalance>0?'Cr':''),
+      stmtCsvNum(m.dailyProduct||0),
+      stmtCsvNum(m.interest||0),
+      stmtCsvNum(m.bankInterestCredited||0),
+      stmtCsvNum(m.bankInterestCharged||0),
+      stmtCsvNum(m.bankCharges||0)
+    ]);
+  });
+  const totalProduct=(result.monthly||[]).reduce((a,m)=>a+Number(m.dailyProduct||0),0);
+  rows.push(['TOTAL','',(result.monthly||[]).reduce((a,m)=>a+Number(m.calculatedDays||0),0),(result.monthly||[]).reduce((a,m)=>a+Number(m.excludedDays||0),0),'','',stmtCsvNum(totalProduct),stmtCsvNum(result.total||0),stmtCsvNum(result.bankInterestCredited||0),stmtCsvNum(result.bankInterestCharged||0),stmtCsvNum(result.bankCharges||0)]);
+  rows.push([]);
+  rows.push(['Account type',acctType==='loan'?'Loan / OD / CC (debit balance)':'Deposit / Savings (credit balance)']);
+  return stmtRowsToCsv(rows);
+}
+async function stmtShareCsv(filename,csv,shareTitle){
+  const status=document.getElementById('stmtShareStatus');
+  const setStatus=(msg)=>{ if(status)status.textContent=msg; };
+  try{
+    const blob=new Blob([csv],{type:'text/csv'});
+    const file=new File([blob],filename,{type:'text/csv'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file],title:shareTitle});
+      setStatus('✓ Shared '+filename);
+      return;
+    }
+    if(navigator.share){
+      await navigator.share({title:shareTitle,text:csv});
+      setStatus('✓ Shared '+filename);
+      return;
+    }
+  }catch(e){
+    if(e && e.name==='AbortError'){ setStatus('Share cancelled.'); return; }
+  }
+  // Fallback: download the CSV directly.
+  try{
+    const blob=new Blob([csv],{type:'text/csv'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),4000);
+    setStatus('Sharing isn\'t available here, so '+filename+' was downloaded instead.');
+  }catch(e2){
+    try{
+      await navigator.clipboard.writeText(csv);
+      setStatus('Sharing and download aren\'t available here, so the data was copied to your clipboard instead.');
+    }catch(e3){
+      setStatus('Unable to share, download or copy. Please try Print / Save report instead.');
+    }
+  }
 }
 function stmtDate(d){
   if(!(d instanceof Date)||isNaN(d)) return '';
@@ -3541,6 +3652,9 @@ function stmtPersistSlabs(){
   document.getElementById('stmtMenuMonthly')?.setAttribute('disabled','disabled');
   document.getElementById('stmtMenuDaily')?.setAttribute('disabled','disabled');
   document.getElementById('stmtMenuLoan')?.setAttribute('disabled','disabled');
+  document.getElementById('stmtMenuShare')?.setAttribute('disabled','disabled');
+  document.getElementById('stmtShareCard')?.style.setProperty('display','none');
+  const stmtShareStatusEl=document.getElementById('stmtShareStatus'); if(stmtShareStatusEl)stmtShareStatusEl.textContent='';
   stmtRenderSlabs(slabs);
 }
 function stmtAddSlab(){
@@ -4044,6 +4158,7 @@ function stmtRunCalculation(){
   document.getElementById('stmtMenuMonthly')?.removeAttribute('disabled');
   document.getElementById('stmtMenuDaily')?.removeAttribute('disabled');
   document.getElementById('stmtMenuLoan')?.removeAttribute('disabled');
+  document.getElementById('stmtMenuShare')?.removeAttribute('disabled');
 }
 
 
@@ -4113,6 +4228,29 @@ document.getElementById('stmtMenuSettings')?.addEventListener('click',()=>{
   if(card)card.style.display='block';
   stmtScrollTo('stmtSlabCard');
 });
+document.getElementById('stmtMenuShare')?.addEventListener('click',()=>{
+  if(!stmtLastResult){
+    stmtMenuCalculate();
+    return;
+  }
+  const card=document.getElementById('stmtShareCard');
+  if(card)card.style.display='block';
+  stmtScrollTo('stmtShareCard');
+});
+document.getElementById('stmtShareDailyBtn')?.addEventListener('click',()=>{
+  if(!stmtLastResult)return;
+  const {result}=stmtLastResult;
+  const csv=stmtDailyProductCsv(result);
+  const status=document.getElementById('stmtShareStatus'); if(status)status.textContent='Preparing daily product…';
+  stmtShareCsv('Daily-Product-'+stmtDate(new Date()).replace(/\//g,'-')+'.csv',csv,'Day-wise balance & daily product');
+});
+document.getElementById('stmtShareMonthlyBtn')?.addEventListener('click',()=>{
+  if(!stmtLastResult)return;
+  const {result}=stmtLastResult;
+  const csv=stmtMonthlyProductCsv(result);
+  const status=document.getElementById('stmtShareStatus'); if(status)status.textContent='Preparing monthly product…';
+  stmtShareCsv('Monthly-Product-'+stmtDate(new Date()).replace(/\//g,'-')+'.csv',csv,'Month-wise interest & daily product');
+});
 document.getElementById('stmtMenuReset')?.addEventListener('click',()=>{
   document.getElementById('stmtResetBtn')?.click();
   stmtScrollTo('module-statement');
@@ -4138,6 +4276,9 @@ document.getElementById('stmtFile').addEventListener('change',async e=>{
   document.getElementById('stmtMenuMonthly')?.setAttribute('disabled','disabled');
   document.getElementById('stmtMenuDaily')?.setAttribute('disabled','disabled');
   document.getElementById('stmtMenuLoan')?.setAttribute('disabled','disabled');
+  document.getElementById('stmtMenuShare')?.setAttribute('disabled','disabled');
+  document.getElementById('stmtShareCard')?.style.setProperty('display','none');
+  const stmtShareStatusEl=document.getElementById('stmtShareStatus'); if(stmtShareStatusEl)stmtShareStatusEl.textContent='';
 
   stmtShowPdfPasswordBox(/\.pdf$/i.test((e.target.files&&e.target.files[0]&&e.target.files[0].name)||''));
   const file=e.target.files[0]; if(!file)return;
@@ -4222,6 +4363,9 @@ document.getElementById('stmtResetBtn').addEventListener('click',()=>{
   document.getElementById('stmtMenuMonthly')?.setAttribute('disabled','disabled');
   document.getElementById('stmtMenuDaily')?.setAttribute('disabled','disabled');
   document.getElementById('stmtMenuLoan')?.setAttribute('disabled','disabled');
+  document.getElementById('stmtMenuShare')?.setAttribute('disabled','disabled');
+  document.getElementById('stmtShareCard')?.style.setProperty('display','none');
+  const stmtShareStatusEl=document.getElementById('stmtShareStatus'); if(stmtShareStatusEl)stmtShareStatusEl.textContent='';
 });
 stmtRenderSlabs(stmtLoadSlabs());
 
@@ -5672,7 +5816,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
     const status=document.getElementById('stmtStatus');if(status){status.style.display='block';status.textContent=rows.length?'Mapped '+rows.length+' transaction rows. Calculating interest…':'No transaction rows could be mapped. Please check the statement preview.';}
     if(!rows.length){alert('No valid transactions were found.\n\nThe workbook was read, but the working StatementIQ mapper could not identify transaction rows. It checks Date, Debit, Credit, Amount, DR/CR and Balance using both headings and the actual values. Please check the preview.');return;}
     const slabs=stmtNormaliseSlabs(stmtSlabRows());const errors=stmtValidateSlabs(slabs);if(errors.length){alert(errors.join('\n'));return;}stmtSaveSlabs(slabs);
-    const manual=(document.getElementById('stmtBankInterest')?.value||'').trim();const manualVal=manual===''?null:Number(manual);const accountType=document.getElementById('stmtAccountType')?.value==='loan'?'loan':'deposit';const result=window.stmtCalculate(rows,slabs,manualVal,accountType);stmtRenderResults(result,slabs);if(status)status.textContent=result.error?'Calculation needs attention: '+result.error:'Interest calculated for '+(result.monthly||[]).length+' month(s).';document.getElementById('stmtMenuMonthly')?.removeAttribute('disabled');document.getElementById('stmtMenuDaily')?.removeAttribute('disabled');
+    const manual=(document.getElementById('stmtBankInterest')?.value||'').trim();const manualVal=manual===''?null:Number(manual);const accountType=document.getElementById('stmtAccountType')?.value==='loan'?'loan':'deposit';const result=window.stmtCalculate(rows,slabs,manualVal,accountType);stmtRenderResults(result,slabs);if(status)status.textContent=result.error?'Calculation needs attention: '+result.error:'Interest calculated for '+(result.monthly||[]).length+' month(s).';document.getElementById('stmtMenuMonthly')?.removeAttribute('disabled');document.getElementById('stmtMenuDaily')?.removeAttribute('disabled');document.getElementById('stmtMenuShare')?.removeAttribute('disabled');
   document.getElementById('stmtMenuLoan')?.removeAttribute('disabled');
   };
 })();
