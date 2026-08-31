@@ -423,7 +423,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calculator with Bank Interest Comparison</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v8.12</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v8.13</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -823,6 +823,17 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
           <label for="stmtBankInterest">Bank-stated interest, optional (&#8377;)</label>
           <input type="number" id="stmtBankInterest" placeholder="Override / total for comparison" />
         </div>
+        <div>
+          <label for="stmtAccountType">Interest account type</label>
+          <select id="stmtAccountType">
+            <option value="auto">🤖 Auto-detect</option>
+            <option value="deposit">💰 Deposit account — credit balance only</option>
+            <option value="loan">🏦 Loan account — debit balance only</option>
+          </select>
+          <div id="stmtAccountTypeStatus" class="hint" style="margin-top:6px">
+            Deposit: only a credit/positive closing balance earns interest. Loan: only a debit/outstanding balance earns interest. Opposite-side balances are excluded.
+          </div>
+        </div>
       </div>
       <div id="stmtStatus" class="note" style="display:none;margin-top:16px;margin-bottom:0;"></div>
     </div>
@@ -1012,7 +1023,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.12</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.13</strong>
   </footer>
 </div>
 
@@ -1761,7 +1772,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculator with Bank Interest Comparison v8.12 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculator with Bank Interest Comparison v8.13 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -3776,7 +3787,8 @@ function stmtRenderResults(result,slabs){
     const note=holder.firstElementChild;if(note){note.id='stmtExcludedMonthsNote';document.getElementById('stmtTable').after(note);}
   }
 
-  let note='Daily product × annual slab rate ÷ 365. The number of calendar days in each month determines how many daily products are accumulated. Every month in the uploaded statement is shown in the month-wise table, including partial first/last months.';
+  let note='Daily product × annual slab rate ÷ 365. The number of calendar days in each month determines how many daily products are accumulated. Every month in the uploaded statement is shown in the month-wise table, including partial first/last months.'+
+    `<br><b>Interest basis:</b> ${result.accountType==='loan'?'Loan account — only debit/outstanding closing balances are counted; credit balances are excluded.':'Deposit account — only credit closing balances are counted; debit balances are excluded.'}`;
   if(result.opening!==null && result.opening!==undefined) note += ' Opening / brought-forward balance used for the first day: ₹'+stmtMoney(result.opening)+'.';
   if(result.firstMonthMode==='from-first-transaction') note += ' No brought-forward balance was available, so the first available month starts on '+stmtDate(result.startDate)+' using the first transaction-day closing balance.';
   else if(result.firstMonthMode==='from-first-day-closing-balance') note += ' The first transaction is on the 1st and no separate brought-forward balance was available, so its supplied closing balance is used as the 1st-day balance.';
@@ -3798,7 +3810,7 @@ function stmtShowDaily(){
   days.forEach(d=>{bh+=`<tr><td style="text-align:left">${stmtDate(d.date)}</td><td>₹${stmtMoney(d.balance)}</td></tr>`;});
   bh+='</tbody></table>';
   const bs=document.getElementById('stmtBalanceSchedule'); if(bs)bs.innerHTML='<h3 style="margin:12px 0 6px">Daily Date &amp; Balance Schedule</h3>'+bh;
-  let h='<thead><tr><th style="text-align:left">Date</th><th>Days in month</th><th>Closing balance</th><th>Daily product (Balance)</th><th>Interest basis</th>';
+  let h='<thead><tr><th style="text-align:left">Date</th><th>Days in month</th><th>Closing balance</th><th>Interest-bearing balance</th><th>Daily product</th><th>Interest basis</th>';
   slabs.forEach((s,i)=>h+=`<th>Slab ${i+1} product</th><th>Rate</th><th>Daily interest</th>`);
   h+='<th>Total daily interest</th></tr></thead><tbody>';
   days.forEach(d=>{
@@ -5182,7 +5194,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
 </script>
 
 <script>
-// StatementIQ working Bank Interest engine transplant for Financial Calculator with Bank Interest Comparison v8.12
+// StatementIQ working Bank Interest engine transplant for Financial Calculator with Bank Interest Comparison v8.13
 (function(){
   const aliasGroups={
     date:['transaction date','txn date','tran date','value date','posting date','post date','date of transaction','trans date','date'],
@@ -5339,9 +5351,47 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
     for(const s of slabs){if(b<=prev)break;const upper=s.to===null?Infinity:Number(s.to);const portion=Math.max(0,Math.min(b,upper)-prev);if(portion>0)parts.push({portion,rate:Number(s.rate)||0});if(!isFinite(upper))break;prev=upper;}
     return parts;
   }
+  function stmtDetectAccountType(rows){
+    const text=(rows||[]).map(r=>String(r.narration||'')).join(' ').toLowerCase();
+    const loanHits=(text.match(/\b(loan|term loan|cash credit|cc account|overdraft|od account|emi|instalment|installment|principal outstanding|loan repayment|loan interest)\b/g)||[]).length;
+    const depHits=(text.match(/\b(savings|saving account|current account|deposit account|fixed deposit|term deposit|recurring deposit|interest credited|deposit interest)\b/g)||[]).length;
+    if(loanHits>depHits && loanHits>0)return 'loan';
+    if(depHits>loanHits && depHits>0)return 'deposit';
+    // If the statement does not contain reliable product words, keep the
+    // conventional bank-statement default as deposit rather than guessing loan.
+    return 'deposit';
+  }
+  function stmtSetAccountTypeStatus(type, detected){
+    const el=document.getElementById('stmtAccountTypeStatus');
+    if(!el)return;
+    const t=type==='auto'?detected:type;
+    el.innerHTML = t==='loan'
+      ? '<b>Loan basis:</b> only the debit/outstanding closing balance of each day is used. Any credit balance is excluded.'
+      : '<b>Deposit basis:</b> only the credit closing balance of each day is used. Any debit balance is excluded.';
+  }
+  function stmtEligibleDailyBalance(row, accountType){
+    const b=Number(row?.balance);
+    if(!Number.isFinite(b))return 0;
+    // Some statements carry DR/CR beside the running balance. Honour that
+    // side indicator when present. Transaction DR/CR is intentionally NOT
+    // used here because a loan repayment is a credit transaction but does
+    // not create a credit balance.
+    const side=String(row?.balanceSide||'').toUpperCase();
+    if(accountType==='loan'){
+      if(side==='CR')return 0;
+      return Math.max(0,b);
+    }
+    if(side==='DR')return 0;
+    return Math.max(0,b);
+  }
+
   function interestDaily(rows,slabs,openingOverride){
     const rs=(rows||[]).filter(r=>r.date instanceof Date&&!isNaN(r.date)).sort((a,b)=>a.date-b.date);
     if(!rs.length)return {days:[],monthly:[],total:0,error:'No dated transactions found.'};
+    const requestedType=document.getElementById('stmtAccountType')?.value||'auto';
+    const detectedType=stmtDetectAccountType(rs);
+    const accountType=requestedType==='auto'?detectedType:requestedType;
+    stmtSetAccountTypeStatus(requestedType, detectedType);
 
     const first=new Date(rs[0].date.getFullYear(),rs[0].date.getMonth(),rs[0].date.getDate());
     const last=new Date(rs[rs.length-1].date.getFullYear(),rs[rs.length-1].date.getMonth(),rs[rs.length-1].date.getDate());
@@ -5406,10 +5456,15 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
         slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),
         actualInterest:0,bankInterestCredited:0,bankInterestCharged:0,bankCharges:0,
         openingBalance:x.monthOpening,closingBalance:x.balance};
-      const parts=allocate(x.balance,slabs);
+      x.interestBearingBalance=stmtEligibleDailyBalance(x,accountType);
+      const parts=allocate(x.interestBearingBalance,slabs);
       x.parts=parts;
-      x.interest=parts.reduce((a,p)=>a+p.portion*p.rate/100/365,0);
-      m.dailyProduct+=x.balance; m.calculatedDays++; m.interest+=x.interest; m.closingBalance=x.balance;
+      x.interest=x.interestBearingBalance>0
+        ? parts.reduce((a,p)=>a+p.portion*p.rate/100/365,0)
+        : 0;
+      // A day is counted in the calendar, but a zero/opposite-side balance
+      // contributes ZERO to daily product and ZERO interest.
+      m.dailyProduct+=x.interestBearingBalance; m.calculatedDays++; m.interest+=x.interest; m.closingBalance=x.balance;
       parts.forEach((p,i)=>{
         m.slabProducts[i]+=p.portion;
         m.slabInterest[i]+=p.portion*p.rate/100/365;
@@ -5460,7 +5515,9 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
       bankInterestNet:detectedNet,bankEntries,
       opening:days[0]?.opening??opening,closing:days.at(-1)?.balance??balance,
       startDate,firstMonthMode,partial:!firstComplete||!lastComplete,
-      calculatedDays:all.reduce((a,m)=>a+m.calculatedDays,0)
+      calculatedDays:all.reduce((a,m)=>a+m.calculatedDays,0),
+      accountType,
+      detectedAccountType:detectedType
     };
   }
 
@@ -5486,6 +5543,20 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
     const manual=(document.getElementById('stmtBankInterest')?.value||'').trim();const manualVal=manual===''?null:Number(manual);const result=window.stmtCalculate(rows,slabs,manualVal);stmtRenderResults(result,slabs);if(status)status.textContent=result.error?'Calculation needs attention: '+result.error:'Interest calculated for '+(result.monthly||[]).length+' month(s).';document.getElementById('stmtMenuMonthly')?.removeAttribute('disabled');document.getElementById('stmtMenuDaily')?.removeAttribute('disabled');
   document.getElementById('stmtMenuLoan')?.removeAttribute('disabled');
   };
+  document.getElementById('stmtAccountType')?.addEventListener('change',()=>{
+    if(!stmtRawRows?.length)return;
+    try{
+      const p=parseRows(stmtRawRows);
+      window.__fiqMapped=p;
+      const slabs=stmtNormaliseSlabs(stmtSlabRows());
+      const manual=(document.getElementById('stmtBankInterest')?.value||'').trim();
+      const manualVal=manual===''?null:Number(manual);
+      if(p.rows?.length){
+        const result=window.stmtCalculate(p.rows,slabs,manualVal);
+        stmtRenderResults(result,slabs);
+      }
+    }catch(e){console.warn('Account type recalculation:',e);}
+  });
 })();
 
 </script>
