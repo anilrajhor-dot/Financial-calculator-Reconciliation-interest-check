@@ -3712,6 +3712,14 @@ function stmtInterestTx(r, previousRow){
     /\binterest\s*rate\s*(change|revision|revised)\b/.test(n);
   if(nonGenuine)return {isInterest:false,excluded:true,credit:0,debit:0,net:0,amount:0,type:'Interest-related, not counted (transfer/adjustment)'};
 
+  // Interest belonging to a different deposit/loan product — e.g. a Fixed
+  // Deposit, Recurring Deposit, Term Deposit, NRE/NRO deposit, KVP, PPF,
+  // SCSS, or Monthly Income Scheme — that happens to be credited into or
+  // referenced from THIS statement is not this savings account's own
+  // interest and must not be counted as "Bank interest credited/charged".
+  const otherProduct=/\b(fdr?|fd's?|fixed\s*deposit|term\s*deposit|tdr|stdr|\btd\b|\brd\b|recurring\s*deposit|\bnre\b|\bnro\b|\bfcnr\b|\bkvp\b|\bppf\b|\bmis\b|\bscss\b|\bssy\b|sukanya|\bnsc\b|tax\s*saver)\b/.test(n);
+  if(otherProduct)return {isInterest:false,excluded:true,credit:0,debit:0,net:0,amount:0,type:'Interest-related, not counted (other deposit product, e.g. FD/RD/term deposit)'};
+
   let credit=Math.abs(Number(r?.credit||0));
   let debit=Math.abs(Number(r?.debit||0));
 
