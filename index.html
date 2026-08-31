@@ -416,6 +416,65 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
 }
 </style>
 
+<style id="uiPolishV34">
+  /* v34 — visual refinement pass: depth, motion and consistency.
+     Purely cosmetic; no structural or functional changes. */
+  .card, .input-card, .ledger, .chart-card {
+    box-shadow: 0 1px 2px rgba(22,34,31,.04), 0 6px 18px -10px rgba(22,34,31,.10);
+    transition: box-shadow .18s ease, border-color .18s ease, transform .18s ease;
+  }
+  body.dark .card, body.dark .input-card, body.dark .ledger, body.dark .chart-card {
+    box-shadow: 0 1px 2px rgba(0,0,0,.25), 0 8px 22px -12px rgba(0,0,0,.5);
+  }
+  .input-card:hover, .chart-card:hover { box-shadow: 0 2px 4px rgba(22,34,31,.06), 0 10px 26px -12px rgba(22,34,31,.14); }
+  body.dark .input-card:hover, body.dark .chart-card:hover { box-shadow: 0 2px 4px rgba(0,0,0,.3), 0 12px 30px -14px rgba(0,0,0,.6); }
+
+  .btn {
+    transition: background-color .15s ease, box-shadow .15s ease, transform .08s ease;
+    box-shadow: 0 1px 2px rgba(15,110,92,.15);
+  }
+  .btn:hover { box-shadow: 0 3px 10px -2px rgba(15,110,92,.35); transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); box-shadow: 0 1px 2px rgba(15,110,92,.2); }
+  .btn:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+  .btn.primary { background: var(--green); }
+  .btn[disabled] { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  input, select {
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  input:hover, select:hover { border-color: #A9B7AF; }
+  input:focus, select:focus { box-shadow: 0 0 0 3px rgba(15,110,92,.14); }
+  body.dark input:focus, body.dark select:focus { box-shadow: 0 0 0 3px rgba(47,165,139,.20); }
+
+  .stat { transition: background-color .15s ease; }
+  .stat:hover { background: #FBFAF6; }
+  body.dark .stat:hover { background: #182019; }
+
+  .tab { transition: color .15s ease, border-color .15s ease; }
+  .subtab { transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
+  .subtab:hover:not(.active) { border-color: var(--green); color: var(--ink); }
+
+  tbody tr { transition: background-color .12s ease; }
+
+  .folio-toggle { transition: background-color .15s ease; }
+
+  /* Small status pill for inline eligibility/status markers (e.g. "excluded"). */
+  .stmt-review, .stmt-good { border-radius: 999px; padding: 1px 8px; font-size: 11px; letter-spacing: .02em; }
+  .stmt-review { background: rgba(181,73,59,.10); }
+  .stmt-good { background: rgba(15,110,92,.10); }
+  body.dark .stmt-review { background: rgba(240,122,105,.14); }
+  body.dark .stmt-good { background: rgba(47,165,139,.14); }
+
+  #stmtAccountTypeNote { border-left-color: var(--green); }
+  #stmtAccountTypeNote b { color: var(--ink); }
+
+  .masthead-title { letter-spacing: -0.01em; }
+  h1.page-title { letter-spacing: -0.01em; }
+  .stub { transition: background-color .15s ease; }
+
+  ::selection { background: rgba(15,110,92,.22); }
+</style>
+
 </head>
 <body>
 <div class="wrap">
@@ -423,7 +482,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calculator with Bank Interest Comparison</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v8.13</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v8.12</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -820,20 +879,20 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
           <input type="number" id="stmtManualRate" value="4" step="0.01" min="0" />
         </div>
         <div>
+          <label for="stmtAccountType">Account type</label>
+          <select id="stmtAccountType">
+            <option value="deposit">Deposit / Savings (credit balance)</option>
+            <option value="loan">Loan / OD / CC (debit balance)</option>
+          </select>
+        </div>
+        <div>
           <label for="stmtBankInterest">Bank-stated interest, optional (&#8377;)</label>
           <input type="number" id="stmtBankInterest" placeholder="Override / total for comparison" />
         </div>
-        <div>
-          <label for="stmtAccountType">Interest account type</label>
-          <select id="stmtAccountType">
-            <option value="auto">🤖 Auto-detect</option>
-            <option value="deposit">💰 Deposit account — credit balance only</option>
-            <option value="loan">🏦 Loan account — debit balance only</option>
-          </select>
-          <div id="stmtAccountTypeStatus" class="hint" style="margin-top:6px">
-            Deposit: only a credit/positive closing balance earns interest. Loan: only a debit/outstanding balance earns interest. Opposite-side balances are excluded.
-          </div>
-        </div>
+      </div>
+      <div id="stmtAccountTypeNote" class="note" style="margin-top:16px;margin-bottom:0">
+        <b>Deposit / Savings:</b> only days with a credit closing balance earn interest — a day the account is overdrawn (a debit balance) is excluded.
+        <b>Loan / OD / CC:</b> only days with a debit closing balance (the amount owed) are used — a day the account shows a credit balance (e.g. a temporary overpayment) is excluded.
       </div>
       <div id="stmtStatus" class="note" style="display:none;margin-top:16px;margin-bottom:0;"></div>
     </div>
@@ -1023,7 +1082,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.13</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.12</strong>
   </footer>
 </div>
 
@@ -1772,7 +1831,7 @@ document.getElementById('ageAsOf').value = todayStr;
 });
 try { renderAge(); } catch (e) { console.error('renderAge failed:', e); }
 
-/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculator with Bank Interest Comparison v8.13 ---------- */
+/* ---------- Bank Statement Interest Calculator v2.9 · Financial Calculator with Bank Interest Comparison v8.12 ---------- */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -1791,6 +1850,12 @@ function stmtEsc(s){
 }
 function stmtMoney(n){
   return Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function stmtMoneySigned(n){
+  // Formats a signed balance (positive = credit, negative = debit) with the
+  // conventional Indian-banking "Dr"/"Cr" suffix instead of a minus sign.
+  const v=Number(n||0);
+  return stmtMoney(Math.abs(v))+(v<0?' Dr':(v>0?' Cr':''));
 }
 function stmtDate(d){
   if(!(d instanceof Date)||isNaN(d)) return '';
@@ -1884,7 +1949,48 @@ function parseNumberFlexible(val) {
   return neg?-n:n;
 }
 
-
+/* ---------- Debit / Credit balance direction (deposit vs loan accounts) ----------
+   A bank statement's "balance" figure can be a credit balance (money held by the
+   customer) or a debit balance (money owed by the customer). Indian statements
+   usually mark this explicitly with a trailing "Dr" or "Cr" against the balance.
+   For DEPOSIT / SAVINGS accounts, only days with a credit closing balance should
+   earn interest — a day the account is overdrawn (a debit balance) must not be
+   included. For LOAN / OD / CC accounts, the reverse applies — only days with a
+   debit closing balance (the amount owed) are used; a day the account shows a
+   credit balance (e.g. a temporary overpayment) must not be included.
+   stmtDrCrTag() reads the explicit Dr/Cr marker, if any, from a cell's text.
+   stmtClassifyBalance() turns a signed running balance (positive = credit,
+   negative = debit) into an eligible/excluded magnitude for the selected
+   account type. stmtDayEligible() does the same starting from a freshly parsed
+   magnitude plus an optional explicit tag, defaulting the direction to the
+   account type's normal state when no explicit marker is present (an unmarked
+   loan-statement balance is, by convention, a debit balance; an unmarked
+   deposit-statement balance is, by convention, a credit balance). ---------- */
+function stmtDrCrTag(text){
+  const s=String(text??'').trim();
+  if(!s)return null;
+  const su=s.toUpperCase();
+  if(/\bDR\.?$/.test(su)||/(^|[\s-])(DR|DB)$/.test(su))return 'dr';
+  if(/\bCR\.?$/.test(su)||/(^|[\s-])CR$/.test(su))return 'cr';
+  return null;
+}
+function stmtClassifyBalance(actual,accountType){
+  const eligible = accountType==='loan' ? actual<0 : actual>0;
+  return {eligible, magnitude: eligible?Math.abs(actual):0, type: actual<0?'dr':(actual>0?'cr':'—')};
+}
+function stmtDayEligible(parsedMag,tag,accountType){
+  const mag=Math.abs(Number(parsedMag)||0);
+  const textNeg=Number(parsedMag)<0;
+  let effTag=tag;
+  if(!effTag){
+    effTag = textNeg
+      ? (accountType==='loan' ? 'cr' : 'dr')
+      : (accountType==='loan' ? 'dr' : 'cr');
+  }
+  const actual = effTag==='dr' ? -mag : mag;
+  const c=stmtClassifyBalance(actual,accountType);
+  return {actual, eligible:c.eligible, magnitude:c.magnitude, type:effTag};
+}
 
 function stmtWorksheetCellsToRows(sheet){
   // Works with both normal SheetJS sparse sheets and dense sheets. It ignores
@@ -2357,6 +2463,7 @@ function stmtExtractTransactionsUniversal(raw){
     const a=parseNumberFlexible(get('amount',g));
     const btxt=String(get('balance',g)??'').trim();
     const balance=btxt===''?null:parseNumberFlexible(get('balance',g));
+    const balanceDrCr=stmtDrCrTag(get('drcr',g))||stmtDrCrTag(btxt);
     const hasMoney=!!(get('debit',g)!==''||get('credit',g)!==''||get('amount',g)!=='');
 
     // Wrapped narration: no date and no money means continuation of previous row.
@@ -2376,7 +2483,7 @@ function stmtExtractTransactionsUniversal(raw){
       if(isCr)credit=Math.abs(a); else if(isDr)debit=Math.abs(a); else if(a<0)credit=Math.abs(a); else debit=Math.abs(a);
     }
     if(!debit&&!credit&&!narr)continue;
-    result.push({date,dateRaw,narration:narr||'(no description)',ref:String(get('ref',g)||'').trim(),debit,credit,balance,sourceRow:i+1});
+    result.push({date,dateRaw,narration:narr||'(no description)',ref:String(get('ref',g)||'').trim(),debit,credit,balance,balanceDrCr,sourceRow:i+1});
   }
 
   // Statements may be newest-first. Downstream interest calculations require
@@ -2853,6 +2960,7 @@ function stmtRowsFromAIMap(map){
     if(!date)continue;
     const btxt=String(get(r,map.balance)??'').trim();
     const balance=btxt===''?null:parseNumberFlexible(get(r,map.balance));
+    const balanceDrCr=stmtDrCrTag(get(r,map.drcr))||stmtDrCrTag(btxt);
     let debit=map.debit>=0?Math.abs(parseNumberFlexible(get(r,map.debit))):0;
     let credit=map.credit>=0?Math.abs(parseNumberFlexible(get(r,map.credit))):0;
     if(map.amount>=0 && map.debit<0 && map.credit<0){
@@ -2874,7 +2982,7 @@ function stmtRowsFromAIMap(map){
       if(delta>0)credit=delta;
       else if(delta<0)debit=-delta;
     }
-    out.push({date,debit,credit,balance,narration:narration||'(no description)',ref:map.ref>=0?String(get(r,map.ref)||'').trim():'',sourceRow:i+1});
+    out.push({date,debit,credit,balance,balanceDrCr,narration:narration||'(no description)',ref:map.ref>=0?String(get(r,map.ref)||'').trim():'',sourceRow:i+1});
   }
   out.sort((a,b)=>a.date-b.date);
   return out;
@@ -3005,6 +3113,7 @@ function stmtRowsFromKnownBankFormat(){
     const credit=Math.abs(parseNumberFlexible(creditRaw));
     const balanceText=String(balRaw??'').trim();
     const balance=balanceText!==''?parseNumberFlexible(balRaw):null;
+    const balanceDrCr=stmtDrCrTag(balanceText);
 
     // A real statement row must have a date and either a balance or a debit/
     // credit value. Ignore totals, footers and blank rows.
@@ -3015,6 +3124,7 @@ function stmtRowsFromKnownBankFormat(){
       debit,
       credit,
       balance,
+      balanceDrCr,
       narration:r.map(x=>String(x??'')).join(' ').trim(),
       sourceRow:i+1
     });
@@ -3090,6 +3200,7 @@ function stmtRowsFromMapping(){
     const credit=creditCol>=0?Math.abs(parseNumberFlexible(r[creditCol])):0;
     const balText=balCol>=0?String(r[balCol]??'').trim():'';
     const balance=balCol>=0&&balText!==''?parseNumberFlexible(balText):null;
+    const balanceDrCr=stmtDrCrTag(balText);
 
     // Accept a transaction row when it has a valid date and either a
     // transaction amount or a balance. This is important for days where
@@ -3101,6 +3212,7 @@ function stmtRowsFromMapping(){
       debit,
       credit,
       balance,
+      balanceDrCr,
       narration:r.map(x=>String(x??'')).join(' ').trim(),
       sourceRow:i+1
     });
@@ -3223,6 +3335,8 @@ function stmtExtractOpening(rows){
   // IDFC-style statements often have a summary row:
   // "Opening Balance | Total Debit | Total Credit | Closing Balance"
   // followed by a numeric row. Never parse the text label itself as zero.
+  // Returns {value, tag} where tag is 'dr'/'cr' if the statement explicitly
+  // marked the opening figure, or null otherwise.
   const raw=stmtRawRows||[];
   for(let i=0;i<raw.length;i++){
     const r=raw[i]||[];
@@ -3232,11 +3346,11 @@ function stmtExtractOpening(rows){
         const rr=raw[j]||[];
         for(let c=0;c<rr.length;c++){
           const v=rr[c];
-          if(typeof v==='number' && isFinite(v) && Number(v)!==0) return Number(v);
+          if(typeof v==='number' && isFinite(v) && Number(v)!==0) return {value:Number(v),tag:stmtDrCrTag(rr[c+1])};
           const text=String(v??'').trim();
-          if(/^[-+]?₹?\s*[\d,]+(?:\.\d+)?$/.test(text)){
+          if(/^[-+]?₹?\s*[\d,]+(?:\.\d+)?\s*(dr|cr)?\.?$/i.test(text)){
             const n=parseNumberFlexible(text);
-            if(isFinite(n)) return n;
+            if(isFinite(n)) return {value:n,tag:stmtDrCrTag(text)||stmtDrCrTag(rr[c+1])};
           }
         }
       }
@@ -3247,17 +3361,19 @@ function stmtExtractOpening(rows){
     const cells=(r||[]).map(x=>String(x??''));
     const joined=cells.join(' ');
     if(/opening\s+balance|brought\s+forward|balance\s+b\/f|opening\s+bal(?:ance)?/i.test(joined)){
-      for(const cell of cells){
-        if(/^[-+]?₹?\s*[\d,]+(?:\.\d+)?$/.test(cell.trim())){
+      for(let ci=0;ci<cells.length;ci++){
+        const cell=cells[ci];
+        if(/^[-+]?₹?\s*[\d,]+(?:\.\d+)?\s*(dr|cr)?\.?$/i.test(cell.trim())){
           const n=parseNumberFlexible(cell);
-          if(isFinite(n)) return n;
+          if(isFinite(n)) return {value:n,tag:stmtDrCrTag(cell)||stmtDrCrTag(cells[ci+1])};
         }
       }
     }
   }
   return null;
 }
-function stmtBuildDaily(rows){
+function stmtBuildDaily(rows,accountType){
+  accountType = accountType==='loan' ? 'loan' : 'deposit';
   if(!rows.length)return {days:[],partial:true,from:null,to:null,error:'No dated transactions could be read from the mapped statement.'};
 
   const sorted=[...rows].filter(r=>r.date instanceof Date&&!isNaN(r.date)).sort((a,b)=>a.date-b.date);
@@ -3272,9 +3388,17 @@ function stmtBuildDaily(rows){
   // Otherwise, if the statement starts after the 1st, use that first day's closing
   // balance and calculate from that date. If it starts on the 1st, derive opening
   // balance from the first day's closing balance less that day's net movement.
-  let opening=stmtExtractOpening(sorted);
+  // stmtExtractOpening() returns {value, tag}; tag is the explicit Dr/Cr marker
+  // if the statement showed one. stmtDayEligible() turns this into a signed
+  // "actual" balance (positive = credit, negative = debit) — when no explicit
+  // marker is present, the account type's normal polarity is assumed (a
+  // deposit account defaults to credit; a loan account defaults to debit).
+  let openingInfo=stmtExtractOpening(sorted);
+  let opening = openingInfo===null ? null : stmtDayEligible(openingInfo.value,openingInfo.tag,accountType).actual;
   let startDate;
   let firstMonthMode='full';
+
+  const balOf=r=>stmtDayEligible(r.balance,r.balanceDrCr,accountType).actual;
 
   if(opening===null && first.getDate()>1){
     const firstDayRows=byDay[stmtDayKey(first)]||[];
@@ -3283,7 +3407,7 @@ function stmtBuildDaily(rows){
       return {days:[],partial:true,from:first,to:last,missingOpening:true,
         error:'No brought-forward balance is shown and the first transaction is after the 1st. A closing balance on the first transaction day is required to calculate interest from that date.'};
     }
-    opening=Number(firstWithBal[firstWithBal.length-1].balance);
+    opening=balOf(firstWithBal[firstWithBal.length-1]);
     startDate=first;
     firstMonthMode='from-first-transaction';
   }else{
@@ -3294,7 +3418,7 @@ function stmtBuildDaily(rows){
         // If transactions begin on the 1st and a closing balance is supplied,
         // the supplied closing/opening balance is used as the 1st-day balance.
         // Do not reverse the day's debit/credit movement.
-        opening=Number(firstWithBal[firstWithBal.length-1].balance);
+        opening=balOf(firstWithBal[firstWithBal.length-1]);
         firstMonthMode='from-first-day-closing-balance';
       }
     }
@@ -3306,7 +3430,7 @@ function stmtBuildDaily(rows){
   }
 
   const days=[];
-  let balance=opening;
+  let actualBalance=opening;
   const end=new Date(last.getFullYear(),last.getMonth(),last.getDate());
   for(let d=new Date(startDate);d<=end;d.setDate(d.getDate()+1)){
     const tx=byDay[stmtDayKey(d)]||[];
@@ -3317,20 +3441,24 @@ function stmtBuildDaily(rows){
         // on that same day. Use the closing balance immediately before that credit.
         const interestCredits=tx.filter(r=>stmtInterestTx(r).credit>0);
         if(interestCredits.length&&withBal.length>=2){
-          const candidate=withBal[withBal.length-2].balance;
-          balance=isFinite(candidate)?Number(candidate):Number(withBal[withBal.length-1].balance);
+          const candidate=withBal[withBal.length-2];
+          actualBalance=candidate&&isFinite(Number(candidate.balance))?balOf(candidate):balOf(withBal[withBal.length-1]);
         }else{
-          balance=Number(withBal[withBal.length-1].balance);
+          actualBalance=balOf(withBal[withBal.length-1]);
         }
       }else{
-        tx.forEach(r=>{balance+=Number(r.credit||0)-Number(r.debit||0);});
+        tx.forEach(r=>{actualBalance+=Number(r.credit||0)-Number(r.debit||0);});
       }
     }
+    const cls=stmtClassifyBalance(actualBalance,accountType);
     days.push({
       date:new Date(d),
       month:stmtMonthKey(d),
       daysInMonth:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),
-      balance,
+      balance:cls.magnitude,
+      actualBalance,
+      eligible:cls.eligible,
+      balanceType:cls.type,
       hasTransaction:tx.length>0,
       txCount:tx.length
     });
@@ -3340,7 +3468,9 @@ function stmtBuildDaily(rows){
   return {
     days,
     partial:!(first.getDate()===1&&completeLast)||firstMonthMode!=='full',
-    from:first,to:last,opening,closing:balance,
+    from:first,to:last,opening,closing:actualBalance,
+    accountType,
+    excludedDayCount:days.filter(x=>!x.eligible).length,
     startDate:new Date(startDate),firstMonthMode
   };
 }
@@ -3514,7 +3644,7 @@ function stmtRenderMonthlyProductInterest(result){
     const calc=Number(m.interest||0);
     const diff=calc-bank;
 
-    h+=`<tr><td style="text-align:left">${stmtMonthLabel(m.month)}</td><td>${m.days}</td><td>${m.calculatedDays}</td><td>${m.openingBalance==null?'—':'₹'+stmtMoney(m.openingBalance)}</td><td><b>₹${stmtMoney(m.dailyProduct||0)}</b></td><td>${bank?'₹'+stmtMoney(bank):'—'}</td><td>${m.bankCharges?'₹'+stmtMoney(m.bankCharges):'—'}</td><td><b>₹${stmtMoney(calc)}</b></td><td>${bank?(diff>=0?'+':'−')+'₹'+stmtMoney(Math.abs(diff)):'—'}</td>`;
+    h+=`<tr><td style="text-align:left">${stmtMonthLabel(m.month)}</td><td>${m.days}</td><td>${m.calculatedDays}</td><td>${m.openingBalance==null?'—':'₹'+stmtMoneySigned(m.openingBalance)}</td><td><b>₹${stmtMoney(m.dailyProduct||0)}</b></td><td>${bank?'₹'+stmtMoney(bank):'—'}</td><td>${m.bankCharges?'₹'+stmtMoney(m.bankCharges):'—'}</td><td><b>₹${stmtMoney(calc)}</b></td><td>${bank?(diff>=0?'+':'−')+'₹'+stmtMoney(Math.abs(diff)):'—'}</td>`;
     slabs.forEach((s,i)=>h+=`<td>₹${stmtMoney((m.slabProducts||[])[i]||0)}</td><td>${Number(s.rate||0).toFixed(2)}%</td><td>₹${stmtMoney((m.slabInterest||[])[i]||0)}</td>`);
     h+='</tr>';
   });
@@ -3571,15 +3701,15 @@ function stmtRenderLoanComparison(result){
     `Both the main interest result and this comparison use the same calculated-interest and current-statement bank-interest figures. `+
     `Interest entries are kept separate from GST, folio/quarterly, NeSL, processing and other charges. `+
     (inferred!==null?`The bank figure implies an effective rate of <b>${inferred.toFixed(4)}% p.a.</b> based on total daily product and the 365-day formula. `:'')+
-    (result.opening!==null&&result.opening!==undefined?`Opening balance used: <b>₹${stmtMoney(result.opening)}</b>. `:'')+
-    (result.closing!==null&&result.closing!==undefined?`Closing balance: <b>₹${stmtMoney(result.closing)}</b>.`:'');
+    (result.opening!==null&&result.opening!==undefined?`Opening balance used: <b>₹${stmtMoneySigned(result.opening)}</b>. `:'')+
+    (result.closing!==null&&result.closing!==undefined?`Closing balance: <b>₹${stmtMoneySigned(result.closing)}</b>.`:'');
 
   let h='<thead><tr><th style="text-align:left">Month</th><th>Days</th><th>Opening balance</th><th>Closing balance</th><th>Daily product</th><th>Calculated interest</th><th>Bank interest</th><th>Other charges</th><th>Difference</th><th>Implied rate</th></tr></thead><tbody>';
   rows.forEach(m=>{
     const b=Math.max(Number(m.bankInterestCharged||0),Number(m.bankInterestCredited||0));
     const c=Number(m.interest||0), p=Number(m.dailyProduct||0), d=c-b;
     const rate=b>0&&p>0 ? b*365/p*100 : null;
-    h+=`<tr><td style="text-align:left">${stmtMonthLabel(m.month)}</td><td>${m.calculatedDays}</td><td>${m.openingBalance==null?'—':'₹'+stmtMoney(m.openingBalance)}</td><td>${m.closingBalance==null?'—':'₹'+stmtMoney(m.closingBalance)}</td><td>₹${stmtMoney(p)}</td><td>₹${stmtMoney(c)}</td><td>${b?'₹'+stmtMoney(b):'—'}</td><td>${m.bankCharges?'₹'+stmtMoney(m.bankCharges):'—'}</td><td>${b?(d>=0?'+':'−')+'₹'+stmtMoney(Math.abs(d)):'—'}</td><td>${rate===null?'—':rate.toFixed(4)+'%'}</td></tr>`;
+    h+=`<tr><td style="text-align:left">${stmtMonthLabel(m.month)}</td><td>${m.calculatedDays}</td><td>${m.openingBalance==null?'—':'₹'+stmtMoneySigned(m.openingBalance)}</td><td>${m.closingBalance==null?'—':'₹'+stmtMoneySigned(m.closingBalance)}</td><td>₹${stmtMoney(p)}</td><td>₹${stmtMoney(c)}</td><td>${b?'₹'+stmtMoney(b):'—'}</td><td>${m.bankCharges?'₹'+stmtMoney(m.bankCharges):'—'}</td><td>${b?(d>=0?'+':'−')+'₹'+stmtMoney(Math.abs(d)):'—'}</td><td>${rate===null?'—':rate.toFixed(4)+'%'}</td></tr>`;
   });
   h+=`</tbody><tfoot><tr><th style="text-align:left">TOTAL</th><th>${rows.reduce((a,m)=>a+Number(m.calculatedDays||0),0)}</th><th></th><th></th><th>₹${stmtMoney(product)}</th><th>₹${stmtMoney(calc)}</th><th>₹${stmtMoney(bankCharged)}</th><th>₹${stmtMoney(totalCharges)}</th><th>${(diff>=0?'+':'−')}₹${stmtMoney(Math.abs(diff))}</th><th>${inferred===null?'—':inferred.toFixed(4)+'%'}</th></tr></tfoot>`;
   document.getElementById('stmtLoanComparisonTable').innerHTML=h;
@@ -3604,13 +3734,18 @@ function stmtRenderLoanComparison(result){
   }
 }
 
-function stmtCalculate(rows,slabs,manualBankInterest){
-  const daily=stmtBuildDaily(rows);
-  if(!daily.days.length)return {...daily,monthly:[],total:0};
+function stmtCalculate(rows,slabs,manualBankInterest,accountType){
+  accountType = accountType==='loan' ? 'loan' : 'deposit';
+  const daily=stmtBuildDaily(rows,accountType);
+  if(!daily.days.length)return {...daily,monthly:[],total:0,accountType};
 
   const out=[];
   let total=0;
   daily.days.forEach(x=>{
+    // x.balance is already the eligible magnitude for this account type — 0 on
+    // a day whose closing balance is on the wrong side (a debit day for a
+    // deposit account, or a credit day for a loan account), so such days
+    // automatically contribute nothing to the daily product or interest.
     const parts=stmtAllocate(x.balance,slabs);
     let interest=0;
     // Interest is calculated every day as: daily product × applicable annual slab rate ÷ 365.
@@ -3626,12 +3761,14 @@ function stmtCalculate(rows,slabs,manualBankInterest){
       month:x.month,days:x.daysInMonth,calculatedDays:0,dailyProduct:0,interest:0,
       slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),
       actualInterest:0,bankInterestCredited:0,bankInterestCharged:0,bankCharges:0,
-      openingBalance:x.openingBalance??null,closingBalance:x.balance
+      openingBalance:x.openingBalance??null,closingBalance:x.actualBalance,
+      excludedDays:0,excludedBalanceTotal:0
     };
     m.dailyProduct+=x.balance;
     m.calculatedDays++;
     m.interest+=x.interest;
-    m.closingBalance=x.balance;
+    m.closingBalance=x.actualBalance;
+    if(!x.eligible){ m.excludedDays++; m.excludedBalanceTotal+=Math.abs(x.actualBalance); }
     x.parts.forEach((part,i)=>{
       m.slabProducts[i]+=part.portion;
       m.slabInterest[i]+=part.portion*part.rate/100/x.daysInMonth;
@@ -3653,7 +3790,7 @@ function stmtCalculate(rows,slabs,manualBankInterest){
       calculatedDays:0,dailyProduct:0,interest:0,
       slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),
       actualInterest:0,bankInterestCredited:0,bankInterestCharged:0,bankCharges:0,
-      openingBalance:null,closingBalance:null
+      openingBalance:null,closingBalance:null,excludedDays:0,excludedBalanceTotal:0
     };
 
     const it=stmtInterestTx(r,prev);
@@ -3688,7 +3825,7 @@ function stmtCalculate(rows,slabs,manualBankInterest){
     if(firstDay){
       const prev=new Date(firstDay.date); prev.setDate(prev.getDate()-1);
       const prevDay=out.find(x=>stmtDayKey(x.date)===stmtDayKey(prev));
-      m.openingBalance=prevDay?prevDay.balance:(firstDay.openingBalance??firstDay.balance);
+      m.openingBalance=prevDay?prevDay.actualBalance:(firstDay.openingBalance??firstDay.actualBalance);
     }
     m.bankInterestNet=(m.bankInterestCredited||0)-(m.bankInterestCharged||0);
     m.bankInterestMagnitude=Math.abs(m.bankInterestNet);
@@ -3708,6 +3845,9 @@ function stmtCalculate(rows,slabs,manualBankInterest){
     daily:out,
     monthly,
     total,
+    accountType,
+    excludedDayCount:out.filter(x=>!x.eligible).length,
+    excludedBalanceTotal:out.filter(x=>!x.eligible).reduce((a,x)=>a+Math.abs(x.actualBalance),0),
     autoBankInterest:detectedMagnitude,
     bankInterestCredited:bankInterestCredited,
     bankInterestCharged:bankInterestCharged,
@@ -3735,6 +3875,8 @@ function stmtRenderResults(result,slabs){
   const diff=result.overallDifference;
   const bankAvailable=totalBank!==null&&totalBank!==undefined;
   const bankSource=(document.getElementById('stmtBankInterest').value.trim()!=='')?'Manual / entered':'Detected from CURRENT statement interest transactions';
+  const acctType=result.accountType==='loan'?'loan':'deposit';
+  const excludedDays=result.excludedDayCount||0;
   document.getElementById('stmtSummary').innerHTML=[
     {label:'Calculated interest',value:'₹ '+stmtMoney(result.total),cls:''},
     {label:'Bank interest credited',value:'₹ '+stmtMoney(result.bankInterestCredited||0),cls:''},
@@ -3742,17 +3884,19 @@ function stmtRenderResults(result,slabs){
     {label:'Other bank charges',value:'₹ '+stmtMoney(result.bankCharges||0),cls:''},
     {label:'Net bank interest',value:bankAvailable?'₹ '+stmtMoney(totalBank):'Not detected',cls:''},
     {label:'Difference',value:bankAvailable?((diff>=0?'+':'−')+'₹ '+stmtMoney(Math.abs(diff||0))):'—',cls:bankAvailable?(Math.abs(diff||0)<0.01?'stmt-good':'stmt-review'):''},
-    {label:'Days calculated',value:String((result.calculatedDays??(result.daily||[]).length)),cls:''}
+    {label:'Days calculated',value:String((result.calculatedDays??(result.daily||[]).length)),cls:''},
+    ...(excludedDays?[{label:acctType==='loan'?'Days excluded (credit balance)':'Days excluded (debit balance)',value:String(excludedDays),cls:'stmt-review'}]:[])
   ].map(s=>`<div class="stat"><div class="stat-label">${s.label}</div><div class="stat-value ${s.cls}">${s.value}</div></div>`).join('');
   document.getElementById('stmtLedgerSub').textContent=
-    `${months.length} month(s) shown · ${(result.calculatedDays??(result.daily||[]).length)} day(s) calculated · bank figure: ${bankSource}`;
+    `${months.length} month(s) shown · ${(result.calculatedDays??(result.daily||[]).length)} day(s) calculated · bank figure: ${bankSource} · ${acctType==='loan'?'Loan / OD / CC account':'Deposit / Savings account'} rules applied`;
 
   let h='<thead><tr><th style="text-align:left">Month</th><th>Calendar days</th><th>Calculated days</th><th>Daily product</th><th>Calculated interest</th><th>Bank interest credited</th><th>Bank interest charged</th><th>Net bank interest</th><th>Difference</th><th>Status</th></tr></thead><tbody>';
   months.forEach(m=>{
     const credited=Number(m.bankInterestCredited||0),charged=Number(m.bankInterestCharged||0),net=credited-charged;
     const d=(credited||charged)?m.interest-Math.abs(net):null;
     const status=m.partial?'<span class="stmt-review">Partial statement period</span>':((credited||charged)?(Math.abs(d)<0.01?'<span class="stmt-good">Matches</span>':'<span class="stmt-review">Review</span>'):'<span class="hint">No interest entry found</span>');
-    h+=`<tr><td style="text-align:left">${stmtMonthLabel(m.month)}</td><td>${m.days}</td><td>${m.calculatedDays}</td><td>₹${stmtMoney(m.dailyProduct)}</td><td>₹${stmtMoney(m.interest)}</td><td>${credited?'₹'+stmtMoney(credited):'—'}</td><td>${charged?'₹'+stmtMoney(charged):'—'}</td><td>${(credited||charged)?'₹'+stmtMoney(Math.abs(net)):'—'}</td><td>${d===null?'—':(d>=0?'+':'−')+'₹'+stmtMoney(Math.abs(d))}</td><td>${status}</td></tr>`;
+    const excludedNote=m.excludedDays?`<div class="hint" style="margin-top:2px">${m.excludedDays} day(s) excluded — ${acctType==='loan'?'credit':'debit'} balance not eligible</div>`:'';
+    h+=`<tr><td style="text-align:left">${stmtMonthLabel(m.month)}</td><td>${m.days}</td><td>${m.calculatedDays}${excludedNote}</td><td>₹${stmtMoney(m.dailyProduct)}</td><td>₹${stmtMoney(m.interest)}</td><td>${credited?'₹'+stmtMoney(credited):'—'}</td><td>${charged?'₹'+stmtMoney(charged):'—'}</td><td>${(credited||charged)?'₹'+stmtMoney(Math.abs(net)):'—'}</td><td>${d===null?'—':(d>=0?'+':'−')+'₹'+stmtMoney(Math.abs(d))}</td><td>${status}</td></tr>`;
   });
   h+=`</tbody><tfoot><tr><th style="text-align:left">TOTAL</th><th></th><th>${months.reduce((a,m)=>a+m.calculatedDays,0)}</th><th>₹${stmtMoney(months.reduce((a,m)=>a+m.dailyProduct,0))}</th><th>₹${stmtMoney(result.total)}</th><th>₹${stmtMoney(result.bankInterestCredited||0)}</th><th>₹${stmtMoney(result.bankInterestCharged||0)}</th><th>${bankAvailable?'₹'+stmtMoney(totalBank):'—'}</th><th>${bankAvailable?((diff>=0?'+':'−')+'₹'+stmtMoney(Math.abs(diff||0))):'—'}</th><th></th></tr></tfoot>`;
   document.getElementById('stmtTable').innerHTML=h;
@@ -3787,9 +3931,12 @@ function stmtRenderResults(result,slabs){
     const note=holder.firstElementChild;if(note){note.id='stmtExcludedMonthsNote';document.getElementById('stmtTable').after(note);}
   }
 
-  let note='Daily product × annual slab rate ÷ 365. The number of calendar days in each month determines how many daily products are accumulated. Every month in the uploaded statement is shown in the month-wise table, including partial first/last months.'+
-    `<br><b>Interest basis:</b> ${result.accountType==='loan'?'Loan account — only debit/outstanding closing balances are counted; credit balances are excluded.':'Deposit account — only credit closing balances are counted; debit balances are excluded.'}`;
-  if(result.opening!==null && result.opening!==undefined) note += ' Opening / brought-forward balance used for the first day: ₹'+stmtMoney(result.opening)+'.';
+  let note='Daily product × annual slab rate ÷ 365. The number of calendar days in each month determines how many daily products are accumulated. Every month in the uploaded statement is shown in the month-wise table, including partial first/last months.';
+  note += acctType==='loan'
+    ? ' Loan / OD / CC account selected: only days with a debit closing balance (the amount owed) are used for interest; days the account shows a credit balance are excluded.'
+    : ' Deposit / Savings account selected: only days with a credit closing balance earn interest; days the account is overdrawn (a debit balance) are excluded.';
+  if(excludedDays) note += ' '+excludedDays+' day(s) in this statement were excluded on this basis, totaling ₹'+stmtMoney(result.excludedBalanceTotal||0)+' of balance-days not included in the daily product.';
+  if(result.opening!==null && result.opening!==undefined) note += ' Opening / brought-forward balance used for the first day: ₹'+stmtMoneySigned(result.opening)+'.';
   if(result.firstMonthMode==='from-first-transaction') note += ' No brought-forward balance was available, so the first available month starts on '+stmtDate(result.startDate)+' using the first transaction-day closing balance.';
   else if(result.firstMonthMode==='from-first-day-closing-balance') note += ' The first transaction is on the 1st and no separate brought-forward balance was available, so its supplied closing balance is used as the 1st-day balance.';
   else if(result.firstMonthMode==='from-opening-balance'||result.firstMonthMode==='full') note += ' The available opening / brought-forward balance is used to establish the daily balances.';
@@ -3806,15 +3953,21 @@ function stmtShowDaily(){
   const {result,slabs}=stmtLastResult;
   if(box.style.display==='block'){box.style.display='none';document.getElementById('stmtShowDailyBtn').textContent='Show daily calculation';return;}
   const days=result.daily||[];
+  const rowBalanceLabel=d=>{
+    const actual=d.actualBalance!==undefined?d.actualBalance:d.balance;
+    const excludedTag=d.eligible===false?' <span class="stmt-review">excluded</span>':'';
+    return stmtMoneySigned(actual)+excludedTag;
+  };
   let bh='<table class="interest-table"><thead><tr><th style="text-align:left">Date</th><th>Closing Balance on Date</th></tr></thead><tbody>';
-  days.forEach(d=>{bh+=`<tr><td style="text-align:left">${stmtDate(d.date)}</td><td>₹${stmtMoney(d.balance)}</td></tr>`;});
+  days.forEach(d=>{bh+=`<tr><td style="text-align:left">${stmtDate(d.date)}</td><td>₹${rowBalanceLabel(d)}</td></tr>`;});
   bh+='</tbody></table>';
   const bs=document.getElementById('stmtBalanceSchedule'); if(bs)bs.innerHTML='<h3 style="margin:12px 0 6px">Daily Date &amp; Balance Schedule</h3>'+bh;
-  let h='<thead><tr><th style="text-align:left">Date</th><th>Days in month</th><th>Closing balance</th><th>Interest-bearing balance</th><th>Daily product</th><th>Interest basis</th>';
+  let h='<thead><tr><th style="text-align:left">Date</th><th>Days in month</th><th>Closing balance</th><th>Daily product (eligible balance)</th><th>Interest basis</th>';
   slabs.forEach((s,i)=>h+=`<th>Slab ${i+1} product</th><th>Rate</th><th>Daily interest</th>`);
   h+='<th>Total daily interest</th></tr></thead><tbody>';
   days.forEach(d=>{
-    h+=`<tr><td style="text-align:left">${stmtDate(d.date)}</td><td>${d.daysInMonth}</td><td>₹${stmtMoney(d.balance)}</td><td>₹${stmtMoney(d.balance)}</td><td>365-day annual divisor</td>`;
+    const basisNote=d.eligible===false?'Excluded — not eligible':'365-day annual divisor';
+    h+=`<tr><td style="text-align:left">${stmtDate(d.date)}</td><td>${d.daysInMonth}</td><td>₹${rowBalanceLabel(d)}</td><td>₹${stmtMoney(d.balance)}</td><td>${basisNote}</td>`;
     slabs.forEach((s,i)=>{
       const p=d.parts[i]||{portion:0,rate:s.rate};
       const di=p.portion*p.rate/100/365;
@@ -3832,10 +3985,10 @@ function stmtShowDaily(){
   });
   h+=`<th>₹${stmtMoney(totalInterest)}</th></tr></tfoot>`;
   document.getElementById('stmtDailyTable').innerHTML=h;
-  const exampleInterest=(300000*5/100/365)+(200000*6/100/365)+(200000*7/100/365);
+  const excludedCount=days.filter(d=>d.eligible===false).length;
   document.getElementById('stmtDailyTotals').innerHTML=
-    `<div class="summary" style="margin-top:16px"><div class="stat"><div class="stat-label">Total daily product</div><div class="stat-value">₹${stmtMoney(totalProduct)}</div></div><div class="stat"><div class="stat-label">Total daily interest</div><div class="stat-value">₹${stmtMoney(totalInterest)}</div></div><div class="stat"><div class="stat-label">Calendar days covered</div><div class="stat-value">${days.length}</div></div></div>
-     <div class="note" style="margin-top:14px"><b>Slab example:</b> If daily product is ₹7,00,000 and slabs are ₹3,00,000 @ 5%, next ₹2,00,000 @ 6%, and balance @ 7%, each day's interest is calculated using the 365-day divisor. The statement calculation uses the same 365-day annual divisor for every day.</div>`;
+    `<div class="summary" style="margin-top:16px"><div class="stat"><div class="stat-label">Total daily product</div><div class="stat-value">₹${stmtMoney(totalProduct)}</div></div><div class="stat"><div class="stat-label">Total daily interest</div><div class="stat-value">₹${stmtMoney(totalInterest)}</div></div><div class="stat"><div class="stat-label">Calendar days covered</div><div class="stat-value">${days.length}</div></div>${excludedCount?`<div class="stat"><div class="stat-label">Days excluded</div><div class="stat-value stmt-review">${excludedCount}</div></div>`:''}</div>
+     <div class="note" style="margin-top:14px"><b>Slab example:</b> If daily product is ₹7,00,000 and slabs are ₹3,00,000 @ 5%, next ₹2,00,000 @ 6%, and balance @ 7%, each day's interest is calculated using the 365-day divisor. The statement calculation uses the same 365-day annual divisor for every day. "Closing balance" shows the day's actual balance (Dr = debit, Cr = credit); "Daily product" shows only the amount eligible for interest under the selected account type — a day marked "excluded" contributes ₹0 to the daily product.</div>`;
   box.style.display='block';
   document.getElementById('stmtShowDailyBtn').textContent='Hide daily calculation';
 }
@@ -3882,7 +4035,8 @@ function stmtRunCalculation(){
   stmtSaveSlabs(slabs);
   const manual=document.getElementById('stmtBankInterest').value.trim();
   const manualVal=manual===''?null:Number(manual);
-  const result=stmtCalculate(rows,slabs,manualVal);
+  const accountType=document.getElementById('stmtAccountType')?.value==='loan'?'loan':'deposit';
+  const result=stmtCalculate(rows,slabs,manualVal,accountType);
   stmtRenderResults(result,slabs);
   if(mapStatus)mapStatus.textContent=result.error
     ? 'Calculation needs attention: '+result.error
@@ -3962,6 +4116,11 @@ document.getElementById('stmtMenuSettings')?.addEventListener('click',()=>{
 document.getElementById('stmtMenuReset')?.addEventListener('click',()=>{
   document.getElementById('stmtResetBtn')?.click();
   stmtScrollTo('module-statement');
+});
+document.getElementById('stmtAccountType')?.addEventListener('change',()=>{
+  // Debit/credit eligibility depends on account type, so any existing result
+  // must be recalculated rather than silently left stale.
+  if(stmtLastResult){ stmtLastResult=null; stmtRunCalculation(); }
 });
 
 document.getElementById('stmtFile').addEventListener('change',async e=>{
@@ -5194,7 +5353,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
 </script>
 
 <script>
-// StatementIQ working Bank Interest engine transplant for Financial Calculator with Bank Interest Comparison v8.13
+// StatementIQ working Bank Interest engine transplant for Financial Calculator with Bank Interest Comparison v8.12
 (function(){
   const aliasGroups={
     date:['transaction date','txn date','tran date','value date','posting date','post date','date of transaction','trans date','date'],
@@ -5276,22 +5435,26 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
     return {header:-1,date,balance,debit:-1,credit:-1,amount:-1,drcr:-1,narration:-1,ref:-1,confidence:date>=0&&balance>=0?70:0};
   }
   function openingClosing(raw,map,rows){
-    let opening=null,closing=null;
+    let opening=null,openingTag=null,closing=null;
     const find=(patterns)=>{
       for(let i=0;i<raw.length;i++){
         const text=(raw[i]||[]).map(v=>String(v??'')).join(' ');
         if(!patterns.some(p=>p.test(text)))continue;
-        for(const v of raw[i]||[]){const n=parseNumberFlexible(v);if(String(v??'').trim()!==''&&Number.isFinite(n)&&Math.abs(n)>0)return n;}
-        for(let j=i+1;j<=Math.min(i+2,raw.length-1);j++)for(const v of raw[j]||[]){const n=parseNumberFlexible(v);if(String(v??'').trim()!==''&&Number.isFinite(n))return n;}
+        const cells=raw[i]||[];
+        for(let c=0;c<cells.length;c++){const v=cells[c];const n=parseNumberFlexible(v);if(String(v??'').trim()!==''&&Number.isFinite(n)&&Math.abs(n)>0)return {value:n,tag:stmtDrCrTag(v)||stmtDrCrTag(cells[c+1])};}
+        for(let j=i+1;j<=Math.min(i+2,raw.length-1);j++){const cells2=raw[j]||[];for(let c=0;c<cells2.length;c++){const v=cells2[c];const n=parseNumberFlexible(v);if(String(v??'').trim()!==''&&Number.isFinite(n))return {value:n,tag:stmtDrCrTag(v)||stmtDrCrTag(cells2[c+1])};}}
       } return null;
     };
-    opening=find([/\bopening\s+balance\b/i,/\bbrought\s+forward\b/i,/\bbalance\s+brought\s+forward\b/i,/\bb\/f\b/i]);
-    closing=find([/\bclosing\s+balance\b/i,/\bcarried\s+forward\b/i,/\bbalance\s+carried\s+forward\b/i,/\bc\/f\b/i]);
+    const openingFound=find([/\bopening\s+balance\b/i,/\bbrought\s+forward\b/i,/\bbalance\s+brought\s+forward\b/i,/\bb\/f\b/i]);
+    const closingFound=find([/\bclosing\s+balance\b/i,/\bcarried\s+forward\b/i,/\bbalance\s+carried\s+forward\b/i,/\bc\/f\b/i]);
+    if(openingFound){opening=openingFound.value;openingTag=openingFound.tag;}
+    if(closingFound)closing=closingFound.value;
     if(opening===null && rows.length && rows[0].balance!==null){
       opening=rows[0].balance-(rows[0].credit||0)+(rows[0].debit||0);
+      openingTag=rows[0].balanceDrCr;
     }
     if(closing===null && rows.length)closing=rows[rows.length-1].balance;
-    return {opening,closing};
+    return {opening,openingTag,closing};
   }
   function parseRows(raw){
     if(!Array.isArray(raw)||!raw.length)return {rows:[],map:null,opening:null,closing:null};
@@ -5309,6 +5472,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
       if(!date)continue;
       const bRaw=get(g,'balance');
       let balance=col.balance>=0&&String(bRaw??'').trim()!==''?parseNumberFlexible(bRaw):null;
+      const balanceDrCr=stmtDrCrTag(get(g,'drcr'))||stmtDrCrTag(bRaw);
       let debit=col.debit>=0?Math.abs(parseNumberFlexible(dRaw)):0;
       let credit=col.credit>=0?Math.abs(parseNumberFlexible(cRaw)):0;
       if(col.debit<0&&col.credit<0&&col.amount>=0){
@@ -5316,7 +5480,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
         if(/\bCR\.?$/.test(au)||/^C/.test(flag))credit=Math.abs(a); else if(/\bDR\.?$/.test(au)||/^D/.test(flag))debit=Math.abs(a); else if(a<0)credit=Math.abs(a); else debit=Math.abs(a);
       }
       if(!debit&&!credit&&balance===null)continue;
-      out.push({date,debit,credit,balance,narration:narr||'(no description)',ref:col.ref>=0?String(get(g,'ref')||'').trim():'',sourceRow:i+1});
+      out.push({date,debit,credit,balance,balanceDrCr,narration:narr||'(no description)',ref:col.ref>=0?String(get(g,'ref')||'').trim():'',sourceRow:i+1});
     }
     if(out.length>2){let desc=0,asc=0;for(let i=1;i<out.length;i++){if(out[i].date<out[i-1].date)desc++;else if(out[i].date>out[i-1].date)asc++;}if(desc>asc*2)out.reverse();}
     const oc=openingClosing(raw,map,out);
@@ -5327,7 +5491,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
     }
     // If an explicit opening exists and the first balance is a post-transaction closing,
     // preserve the supplied transaction balances; the interest engine will use opening.
-    return {rows:out,map,opening:oc.opening,closing:oc.closing};
+    return {rows:out,map,opening:oc.opening,openingTag:oc.openingTag,closing:oc.closing};
   }
   function applyMap(map){
     if(!map)return;
@@ -5351,64 +5515,32 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
     for(const s of slabs){if(b<=prev)break;const upper=s.to===null?Infinity:Number(s.to);const portion=Math.max(0,Math.min(b,upper)-prev);if(portion>0)parts.push({portion,rate:Number(s.rate)||0});if(!isFinite(upper))break;prev=upper;}
     return parts;
   }
-  function stmtDetectAccountType(rows){
-    const text=(rows||[]).map(r=>String(r.narration||'')).join(' ').toLowerCase();
-    const loanHits=(text.match(/\b(loan|term loan|cash credit|cc account|overdraft|od account|emi|instalment|installment|principal outstanding|loan repayment|loan interest)\b/g)||[]).length;
-    const depHits=(text.match(/\b(savings|saving account|current account|deposit account|fixed deposit|term deposit|recurring deposit|interest credited|deposit interest)\b/g)||[]).length;
-    if(loanHits>depHits && loanHits>0)return 'loan';
-    if(depHits>loanHits && depHits>0)return 'deposit';
-    // If the statement does not contain reliable product words, keep the
-    // conventional bank-statement default as deposit rather than guessing loan.
-    return 'deposit';
-  }
-  function stmtSetAccountTypeStatus(type, detected){
-    const el=document.getElementById('stmtAccountTypeStatus');
-    if(!el)return;
-    const t=type==='auto'?detected:type;
-    el.innerHTML = t==='loan'
-      ? '<b>Loan basis:</b> only the debit/outstanding closing balance of each day is used. Any credit balance is excluded.'
-      : '<b>Deposit basis:</b> only the credit closing balance of each day is used. Any debit balance is excluded.';
-  }
-  function stmtEligibleDailyBalance(row, accountType){
-    const b=Number(row?.balance);
-    if(!Number.isFinite(b))return 0;
-    // Some statements carry DR/CR beside the running balance. Honour that
-    // side indicator when present. Transaction DR/CR is intentionally NOT
-    // used here because a loan repayment is a credit transaction but does
-    // not create a credit balance.
-    const side=String(row?.balanceSide||'').toUpperCase();
-    if(accountType==='loan'){
-      if(side==='CR')return 0;
-      return Math.max(0,b);
-    }
-    if(side==='DR')return 0;
-    return Math.max(0,b);
-  }
-
-  function interestDaily(rows,slabs,openingOverride){
+  function interestDaily(rows,slabs,openingOverride,accountType,openingTag){
+    accountType = accountType==='loan' ? 'loan' : 'deposit';
     const rs=(rows||[]).filter(r=>r.date instanceof Date&&!isNaN(r.date)).sort((a,b)=>a.date-b.date);
-    if(!rs.length)return {days:[],monthly:[],total:0,error:'No dated transactions found.'};
-    const requestedType=document.getElementById('stmtAccountType')?.value||'auto';
-    const detectedType=stmtDetectAccountType(rs);
-    const accountType=requestedType==='auto'?detectedType:requestedType;
-    stmtSetAccountTypeStatus(requestedType, detectedType);
+    if(!rs.length)return {days:[],monthly:[],total:0,error:'No dated transactions found.',accountType};
 
     const first=new Date(rs[0].date.getFullYear(),rs[0].date.getMonth(),rs[0].date.getDate());
     const last=new Date(rs[rs.length-1].date.getFullYear(),rs[rs.length-1].date.getMonth(),rs[rs.length-1].date.getDate());
 
+    // stmtDayEligible() turns a magnitude + optional Dr/Cr marker into a signed
+    // "actual" balance (positive = credit, negative = debit); when the source
+    // gave no marker it assumes the account type's normal polarity — a deposit
+    // account defaults to credit, a loan account defaults to debit.
     let opening=openingOverride;
-    if(opening===null||opening===undefined){
+    let openingActual = (opening===null||opening===undefined) ? null : stmtDayEligible(opening,openingTag,accountType).actual;
+    if(openingActual===null){
       const r=rs[0];
-      if(r.balance!==null)opening=Number(r.balance)-Number(r.credit||0)+Number(r.debit||0);
+      if(r.balance!==null)openingActual=stmtDayEligible(Number(r.balance)-Number(r.credit||0)+Number(r.debit||0),r.balanceDrCr,accountType).actual;
     }
 
     let startDate,firstMonthMode='from-opening-balance';
-    if(opening===null||!Number.isFinite(opening)){
+    if(openingActual===null||!Number.isFinite(openingActual)){
       if(first.getDate()>1){
-        startDate=first; opening=Number(rs[0].balance||0); firstMonthMode='from-first-transaction';
+        startDate=first; openingActual=stmtDayEligible(Number(rs[0].balance||0),rs[0].balanceDrCr,accountType).actual; firstMonthMode='from-first-transaction';
       }else{
         startDate=new Date(first.getFullYear(),first.getMonth(),1);
-        opening=Number(rs[0].balance||0); firstMonthMode='from-first-day-closing-balance';
+        openingActual=stmtDayEligible(Number(rs[0].balance||0),rs[0].balanceDrCr,accountType).actual; firstMonthMode='from-first-day-closing-balance';
       }
     }else startDate=new Date(first.getFullYear(),first.getMonth(),1);
 
@@ -5416,13 +5548,13 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
     rs.forEach(r=>{const k=stmtDayKey(r.date);(byDay[k]=byDay[k]||[]).push(r);});
 
     const days=[];
-    let balance=opening,currentMonth=null,monthOpening=opening;
+    let actualBalance=openingActual,currentMonth=null,monthOpening=openingActual;
     const end=new Date(last.getFullYear(),last.getMonth()+1,0);
 
     for(let d=new Date(startDate);d<=end;d.setDate(d.getDate()+1)){
       const k=stmtDayKey(d),tx=byDay[k]||[],m=stmtMonthKey(d);
-      if(m!==currentMonth){ currentMonth=m; monthOpening=balance; }
-      const openingForDay=balance;
+      if(m!==currentMonth){ currentMonth=m; monthOpening=actualBalance; }
+      const openingForDay=actualBalance;
       if(tx.length){
         const wb=tx.filter(r=>r.balance!==null&&Number.isFinite(Number(r.balance)));
         if(wb.length){
@@ -5431,19 +5563,22 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
           let operational=wb;
           const special=tx.filter(r=>stmtInterestTx(r).isInterest||stmtChargeTx(r).isCharge);
           if(special.length&&wb.length>=2) operational=wb.slice(0,-1);
-          balance=Number((operational.length?operational[operational.length-1]:wb[wb.length-1]).balance);
+          const chosen=(operational.length?operational[operational.length-1]:wb[wb.length-1]);
+          actualBalance=stmtDayEligible(Number(chosen.balance),chosen.balanceDrCr,accountType).actual;
         }else{
           tx.forEach(r=>{
             const special=stmtInterestTx(r).isInterest||stmtChargeTx(r).isCharge;
-            balance += Number(r.credit||0)-Number(r.debit||0);
+            actualBalance += Number(r.credit||0)-Number(r.debit||0);
             // The posted charge/interest remains part of the running balance for
             // subsequent days, but not for the current day's interest basis.
-            if(special) balance -= Number(r.credit||0)-Number(r.debit||0);
+            if(special) actualBalance -= Number(r.credit||0)-Number(r.debit||0);
           });
         }
       }
+      const cls=stmtClassifyBalance(actualBalance,accountType);
       days.push({date:new Date(d),month:m,daysInMonth:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),
-        opening:openingForDay,monthOpening,balance,hasTransaction:tx.length>0,txCount:tx.length});
+        opening:openingForDay,monthOpening,balance:cls.magnitude,actualBalance,eligible:cls.eligible,balanceType:cls.type,
+        hasTransaction:tx.length>0,txCount:tx.length});
     }
 
     const firstMonth=stmtMonthKey(first),lastMonth=stmtMonthKey(last);
@@ -5455,16 +5590,12 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
       const m=monthlyMap[x.month]??={month:x.month,days:x.daysInMonth,calculatedDays:0,dailyProduct:0,interest:0,
         slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),
         actualInterest:0,bankInterestCredited:0,bankInterestCharged:0,bankCharges:0,
-        openingBalance:x.monthOpening,closingBalance:x.balance};
-      x.interestBearingBalance=stmtEligibleDailyBalance(x,accountType);
-      const parts=allocate(x.interestBearingBalance,slabs);
+        openingBalance:x.monthOpening,closingBalance:x.actualBalance,excludedDays:0,excludedBalanceTotal:0};
+      const parts=allocate(x.balance,slabs);
       x.parts=parts;
-      x.interest=x.interestBearingBalance>0
-        ? parts.reduce((a,p)=>a+p.portion*p.rate/100/365,0)
-        : 0;
-      // A day is counted in the calendar, but a zero/opposite-side balance
-      // contributes ZERO to daily product and ZERO interest.
-      m.dailyProduct+=x.interestBearingBalance; m.calculatedDays++; m.interest+=x.interest; m.closingBalance=x.balance;
+      x.interest=parts.reduce((a,p)=>a+p.portion*p.rate/100/365,0);
+      m.dailyProduct+=x.balance; m.calculatedDays++; m.interest+=x.interest; m.closingBalance=x.actualBalance;
+      if(!x.eligible){ m.excludedDays++; m.excludedBalanceTotal+=Math.abs(x.actualBalance); }
       parts.forEach((p,i)=>{
         m.slabProducts[i]+=p.portion;
         m.slabInterest[i]+=p.portion*p.rate/100/365;
@@ -5510,22 +5641,23 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
     const detectedMagnitude=Math.abs(detectedNet);
     return {
       daily:days,monthly:all,allMonthly:all,total,
+      accountType,
+      excludedDayCount:days.filter(x=>!x.eligible).length,
+      excludedBalanceTotal:days.filter(x=>!x.eligible).reduce((a,x)=>a+Math.abs(x.actualBalance),0),
       autoBankInterest:detectedMagnitude,
       bankInterestCredited,bankInterestCharged,bankCharges,
       bankInterestNet:detectedNet,bankEntries,
-      opening:days[0]?.opening??opening,closing:days.at(-1)?.balance??balance,
+      opening:days[0]?.opening??openingActual,closing:days.at(-1)?.actualBalance??actualBalance,
       startDate,firstMonthMode,partial:!firstComplete||!lastComplete,
-      calculatedDays:all.reduce((a,m)=>a+m.calculatedDays,0),
-      accountType,
-      detectedAccountType:detectedType
+      calculatedDays:all.reduce((a,m)=>a+m.calculatedDays,0)
     };
   }
 
   // Replace the calculation entry point with the working StatementIQ flow.
   window.stmtRowsFromMapping=function(){const p=parseRows(stmtRawRows||[]);window.__fiqMapped=p;applyMap(p.map);window.__stmtAIMap=p.map||null;window.__stmtOpeningClosing={opening:p.opening,closing:p.closing};return p.rows;};
-  window.stmtCalculate=function(rows,slabs,manualBankInterest){
+  window.stmtCalculate=function(rows,slabs,manualBankInterest,accountType){
     const p=window.__fiqMapped||{};
-    const r=interestDaily(rows,slabs,p.opening);
+    const r=interestDaily(rows,slabs,p.opening,accountType,p.openingTag);
     if(!r.daily.length)return r;
     const bank=manualBankInterest!==null&&!isNaN(manualBankInterest)
       ?Number(manualBankInterest)
@@ -5540,23 +5672,9 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
     const status=document.getElementById('stmtStatus');if(status){status.style.display='block';status.textContent=rows.length?'Mapped '+rows.length+' transaction rows. Calculating interest…':'No transaction rows could be mapped. Please check the statement preview.';}
     if(!rows.length){alert('No valid transactions were found.\n\nThe workbook was read, but the working StatementIQ mapper could not identify transaction rows. It checks Date, Debit, Credit, Amount, DR/CR and Balance using both headings and the actual values. Please check the preview.');return;}
     const slabs=stmtNormaliseSlabs(stmtSlabRows());const errors=stmtValidateSlabs(slabs);if(errors.length){alert(errors.join('\n'));return;}stmtSaveSlabs(slabs);
-    const manual=(document.getElementById('stmtBankInterest')?.value||'').trim();const manualVal=manual===''?null:Number(manual);const result=window.stmtCalculate(rows,slabs,manualVal);stmtRenderResults(result,slabs);if(status)status.textContent=result.error?'Calculation needs attention: '+result.error:'Interest calculated for '+(result.monthly||[]).length+' month(s).';document.getElementById('stmtMenuMonthly')?.removeAttribute('disabled');document.getElementById('stmtMenuDaily')?.removeAttribute('disabled');
+    const manual=(document.getElementById('stmtBankInterest')?.value||'').trim();const manualVal=manual===''?null:Number(manual);const accountType=document.getElementById('stmtAccountType')?.value==='loan'?'loan':'deposit';const result=window.stmtCalculate(rows,slabs,manualVal,accountType);stmtRenderResults(result,slabs);if(status)status.textContent=result.error?'Calculation needs attention: '+result.error:'Interest calculated for '+(result.monthly||[]).length+' month(s).';document.getElementById('stmtMenuMonthly')?.removeAttribute('disabled');document.getElementById('stmtMenuDaily')?.removeAttribute('disabled');
   document.getElementById('stmtMenuLoan')?.removeAttribute('disabled');
   };
-  document.getElementById('stmtAccountType')?.addEventListener('change',()=>{
-    if(!stmtRawRows?.length)return;
-    try{
-      const p=parseRows(stmtRawRows);
-      window.__fiqMapped=p;
-      const slabs=stmtNormaliseSlabs(stmtSlabRows());
-      const manual=(document.getElementById('stmtBankInterest')?.value||'').trim();
-      const manualVal=manual===''?null:Number(manual);
-      if(p.rows?.length){
-        const result=window.stmtCalculate(p.rows,slabs,manualVal);
-        stmtRenderResults(result,slabs);
-      }
-    }catch(e){console.warn('Account type recalculation:',e);}
-  });
 })();
 
 </script>
