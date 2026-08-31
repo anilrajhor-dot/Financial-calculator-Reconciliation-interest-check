@@ -3692,7 +3692,25 @@ function stmtNarrationText(r){
 function stmtInterestTx(r, previousRow){
   const n=stmtNarrationText(r);
   const hasInterest=/\binterest\b|\bint\b|\bintt\b|\bintrest\b|\bloan\s+interest\b|\binterest\s*(debit|credit|charged|debited|credited|applied)\b/.test(n);
-  if(!hasInterest)return {isInterest:false,credit:0,debit:0,net:0,amount:0,type:''};
+  if(!hasInterest)return {isInterest:false,excluded:false,credit:0,debit:0,net:0,amount:0,type:''};
+
+  // Narrations that mention "interest" but do NOT represent the bank's own
+  // periodic interest payment/charge on THIS account — e.g. a transfer of
+  // interest from another account, a sweep, TDS on interest, a reversal/
+  // adjustment/correction, subvention, or a provisional entry. These must
+  // not inflate "Bank interest credited/charged" used for the comparison.
+  const near=(a,b)=>new RegExp('\\b'+a+'\\b[\\s\\S]{0,25}\\b'+b+'\\b|\\b'+b+'\\b[\\s\\S]{0,25}\\b'+a+'\\b').test(n);
+  const nonGenuine =
+    near('interest','transfer(?:red)?') ||
+    near('interest','sweep(?:t)?') ||
+    near('interest','tds') ||
+    /\binterest\s*(reversal|reversed|adjustment|adjusted|correction|corrected)\b/.test(n) ||
+    near('interest','reversal|reversed|adjustment|adjusted') ||
+    near('interest','subvention') ||
+    /\bprovisional\s*interest\b|\binterest\s*provision\b/.test(n) ||
+    /\binterest\s*(warrant|cheque|instrument)\b/.test(n) ||
+    /\binterest\s*rate\s*(change|revision|revised)\b/.test(n);
+  if(nonGenuine)return {isInterest:false,excluded:true,credit:0,debit:0,net:0,amount:0,type:'Interest-related, not counted (transfer/adjustment)'};
 
   let credit=Math.abs(Number(r?.credit||0));
   let debit=Math.abs(Number(r?.debit||0));
@@ -3908,6 +3926,11 @@ function stmtCalculate(rows,slabs,manualBankInterest,accountType){
     };
 
     const it=stmtInterestTx(r,prev);
+    if(it.excluded){
+      const amt=Math.abs(Number(r?.credit||0))||Math.abs(Number(r?.debit||0));
+      bankEntries.push({date:r.date,narration:r.narration,amount:amt,type:it.type});
+      return;
+    }
     if(it.isInterest){
       if(it.credit>0){
         bankInterestCredited+=it.credit;
@@ -5757,6 +5780,11 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
         calculatedDays:0,dailyProduct:0,interest:0,slabProducts:slabs.map(()=>0),slabInterest:slabs.map(()=>0),
         actualInterest:0,bankInterestCredited:0,bankInterestCharged:0,bankCharges:0,openingBalance:null,closingBalance:null};
       const it=stmtInterestTx(r,prev);
+      if(it.excluded){
+        const amt=Math.abs(Number(r?.credit||0))||Math.abs(Number(r?.debit||0));
+        bankEntries.push({date:r.date,narration:r.narration,amount:amt,type:it.type});
+        return;
+      }
       if(it.isInterest){
         if(it.credit>0){
           bankInterestCredited+=it.credit; m.bankInterestCredited+=it.credit; m.actualInterest+=it.credit;
