@@ -861,7 +861,25 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <button id="stmtMenuReset" class="btn" type="button">↺ Reset</button>
 </div>
 
-    <div class="card input-card">
+    <div class="card input-card" id="stmtAccountTypeGate" style="border:2px solid var(--brass);">
+      <div class="stub-title" style="margin-bottom:4px;">Step 1 — Is this a Deposit or a Loan statement?</div>
+      <div class="stub-sub" style="color:var(--muted);margin-bottom:16px;">This decides which days are eligible for interest, so please choose before uploading the statement.</div>
+      <div class="row" style="gap:14px;flex-wrap:wrap">
+        <button id="stmtChooseDeposit" class="btn primary" type="button" style="flex:1;min-width:230px;padding:16px;text-align:left;line-height:1.5">
+          💰 <b>Deposit / Savings Account</b><br/><span style="font-weight:400;font-size:13px">Only days with a credit closing balance earn interest. A day the account is overdrawn (a debit balance) is excluded.</span>
+        </button>
+        <button id="stmtChooseLoan" class="btn primary" type="button" style="flex:1;min-width:230px;padding:16px;text-align:left;line-height:1.5">
+          🏦 <b>Loan / OD / CC Account</b><br/><span style="font-weight:400;font-size:13px">Only days with a debit closing balance (the amount owed) are used. A day the account shows a credit balance is excluded.</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="card input-card" id="stmtAccountTypeChosenBanner" style="display:none;padding:12px 20px;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;flex-direction:row;">
+      <span id="stmtAccountTypeChosenText" style="font-size:14px"></span>
+      <button id="stmtChangeAccountType" class="btn" type="button" style="padding:5px 14px;font-size:13px">Change</button>
+    </div>
+
+    <div class="card input-card" id="stmtUploadCard" style="display:none;">
       <div class="grid">
         <div>
           <label for="stmtFile">Statement file (CSV / XLSX / XLS / PDF / JSON)</label>
@@ -882,6 +900,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
         <div>
           <label for="stmtAccountType">Account type</label>
           <select id="stmtAccountType">
+            <option value="" disabled selected>Select account type…</option>
             <option value="deposit">Deposit / Savings (credit balance)</option>
             <option value="loan">Loan / OD / CC (debit balance)</option>
           </select>
@@ -4197,6 +4216,38 @@ function stmtScrollTo(id){
   const el=document.getElementById(id);
   if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
 }
+function stmtAccountTypeChosen(){
+  return document.getElementById('stmtAccountType')?.value==='loan'
+      || document.getElementById('stmtAccountType')?.value==='deposit';
+}
+function stmtSetAccountType(type){
+  const sel=document.getElementById('stmtAccountType');
+  if(sel)sel.value=type;
+  document.getElementById('stmtAccountTypeGate')?.style.setProperty('display','none');
+  document.getElementById('stmtUploadCard')?.style.setProperty('display','block');
+  const banner=document.getElementById('stmtAccountTypeChosenBanner');
+  if(banner)banner.style.display='flex';
+  const bannerText=document.getElementById('stmtAccountTypeChosenText');
+  if(bannerText)bannerText.innerHTML = type==='loan'
+    ? '🏦 <b>Loan / OD / CC account</b> selected — only debit-balance (amount owed) days are used for interest.'
+    : '💰 <b>Deposit / Savings account</b> selected — only credit-balance days are used for interest.';
+  // Account type changes which days are eligible, so any existing result is stale.
+  if(typeof stmtLastResult!=='undefined' && stmtLastResult){ stmtLastResult=null; if(typeof stmtRunCalculation==='function')stmtRunCalculation(); }
+}
+document.getElementById('stmtChooseDeposit')?.addEventListener('click',()=>stmtSetAccountType('deposit'));
+document.getElementById('stmtChooseLoan')?.addEventListener('click',()=>stmtSetAccountType('loan'));
+document.getElementById('stmtChangeAccountType')?.addEventListener('click',()=>{
+  document.getElementById('stmtAccountTypeGate')?.style.setProperty('display','block');
+  stmtScrollTo('stmtAccountTypeGate');
+});
+function stmtRequireAccountType(){
+  if(stmtAccountTypeChosen())return true;
+  document.getElementById('stmtAccountTypeGate')?.style.setProperty('display','block');
+  document.getElementById('stmtAccountTypeChosenBanner')?.style.setProperty('display','none');
+  stmtScrollTo('stmtAccountTypeGate');
+  alert('Please choose Deposit or Loan account first — this decides which days are eligible for interest.');
+  return false;
+}
 async function stmtEnsureStatementLoaded(){
   if(Array.isArray(window.__statementRows) && window.__statementRows.length){
     stmtRawRows=window.__statementRows;
@@ -4221,6 +4272,7 @@ async function stmtEnsureStatementLoaded(){
 }
 
 async function stmtMenuCalculate(){
+  if(!stmtRequireAccountType())return;
   if(stmtLastResult){ stmtScrollTo('stmtResults'); return; }
   const loaded=await stmtEnsureStatementLoaded();
   if(!loaded){
@@ -4286,10 +4338,11 @@ document.getElementById('stmtMenuReset')?.addEventListener('click',()=>{
   document.getElementById('stmtResetBtn')?.click();
   stmtScrollTo('module-statement');
 });
-document.getElementById('stmtAccountType')?.addEventListener('change',()=>{
-  // Debit/credit eligibility depends on account type, so any existing result
-  // must be recalculated rather than silently left stale.
-  if(stmtLastResult){ stmtLastResult=null; stmtRunCalculation(); }
+document.getElementById('stmtAccountType')?.addEventListener('change',(e)=>{
+  // Keep the confirmation banner and gate in sync when the type is changed
+  // via the settings dropdown rather than the Step 1 buttons.
+  const v=e.target.value;
+  if(v==='loan'||v==='deposit')stmtSetAccountType(v);
 });
 
 document.getElementById('stmtFile').addEventListener('change',async e=>{
@@ -4397,6 +4450,11 @@ document.getElementById('stmtResetBtn').addEventListener('click',()=>{
   document.getElementById('stmtMenuShare')?.setAttribute('disabled','disabled');
   document.getElementById('stmtShareCard')?.style.setProperty('display','none');
   const stmtShareStatusEl=document.getElementById('stmtShareStatus'); if(stmtShareStatusEl)stmtShareStatusEl.textContent='';
+  // A full reset starts over, so ask Deposit/Loan again before the next statement.
+  const acctSel=document.getElementById('stmtAccountType'); if(acctSel)acctSel.value='';
+  document.getElementById('stmtAccountTypeGate')?.style.setProperty('display','block');
+  document.getElementById('stmtAccountTypeChosenBanner')?.style.setProperty('display','none');
+  document.getElementById('stmtUploadCard')?.style.setProperty('display','none');
 });
 stmtRenderSlabs(stmtLoadSlabs());
 
@@ -5845,6 +5903,7 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
     return {...r,bankInterest:bank,overallDifference:bank!==null?r.total-bank:null};
   };
   window.stmtRunCalculation=function(){
+    if(typeof stmtRequireAccountType==='function' && !stmtRequireAccountType())return;
     if((!stmtRawRows||!stmtRawRows.length) && Array.isArray(window.__statementRows)) stmtRawRows=window.__statementRows;
     if(!stmtRawRows||!stmtRawRows.length){alert('Please upload/select the bank statement first.');return;}
     const p=parseRows(stmtRawRows);window.__fiqMapped=p;applyMap(p.map);window.__stmtAIMap=p.map;window.__stmtOpeningClosing={opening:p.opening,closing:p.closing};
