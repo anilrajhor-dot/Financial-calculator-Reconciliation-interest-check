@@ -855,7 +855,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <button id="stmtMenuCalculate" class="btn primary" type="button">🧮 Calculate Interest</button>
   <button id="stmtMenuMonthly" class="btn" type="button" disabled>📊 Month-wise Interest</button>
   <button id="stmtMenuDaily" class="btn" type="button" disabled>📅 Daily Product</button>
-  <button id="stmtMenuLoan" class="btn" type="button" disabled>🏦 Loan Interest Comparison</button>
+  <button id="stmtMenuLoan" class="btn" type="button" disabled>🏦 Statement Interest Comparison</button>
   <button id="stmtMenuShare" class="btn" type="button" disabled>📤 Share</button>
   <button id="stmtMenuSettings" class="btn" type="button">⚙ Interest Settings</button>
   <button id="stmtMenuReset" class="btn" type="button">↺ Reset</button>
@@ -985,10 +985,15 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
       <div class="summary" id="stmtSummary"></div>
 
       <div class="card input-card" id="stmtLoanComparisonCard" style="display:none;margin-bottom:24px;">
-        <div class="stub-title">🏦 Loan statement interest comparison</div>
+        <div class="stub-title">🏦 Statement Interest Comparison</div>
         <div class="stub-sub" style="margin:4px 0 14px;color:var(--muted)">
-          The app separates interest charged by the bank from other charges, calculates independent daily-product interest, compares both month by month, and derives the effective annual rate implied by the bank's interest debits.
+          Used for both Deposit/Savings and Loan/OD/CC statements. The app separates interest charged or credited by the bank from other charges, calculates independent daily-product interest, compares both month by month, and derives the effective annual rate implied by the bank's interest entries.
         </div>
+        <div class="row" style="gap:10px;flex-wrap:wrap;margin-bottom:14px">
+          <button id="stmtShareDailyBtn2" class="btn" type="button">📅 Share Daily Product</button>
+          <button id="stmtShareMonthlyBtn2" class="btn" type="button">📊 Share Monthly Product</button>
+        </div>
+        <div id="stmtShareStatus2" class="hint" style="margin:-6px 0 14px"></div>
         <div id="stmtLoanComparisonSummary" class="summary"></div>
         <div id="stmtLoanComparisonNote" class="note" style="margin-top:14px"></div>
         <div class="stub-title" style="margin-top:20px">📊 Slab-wise rate of interest applied</div>
@@ -1950,8 +1955,8 @@ function stmtMonthlyProductCsv(result){
   rows.push(['Account type',acctType==='loan'?'Loan / OD / CC (debit balance)':'Deposit / Savings (credit balance)']);
   return stmtRowsToCsv(rows);
 }
-async function stmtShareCsv(filename,csv,shareTitle){
-  const status=document.getElementById('stmtShareStatus');
+async function stmtShareCsv(filename,csv,shareTitle,statusElId){
+  const status=document.getElementById(statusElId||'stmtShareStatus');
   const setStatus=(msg)=>{ if(status)status.textContent=msg; };
   try{
     const blob=new Blob([csv],{type:'text/csv'});
@@ -4361,6 +4366,20 @@ document.getElementById('stmtShareMonthlyBtn')?.addEventListener('click',()=>{
   const csv=stmtMonthlyProductCsv(result);
   const status=document.getElementById('stmtShareStatus'); if(status)status.textContent='Preparing monthly product…';
   stmtShareCsv('Monthly-Product-'+stmtDate(new Date()).replace(/\//g,'-')+'.csv',csv,'Month-wise interest & daily product');
+});
+document.getElementById('stmtShareDailyBtn2')?.addEventListener('click',()=>{
+  if(!stmtLastResult){alert('Please calculate interest first.');return;}
+  const {result}=stmtLastResult;
+  const csv=stmtDailyProductCsv(result);
+  const status=document.getElementById('stmtShareStatus2'); if(status)status.textContent='Preparing daily product…';
+  stmtShareCsv('Daily-Product-'+stmtDate(new Date()).replace(/\//g,'-')+'.csv',csv,'Day-wise balance & daily product','stmtShareStatus2');
+});
+document.getElementById('stmtShareMonthlyBtn2')?.addEventListener('click',()=>{
+  if(!stmtLastResult){alert('Please calculate interest first.');return;}
+  const {result}=stmtLastResult;
+  const csv=stmtMonthlyProductCsv(result);
+  const status=document.getElementById('stmtShareStatus2'); if(status)status.textContent='Preparing monthly product…';
+  stmtShareCsv('Monthly-Product-'+stmtDate(new Date()).replace(/\//g,'-')+'.csv',csv,'Month-wise interest & daily product','stmtShareStatus2');
 });
 document.getElementById('stmtMenuReset')?.addEventListener('click',()=>{
   document.getElementById('stmtResetBtn')?.click();
