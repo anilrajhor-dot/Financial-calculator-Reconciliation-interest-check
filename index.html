@@ -3728,7 +3728,9 @@ function stmtInterestTx(r, previousRow){
   // not inflate "Bank interest credited/charged" used for the comparison.
   const near=(a,b)=>new RegExp('\\b'+a+'\\b[\\s\\S]{0,25}\\b'+b+'\\b|\\b'+b+'\\b[\\s\\S]{0,25}\\b'+a+'\\b').test(n);
   const nonGenuine =
-    near('interest','transfer(?:red)?') ||
+    near('interest','transfer(?:red)?|trf') ||
+    /\bint\s*\.?\s*trf\b/.test(n) ||
+    /\btrf\b.*\b(fr|frm|from)\b/.test(n) ||
     near('interest','sweep(?:t)?') ||
     near('interest','tds') ||
     /\binterest\s*(reversal|reversed|adjustment|adjusted|correction|corrected)\b/.test(n) ||
