@@ -2249,6 +2249,43 @@ async function stmtParseXlsxDirect(file){
   return best.filter(r=>Array.isArray(r));
 }
 
+let stmtPdfPasswordPending=false;
+function stmtShowPdfPasswordBox(show=true){
+  const box=document.getElementById('stmtPdfPasswordBox');
+  if(box)box.style.display=show?'block':'none';
+}
+function stmtSetPdfPasswordStatus(msg,error=false){
+  const el=document.getElementById('stmtPdfPasswordStatus');
+  if(el){el.textContent=msg;el.style.color=error?'var(--clay)':'';}
+}
+function stmtPdfPasswordCallback(updatePassword,reason){
+  stmtPdfPasswordPending=true;
+  stmtShowPdfPasswordBox(true);
+  const input=document.getElementById('stmtPdfPassword');
+  const btn=document.getElementById('stmtPdfUnlockBtn');
+  // pdf.js reports reason 1 (NEED_PASSWORD) the first time a password is
+  // required, and reason 2 (INCORRECT_PASSWORD) only after a wrong attempt.
+  // Use pdf.js's own constants where available so the two messages are
+  // never swapped, regardless of the exact numeric values in a given build.
+  const R=(window.pdfjsLib && window.pdfjsLib.PasswordResponses) || {NEED_PASSWORD:1,INCORRECT_PASSWORD:2};
+  const incorrect=reason===R.INCORRECT_PASSWORD;
+  stmtSetPdfPasswordStatus(incorrect ? 'Incorrect PDF password. Please try again.' : 'This PDF is password protected. Enter the password and tap Unlock PDF.', incorrect);
+  const submit=()=>{
+    const pw=input?.value||'';
+    if(!pw){stmtSetPdfPasswordStatus('Please enter the PDF password.',true);return;}
+    stmtSetPdfPasswordStatus('Password supplied. Unlocking PDF…');
+    try{updatePassword(pw);}catch(e){stmtSetPdfPasswordStatus('Could not unlock the PDF.',true);}
+  };
+  if(btn)btn.onclick=submit;
+  if(input){
+    input.onkeydown=e=>{if(e.key==='Enter')submit();};
+    input.focus();
+  }
+}
+function stmtPdfGetDocument(data){
+  if(!window.pdfjsLib)throw new Error('PDF reader is not available.');
+  return window.pdfjsLib.getDocument({data:data,password:stmtPdfPasswordCallback});
+}
 async function parseStatementFile(file) {
   const ext=file.name.split('.').pop().toLowerCase();
   if(ext==='xlsx'){
@@ -2343,37 +2380,8 @@ async function parseStatementFile(file) {
     if(!window.pdfjsLib)throw new Error('PDF reader failed to load.');
     const data=await file.arrayBuffer();
     const pdf=await stmtPdfGetDocument(data).promise;
-
-let stmtPdfPasswordPending=false;
-function stmtShowPdfPasswordBox(show=true){
-  const box=document.getElementById('stmtPdfPasswordBox');
-  if(box)box.style.display=show?'block':'none';
-}
-function stmtSetPdfPasswordStatus(msg,error=false){
-  const el=document.getElementById('stmtPdfPasswordStatus');
-  if(el){el.textContent=msg;el.style.color=error?'var(--clay)':'';}
-}
-function stmtPdfPasswordCallback(updatePassword,reason){
-  stmtShowPdfPasswordBox(true);
-  const input=document.getElementById('stmtPdfPassword');
-  const btn=document.getElementById('stmtPdfUnlockBtn');
-  stmtSetPdfPasswordStatus(reason===1 ? 'Incorrect PDF password. Please try again.' : 'This PDF is password protected. Enter the password and tap Unlock PDF.', reason===1);
-  const submit=()=>{
-    const pw=input?.value||'';
-    if(!pw){stmtSetPdfPasswordStatus('Please enter the PDF password.',true);return;}
-    stmtSetPdfPasswordStatus('Password supplied. Unlocking PDF…');
-    try{updatePassword(pw);}catch(e){stmtSetPdfPasswordStatus('Could not unlock the PDF.',true);}
-  };
-  if(btn)btn.onclick=submit;
-  if(input){
-    input.onkeydown=e=>{if(e.key==='Enter')submit();};
-    input.focus();
-  }
-}
-function stmtPdfGetDocument(data){
-  if(!window.pdfjsLib)throw new Error('PDF reader is not available.');
-  return window.pdfjsLib.getDocument({data:data,password:stmtPdfPasswordCallback});
-}
+    stmtPdfPasswordPending=false;
+    stmtShowPdfPasswordBox(false);
     const rows=[];
     for(let p=1;p<=pdf.numPages;p++){
       const page=await pdf.getPage(p), content=await page.getTextContent();
@@ -3739,6 +3747,24 @@ function stmtInterestTx(r, previousRow){
   const otherProduct=/\b(fdr?|fd's?|fixed\s*deposit|term\s*deposit|tdr|stdr|\btd\b|\brd\b|recurring\s*deposit|\bnre\b|\bnro\b|\bfcnr\b|\bkvp\b|\bppf\b|\bmis\b|\bscss\b|\bssy\b|sukanya|\bnsc\b|tax\s*saver)\b/.test(n);
   if(otherProduct)return {isInterest:false,excluded:true,credit:0,debit:0,net:0,amount:0,type:'Interest-related, not counted (other deposit product, e.g. FD/RD/term deposit)'};
 
+  // Interest that did not originate from the bank's own core-banking interest
+  // run — e.g. interest on an income-tax refund, on bonds/debentures/
+  // securities, dividend-and-interest payouts, insurance/staff-loan
+  // subsidy interest, or compensation/delayed-payment interest — is not
+  // this account's own savings/current interest even though it lands in
+  // this statement as a credit.
+  const otherSource=/\b(it\s*refund|income\s*tax\s*refund|tax\s*refund|refund)\b/.test(n) && /\binterest\b/.test(n)
+    || /\bbond\b|\bdebenture\b|\bsecurit(?:y|ies)\b|\bdividend\b|\binsurance\b|\bstaff\s*loan\b|\bcompensation\b|\bmargin\s*money\b|\bdelayed\s*payment\b/.test(n);
+  if(otherSource)return {isInterest:false,excluded:true,credit:0,debit:0,net:0,amount:0,type:'Interest-related, not counted (not this account\'s own interest)'};
+
+  // A credit narration that references an external transfer instrument
+  // (NEFT/RTGS/IMPS/UPI/cheque/collection/UTR) alongside the word "interest"
+  // is money received from a third party that happens to mention interest —
+  // for example interest paid by another company via NEFT — not the bank's
+  // own periodic interest credit on this account.
+  const externalInstrument=/\bneft\b|\brtgs\b|\bimps\b|\bupi\b|\bcheque\b|\bchq\b|\bclg\b|\bcollection\b|\butr\b/.test(n);
+  if(externalInstrument)return {isInterest:false,excluded:true,credit:0,debit:0,net:0,amount:0,type:'Interest-related, not counted (external transfer referencing interest)'};
+
   let credit=Math.abs(Number(r?.credit||0));
   let debit=Math.abs(Number(r?.debit||0));
 
@@ -4364,10 +4390,14 @@ document.getElementById('stmtFile').addEventListener('change',async e=>{
   document.getElementById('stmtShareCard')?.style.setProperty('display','none');
   const stmtShareStatusEl=document.getElementById('stmtShareStatus'); if(stmtShareStatusEl)stmtShareStatusEl.textContent='';
 
-  stmtShowPdfPasswordBox(/\.pdf$/i.test((e.target.files&&e.target.files[0]&&e.target.files[0].name)||''));
+  // The password box is only revealed reactively via stmtPdfPasswordCallback,
+  // which pdf.js calls if and only if the PDF actually turns out to be
+  // password protected. Guessing from the filename beforehand was unreliable.
+  stmtShowPdfPasswordBox(false);
+  document.getElementById('stmtPdfPassword') && (document.getElementById('stmtPdfPassword').value='');
   const file=e.target.files[0]; if(!file)return;
   const status=document.getElementById('stmtStatus');
-  status.style.display='block';status.textContent='Reading file…';
+  status.style.display='block';status.textContent=/\.pdf$/i.test(file.name)?'Reading file… (checking for a PDF password)':'Reading file…';
   document.getElementById('stmtResults').style.display='none';
   try{
     const rows=await parseStatementFile(file);
