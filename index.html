@@ -482,7 +482,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calculator with Bank Interest Comparison</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; <strong>v8.12</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; SHG Grading &middot; <strong>v8.13</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -501,6 +501,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
     <button class="tab" data-module="statement">Bank Statement Interest</button>
     <button class="tab" data-module="recon">Reconciliation</button>
     <button class="tab" data-module="health">🩺 Health Check</button>
+    <button class="tab" data-module="shg">📋 SHG Grading</button>
   </div>
 
   <!-- EMI MODULE -->
@@ -1118,8 +1119,158 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
     </div>
   </div>
 
+  <!-- SHG GRADING MODULE -->
+  <div class="module" id="module-shg">
+    <div class="eyebrow">DAY-NRLM &middot; 07 SHG GRADING</div>
+    <h1 class="page-title">SHG Grading Tool</h1>
+    <p class="lede">Standard NABARD/NRLM SHG grading checklist &mdash; Grading I (fresh bank linkage) and Grading II (repeat linkage), 100 marks each. Enter the group's meeting, savings, lending, repayment, record-keeping and (for Grading II) loan-account data below to get an auto-scored pass/fail grade and the specific gaps to fix.</p>
+
+    <div class="card input-card">
+      <div class="eyebrow">SHG PARTICULARS</div>
+      <div class="grid">
+        <div><label for="shgName">SHG Name</label><input type="text" id="shgName" placeholder="e.g. Jai Bhavani SHG" /></div>
+        <div><label for="shgVillage">Village</label><input type="text" id="shgVillage" /></div>
+        <div><label for="shgBlock">Block</label><input type="text" id="shgBlock" /></div>
+        <div><label for="shgDistrict">District</label><input type="text" id="shgDistrict" /></div>
+        <div><label for="shgDoF">Date of Formation</label><input type="date" id="shgDoF" /></div>
+        <div><label for="shgMembers">No. of Members</label><input type="number" id="shgMembers" min="1" value="12" /></div>
+        <div><label for="shgPeriodFrom">Period From</label><input type="date" id="shgPeriodFrom" /></div>
+        <div><label for="shgPeriodTo">Period To (usually last 6 months)</label><input type="date" id="shgPeriodTo" /></div>
+      </div>
+    </div>
+
+    <div class="subtabs" id="shgTypeTabs">
+      <button class="subtab active" data-shg="1">Grading I &middot; Fresh Linkage</button>
+      <button class="subtab" data-shg="2">Grading II &middot; Repeat Linkage</button>
+    </div>
+
+    <!-- GRADING I -->
+    <div class="depmodule active" id="shg-1">
+      <div class="note">Grading I is used before the SHG's first bank credit linkage, normally 6 months after formation. Total 100 marks &mdash; A grade needs 80+, B grade 70&ndash;79. Only A &amp; B graded SHGs are considered eligible for credit linkage.</div>
+
+      <div class="card input-card">
+        <div class="eyebrow">1&#41; REGULARITY OF MEETINGS &middot; 20 marks</div>
+        <div class="grid">
+          <div><label for="shg1MeetHeld">Meetings held in the period</label><input type="number" id="shg1MeetHeld" min="0" value="0" /></div>
+          <div><label for="shg1MeetReq">Meetings required per SHG rule</label><input type="number" id="shg1MeetReq" min="0" value="0" /></div>
+          <div><label for="shg1AttendAvg">Average members attending</label><input type="number" id="shg1AttendAvg" min="0" value="0" /></div>
+          <div><label for="shg1AttendTotal">Total members</label><input type="number" id="shg1AttendTotal" min="0" value="0" /></div>
+        </div>
+      </div>
+
+      <div class="card input-card">
+        <div class="eyebrow">2&#41; REGULARITY OF SAVINGS BY MEMBERS &middot; 10 marks</div>
+        <div class="grid">
+          <div><label for="shg1SaveDep">Savings actually deposited (&#8377;)</label><input type="number" id="shg1SaveDep" min="0" value="0" /></div>
+          <div><label for="shg1SaveReq">Savings required per SHG rule (&#8377;)</label><input type="number" id="shg1SaveReq" min="0" value="0" /></div>
+        </div>
+      </div>
+
+      <div class="card input-card">
+        <div class="eyebrow">3&#41; VELOCITY OF LENDING FROM GROUP CORPUS &middot; 20 marks</div>
+        <div class="grid">
+          <div><label for="shg1LendAmt">Amount lent to members from corpus (&#8377;)</label><input type="number" id="shg1LendAmt" min="0" value="0" /></div>
+          <div><label for="shg1Corpus">Average group corpus in the period (&#8377;)</label><input type="number" id="shg1Corpus" min="0" value="0" /></div>
+        </div>
+        <p class="hint" style="margin-top:8px">Velocity = amount lent &divide; average corpus. &gt;1.5 = full marks, &gt;1.0&ndash;1.5, &gt;0.5&ndash;1.0, &gt;0.2&ndash;0.5, &le;0.2 = 0.</p>
+      </div>
+
+      <div class="card input-card">
+        <div class="eyebrow">4&#41; REGULARITY OF LOAN REPAYMENT BY MEMBERS &middot; 20 marks</div>
+        <div class="grid">
+          <div><label for="shg1RecoveryAmt">Recovery against demand (&#8377;)</label><input type="number" id="shg1RecoveryAmt" min="0" value="0" /></div>
+          <div><label for="shg1DemandAmt">Demand as per repayment schedule (&#8377;)</label><input type="number" id="shg1DemandAmt" min="0" value="0" /></div>
+        </div>
+      </div>
+
+      <div class="card input-card">
+        <div class="eyebrow">5&#41; UPDATED RECORD KEEPING &middot; 30 marks</div>
+        <div class="grid" id="shg1Records"></div>
+      </div>
+
+      <button id="shg1RunBtn" class="btn" type="button">Grade this SHG &mdash; Grading I</button>
+    </div>
+
+    <!-- GRADING II -->
+    <div class="depmodule" id="shg-2">
+      <div class="note">Grading II is used before a repeat/enhanced credit linkage, and additionally reviews conduct of the existing Cash Credit/Term Loan account. Total 100 marks &mdash; A grade needs 80+, B grade 70&ndash;79.</div>
+
+      <div class="card input-card">
+        <div class="eyebrow">1&#41; REGULARITY OF MEETINGS &middot; 10 marks</div>
+        <div class="grid">
+          <div><label for="shg2MeetHeld">Meetings held in the period</label><input type="number" id="shg2MeetHeld" min="0" value="0" /></div>
+          <div><label for="shg2MeetReq">Meetings required per SHG rule</label><input type="number" id="shg2MeetReq" min="0" value="0" /></div>
+          <div><label for="shg2AttendAvg">Average members attending</label><input type="number" id="shg2AttendAvg" min="0" value="0" /></div>
+          <div><label for="shg2AttendTotal">Total members</label><input type="number" id="shg2AttendTotal" min="0" value="0" /></div>
+        </div>
+      </div>
+
+      <div class="card input-card">
+        <div class="eyebrow">2&#41; REGULARITY OF SAVINGS BY MEMBERS &middot; 10 marks</div>
+        <div class="grid">
+          <div><label for="shg2SaveDep">Savings actually deposited (&#8377;)</label><input type="number" id="shg2SaveDep" min="0" value="0" /></div>
+          <div><label for="shg2SaveReq">Savings required per SHG rule (&#8377;)</label><input type="number" id="shg2SaveReq" min="0" value="0" /></div>
+        </div>
+      </div>
+
+      <div class="card input-card">
+        <div class="eyebrow">3&#41; VELOCITY OF LENDING FROM GROUP CORPUS &middot; 10 marks</div>
+        <div class="grid">
+          <div><label for="shg2LendAmt">Amount lent to members from corpus (&#8377;)</label><input type="number" id="shg2LendAmt" min="0" value="0" /></div>
+          <div><label for="shg2Corpus">Average group corpus in the period (&#8377;)</label><input type="number" id="shg2Corpus" min="0" value="0" /></div>
+        </div>
+        <p class="hint" style="margin-top:8px">Velocity = amount lent &divide; average corpus. &gt;1.5 = full marks, &gt;1.0&ndash;1.5, &gt;0.5&ndash;1.0, &gt;0.2&ndash;0.5, &le;0.2 = 0.</p>
+      </div>
+
+      <div class="card input-card">
+        <div class="eyebrow">4&#41; REGULARITY OF LOAN REPAYMENT BY MEMBERS &middot; 15 marks</div>
+        <div class="grid">
+          <div><label for="shg2RecoveryAmt">Recovery against demand (&#8377;)</label><input type="number" id="shg2RecoveryAmt" min="0" value="0" /></div>
+          <div><label for="shg2DemandAmt">Demand as per repayment schedule (&#8377;)</label><input type="number" id="shg2DemandAmt" min="0" value="0" /></div>
+        </div>
+      </div>
+
+      <div class="card input-card">
+        <div class="eyebrow">5&#41; UPDATED RECORD KEEPING &middot; 30 marks</div>
+        <div class="grid" id="shg2Records"></div>
+      </div>
+
+      <div class="card input-card">
+        <div class="eyebrow">6&#41; CC/TERM LOAN ACCOUNT OPERATIONS &amp; CREDIT HISTORY &middot; 25 marks</div>
+        <div class="grid">
+          <div><label for="shg2Txns">No. of transactions in last 12 months (Dr &amp; Cr)</label><input type="number" id="shg2Txns" min="0" value="0" /></div>
+          <div>
+            <label for="shg2IntServicing">Servicing of interest charged in CC A/c</label>
+            <select id="shg2IntServicing">
+              <option value="1">Within 1 month &mdash; full marks</option>
+              <option value="0.6">Within 2 months &mdash; part marks</option>
+              <option value="0">After 2 months &mdash; no marks</option>
+            </select>
+          </div>
+          <div><label for="shg2Overdraw">Occasions of overdrawing in CC A/c (last 12 months)</label><input type="number" id="shg2Overdraw" min="0" value="0" /></div>
+        </div>
+        <p class="hint" style="margin-top:8px">Transactions: 12+ = full marks, 6&ndash;11 = part marks, &lt;6 = 0. Overdrawing: never = full marks, on 2 occasions = part marks, on more than 2 = 0.</p>
+      </div>
+
+      <button id="shg2RunBtn" class="btn" type="button">Grade this SHG &mdash; Grading II</button>
+    </div>
+
+    <div id="shgResultCard" style="display:none;margin-top:24px">
+      <div class="summary" id="shgSummary"></div>
+      <div class="card" style="padding:20px 20px 8px;margin-bottom:20px">
+        <div class="stub-title" id="shgVerdictTitle"></div>
+        <div class="hint" id="shgVerdictSub" style="margin:6px 0 16px"></div>
+        <div class="table-scroll"><table id="shgTable"></table></div>
+      </div>
+      <div class="card" id="shgGapsCard" style="padding:20px">
+        <div class="stub-title">Specific Gaps To Fix</div>
+        <div id="shgGaps" style="margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.12</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.13</strong>
   </footer>
 </div>
 
@@ -5967,6 +6118,198 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
   };
 })();
 
+</script>
+
+<script>
+/* ---------- SHG Grading Tool (NABARD/NRLM Grading I & II, v8.13) ---------- */
+(function(){
+  document.querySelectorAll('#shgTypeTabs .subtab').forEach(t=>{
+    t.addEventListener('click',()=>{
+      document.querySelectorAll('#shgTypeTabs .subtab').forEach(x=>x.classList.remove('active'));
+      document.querySelectorAll('#module-shg .depmodule').forEach(x=>x.classList.remove('active'));
+      t.classList.add('active');
+      document.getElementById('shg-'+t.dataset.shg).classList.add('active');
+      const rc=document.getElementById('shgResultCard'); if(rc) rc.style.display='none';
+    });
+  });
+
+  const SHG_RECORDS=[
+    {key:'resolution',label:'Resolution / Minutes Book',max:4},
+    {key:'cash',label:'Cash Book',max:8},
+    {key:'savings',label:'Savings Ledger',max:4},
+    {key:'loan',label:'Loan Ledger',max:4},
+    {key:'general',label:'General Ledger',max:6},
+    {key:'passbook',label:'Individual Pass Book',max:4}
+  ];
+  function shgRecordOptionsHtml(){
+    return '<option value="1">Maintained, up to date — full marks</option>'+
+           '<option value="0.5">Maintained, but not up to date — half marks</option>'+
+           '<option value="0">Not maintained — no marks</option>';
+  }
+  function shgRenderRecords(containerId,prefix){
+    const el=document.getElementById(containerId);
+    if(!el)return;
+    el.innerHTML=SHG_RECORDS.map(r=>
+      `<div><label for="${prefix}Rec_${r.key}">${stmtEsc(r.label)} (max ${r.max})</label>`+
+      `<select id="${prefix}Rec_${r.key}">${shgRecordOptionsHtml()}</select></div>`
+    ).join('');
+  }
+  shgRenderRecords('shg1Records','shg1');
+  shgRenderRecords('shg2Records','shg2');
+
+  function shgVal(id){ const el=document.getElementById(id); return el?el.value:''; }
+  function shgNum(id){ return Number(shgVal(id))||0; }
+
+  function shgRatioMarks(numId,denId,max){
+    const num=shgNum(numId), den=shgNum(denId);
+    if(den<=0)return {marks:0,ratio:null};
+    const ratio=num/den;
+    return {marks:Math.max(0,Math.min(max,ratio*max)),ratio};
+  }
+  function shgVelocityMarks(lentId,corpusId,max){
+    const lent=shgNum(lentId), corpus=shgNum(corpusId);
+    if(corpus<=0)return {marks:0,velocity:null};
+    const v=lent/corpus;
+    const bands = max===20 ? [[1.5,20],[1.0,15],[0.5,10],[0.2,5],[0,0]]
+                            : [[1.5,10],[1.0,7],[0.5,5],[0.2,2],[0,0]];
+    let marks=0;
+    for(const b of bands){ if(v>b[0]){marks=b[1];break;} }
+    return {marks,velocity:v};
+  }
+  function shgRecordMarks(prefix){
+    const items=[];
+    SHG_RECORDS.forEach(r=>{
+      const sel=document.getElementById(prefix+'Rec_'+r.key);
+      const state=sel?Number(sel.value):0;
+      items.push({label:r.label,max:r.max,marks:state*r.max,state});
+    });
+    return items;
+  }
+  function shgGrade(total){
+    if(total>=80)return 'A';
+    if(total>=70)return 'B';
+    if(total>=60)return 'C';
+    return 'D';
+  }
+  const shgFmt = n => (Math.round(n*10)/10).toString();
+
+  function shgRenderResult(rows,total,maxTotal,gradingLabel){
+    const grade=shgGrade(total), pass=(grade==='A'||grade==='B');
+    const rc=document.getElementById('shgResultCard'); if(rc) rc.style.display='block';
+    document.getElementById('shgSummary').innerHTML =
+      `<div class="stat"><div class="stat-label">Total Score</div><div class="stat-value">${shgFmt(total)} / ${maxTotal}</div></div>`+
+      `<div class="stat"><div class="stat-label">Grade</div><div class="stat-value ${pass?'health-ok':'health-bad'}">${grade}</div></div>`+
+      `<div class="stat"><div class="stat-label">Result</div><div class="stat-value ${pass?'health-ok':'health-bad'}">${pass?'PASS':'FAIL'}</div></div>`;
+    document.getElementById('shgVerdictTitle').textContent = gradingLabel+' — '+(pass?'Eligible for credit linkage':'Not yet eligible for credit linkage');
+    document.getElementById('shgVerdictSub').textContent = pass
+      ? 'Grade '+grade+' meets the A/B threshold (70 or more) that NABARD/NRLM norms require for bank credit linkage.'
+      : 'Grade '+grade+' is below the 70-mark A/B threshold. Only A & B graded SHGs are considered eligible for credit linkage — address the gaps below and re-grade.';
+    document.getElementById('shgTable').innerHTML =
+      '<thead><tr><th style="text-align:left">Parameter</th><th>Max Marks</th><th>Marks Obtained</th><th style="text-align:left">Status</th></tr></thead><tbody>'+
+      rows.map(r=>{
+        const full=r.marks>=r.max-0.001;
+        return `<tr><td style="text-align:left">${stmtEsc(r.label)}</td><td>${r.max}</td><td>${shgFmt(r.marks)}</td>`+
+               `<td class="${full?'health-ok':'health-bad'}" style="text-align:left">${full?'Full marks':'Shortfall'}</td></tr>`;
+      }).join('') +
+      `<tr><td style="text-align:left"><strong>Total</strong></td><td><strong>${maxTotal}</strong></td><td><strong>${shgFmt(total)}</strong></td><td></td></tr>`+
+      '</tbody>';
+    const gapsEl=document.getElementById('shgGaps');
+    const gaps=rows.filter(r=>r.marks<r.max-0.001 && r.gap).map(r=>r.gap);
+    gapsEl.innerHTML = gaps.length
+      ? '<ul style="margin:0;padding-left:18px;line-height:1.7">'+gaps.map(g=>`<li>${stmtEsc(g)}</li>`).join('')+'</ul>'
+      : '<p class="hint" style="margin:0">No gaps — every parameter scored full marks.</p>';
+  }
+
+  function shgRunGradingI(){
+    const rows=[];
+    const meet=shgRatioMarks('shg1MeetHeld','shg1MeetReq',10);
+    rows.push({label:'Regularity of holding meetings',max:10,marks:meet.marks,
+      gap: meet.ratio===null?'Enter the number of meetings required per the SHG rule so this can be scored.':
+        (meet.marks<10?`Meetings held are short of the group's own norm (held ${shgVal('shg1MeetHeld')} vs required ${shgVal('shg1MeetReq')}). Hold the shortfall of meetings and stick to the meeting calendar going forward.`:null)});
+
+    const att=shgRatioMarks('shg1AttendAvg','shg1AttendTotal',10);
+    rows.push({label:'Regularity of member attendance',max:10,marks:att.marks,
+      gap: att.ratio===null?'Enter total membership so attendance can be scored.':
+        (att.marks<10?`Average attendance is below full membership (avg ${shgVal('shg1AttendAvg')} of ${shgVal('shg1AttendTotal')}). Follow up with irregular members and note reasons for absence in the minutes book.`:null)});
+
+    const save=shgRatioMarks('shg1SaveDep','shg1SaveReq',10);
+    rows.push({label:'Regularity of savings by members',max:10,marks:save.marks,
+      gap: save.ratio===null?'Enter the savings required per the SHG rule so this can be scored.':
+        (save.marks<10?`Savings collected are short of the rule-based requirement (₹${shgVal('shg1SaveDep')} of ₹${shgVal('shg1SaveReq')}). Collect the shortfall and remind members of the fixed savings amount at every meeting.`:null)});
+
+    const vel=shgVelocityMarks('shg1LendAmt','shg1Corpus',20);
+    rows.push({label:'Velocity of lending from group corpus',max:20,marks:vel.marks,
+      gap: vel.velocity===null?'Enter the average group corpus so lending velocity can be scored.':
+        (vel.marks<20?`Internal lending velocity is low (ratio ${vel.velocity.toFixed(2)}). Circulate more of the corpus as internal loans to members instead of letting it sit idle.`:null)});
+
+    const rec=shgRatioMarks('shg1RecoveryAmt','shg1DemandAmt',20);
+    rows.push({label:'Regularity in repayment of internal loans',max:20,marks:rec.marks,
+      gap: rec.ratio===null?'Enter the demand as per the repayment schedule so recovery can be scored.':
+        (rec.marks<20?`Recovery is short of demand (₹${shgVal('shg1RecoveryAmt')} of ₹${shgVal('shg1DemandAmt')}). Strengthen follow-up with overdue members and review the repayment schedule at the next meeting.`:null)});
+
+    shgRecordMarks('shg1').forEach(it=>{
+      rows.push({label:it.label,max:it.max,marks:it.marks,
+        gap: it.state<1 ? `${it.label} is ${it.state===0?'not maintained':'not up to date'}. ${it.state===0?'Open the register and start writing it up from the current meeting.':'Bring the register up to date and assign a member to update it every meeting.'}`:null});
+    });
+
+    const total=rows.reduce((a,r)=>a+r.marks,0);
+    shgRenderResult(rows,total,100,'Grading I (Fresh Linkage)');
+  }
+
+  function shgRunGradingII(){
+    const rows=[];
+    const meet=shgRatioMarks('shg2MeetHeld','shg2MeetReq',5);
+    rows.push({label:'Regularity of holding meetings',max:5,marks:meet.marks,
+      gap: meet.ratio===null?'Enter the number of meetings required per the SHG rule so this can be scored.':
+        (meet.marks<5?`Meetings held are short of the group's own norm (held ${shgVal('shg2MeetHeld')} vs required ${shgVal('shg2MeetReq')}). Hold the shortfall of meetings and stick to the meeting calendar going forward.`:null)});
+
+    const att=shgRatioMarks('shg2AttendAvg','shg2AttendTotal',5);
+    rows.push({label:'Regularity of member attendance',max:5,marks:att.marks,
+      gap: att.ratio===null?'Enter total membership so attendance can be scored.':
+        (att.marks<5?`Average attendance is below full membership (avg ${shgVal('shg2AttendAvg')} of ${shgVal('shg2AttendTotal')}). Follow up with irregular members and note reasons for absence in the minutes book.`:null)});
+
+    const save=shgRatioMarks('shg2SaveDep','shg2SaveReq',10);
+    rows.push({label:'Regularity of savings by members',max:10,marks:save.marks,
+      gap: save.ratio===null?'Enter the savings required per the SHG rule so this can be scored.':
+        (save.marks<10?`Savings collected are short of the rule-based requirement (₹${shgVal('shg2SaveDep')} of ₹${shgVal('shg2SaveReq')}). Collect the shortfall and remind members of the fixed savings amount at every meeting.`:null)});
+
+    const vel=shgVelocityMarks('shg2LendAmt','shg2Corpus',10);
+    rows.push({label:'Velocity of lending from group corpus',max:10,marks:vel.marks,
+      gap: vel.velocity===null?'Enter the average group corpus so lending velocity can be scored.':
+        (vel.marks<10?`Internal lending velocity is low (ratio ${vel.velocity.toFixed(2)}). Circulate more of the corpus as internal loans to members instead of letting it sit idle.`:null)});
+
+    const rec=shgRatioMarks('shg2RecoveryAmt','shg2DemandAmt',15);
+    rows.push({label:'Regularity in repayment of internal loans',max:15,marks:rec.marks,
+      gap: rec.ratio===null?'Enter the demand as per the repayment schedule so recovery can be scored.':
+        (rec.marks<15?`Recovery is short of demand (₹${shgVal('shg2RecoveryAmt')} of ₹${shgVal('shg2DemandAmt')}). Strengthen follow-up with overdue members and review the repayment schedule at the next meeting.`:null)});
+
+    shgRecordMarks('shg2').forEach(it=>{
+      rows.push({label:it.label,max:it.max,marks:it.marks,
+        gap: it.state<1 ? `${it.label} is ${it.state===0?'not maintained':'not up to date'}. ${it.state===0?'Open the register and start writing it up from the current meeting.':'Bring the register up to date and assign a member to update it every meeting.'}`:null});
+    });
+
+    const txns=shgNum('shg2Txns');
+    const txnMarks = txns>=12?10:(txns>=6?6:0);
+    rows.push({label:'CC/Term Loan account transactions (last 12 months)',max:10,marks:txnMarks,
+      gap: txnMarks<10?`Only ${txns} debit/credit transactions were recorded in the loan account against the norm of 12 or more in the last 12 months. Route more of the SHG's savings and internal-lending cash flow through the CC/Term Loan account.`:null});
+
+    const servFactor=Number(shgVal('shg2IntServicing'))||0;
+    const servMarks=servFactor*10;
+    rows.push({label:'Servicing of interest charged in CC A/c',max:10,marks:servMarks,
+      gap: servMarks<10?'Interest on the CC account is not being serviced within a month of being charged. Pay the interest promptly each month so it does not get added to the principal.':null});
+
+    const overdraw=shgNum('shg2Overdraw');
+    const overdrawMarks = overdraw<=0?5:(overdraw<=2?3:0);
+    rows.push({label:'Occasions of overdrawing in CC A/c (last 12 months)',max:5,marks:overdrawMarks,
+      gap: overdrawMarks<5?`The CC account was overdrawn on ${overdraw} occasion(s) in the last 12 months. Track the drawing power closely and avoid withdrawals beyond the sanctioned/available limit.`:null});
+
+    const total=rows.reduce((a,r)=>a+r.marks,0);
+    shgRenderResult(rows,total,100,'Grading II (Repeat Linkage)');
+  }
+
+  document.getElementById('shg1RunBtn')?.addEventListener('click',shgRunGradingI);
+  document.getElementById('shg2RunBtn')?.addEventListener('click',shgRunGradingII);
+})();
 </script>
 </body>
 </html>
