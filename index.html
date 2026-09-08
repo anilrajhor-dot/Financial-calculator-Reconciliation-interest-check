@@ -482,7 +482,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calculator with Bank Interest Comparison</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; SHG Grading &middot; <strong>v8.13</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; SHG Grading &middot; <strong>v8.14</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -1270,7 +1270,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.13</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.14</strong>
   </footer>
 </div>
 
@@ -6309,6 +6309,24 @@ document.getElementById('askMeModal')?.addEventListener('click',function(e){
 
   document.getElementById('shg1RunBtn')?.addEventListener('click',shgRunGradingI);
   document.getElementById('shg2RunBtn')?.addEventListener('click',shgRunGradingII);
+})();
+</script>
+
+<script>
+/* ---------- Global fix: auto-clear default "0" in number fields on focus (v8.14) ---------- */
+(function(){
+  document.addEventListener('focusin',function(e){
+    const t=e.target;
+    if(t && t.tagName==='INPUT' && t.type==='number' && t.value==='0'){
+      t.value='';
+    }
+  });
+  document.addEventListener('focusout',function(e){
+    const t=e.target;
+    if(t && t.tagName==='INPUT' && t.type==='number' && t.value.trim()===''){
+      t.value='0';
+    }
+  });
 })();
 </script>
 </body>
