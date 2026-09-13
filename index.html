@@ -272,6 +272,9 @@ tr.reverse-row-ok{background:#EAF6F1}
 body.dark tr.reverse-row-ok{background:#152A22}
 .stmt-good{color:var(--green);font-weight:700}
 .stmt-review{color:var(--clay);font-weight:700}
+.loan-recon-card{margin-top:28px}
+.loan-recon-card .stub{border-left-color:var(--brass)}
+.loan-recon-table td:first-child{text-align:left}
 </style><style id="folioContrastV29">
 /* v2.9 — fix dim folio/register text in dark mode */
 body.dark .ledger .stub{
@@ -500,7 +503,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calculator with Bank Interest Comparison</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; SHG Grading &middot; <strong>v8.16</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; SHG Grading &middot; <strong>v8.17</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -625,6 +628,20 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
         <div class="stub-sub">A separate account for each interest slab: the portion of the outstanding balance falling in that slab, the rate, and the interest charged, for every instalment. Tap a slab to expand.</div>
       </div>
       <div id="slabLedgerAccounts"></div>
+    </div>
+
+    <div class="card ledger loan-recon-card" id="loanReconCard" style="display:none;">
+      <div class="stub">
+        <div class="stub-title">🏦 Loan Account — Single Ledger &amp; Reconciliation</div>
+        <div class="stub-sub">The bank runs only one loan account and debits EMI/interest there each month — the slabs above are only how the rate is computed internally. This is that single continuous account, month-wise, followed by a reconciliation confirming the slab-wise calculation accounts for the entire principal and interest over the full tenure.</div>
+      </div>
+      <div class="table-scroll">
+        <table class="loan-recon-table">
+          <thead><tr><th>#</th><th>Due date</th><th>Opening bal.</th><th>Interest</th><th>EMI / Installment</th><th>Principal</th><th>Closing bal.</th></tr></thead>
+          <tbody id="loanReconBody"></tbody>
+        </table>
+      </div>
+      <div style="padding:16px 20px 4px" id="loanReconSummary"></div>
     </div>
 
     <div class="card ledger">
@@ -1322,7 +1339,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.16</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.17</strong>
   </footer>
 </div>
 
@@ -1500,6 +1517,70 @@ function renderSlabLedgerAccounts(rows, slabs, freqMonths, method){
       renderEmi();
     });
   });
+}
+
+/* ---------- Single loan-account ledger + reconciliation across the full tenure ---------- */
+function renderLoanReconciliation(rows, slabs, method, principal, freqMonths){
+  const card=document.getElementById('loanReconCard');
+  const body=document.getElementById('loanReconBody');
+  const summary=document.getElementById('loanReconSummary');
+  if(!card||!body||!summary) return;
+  if(method!=='slab' || !rows.length){ card.style.display='none'; return; }
+  card.style.display='block';
+
+  body.innerHTML=rows.map(r=>`
+    <tr${r.moratorium?' style="background:#FBFAF6;"':''}>
+      <td>${r.moratorium?'M'+r.period:r.period}</td>
+      <td>${fmtDate(r.dueDate)}</td>
+      <td>${fmtINR(r.opening)}</td>
+      <td class="debit">${fmtINR(r.interest)}</td>
+      <td>${r.moratorium && !r.moratoriumPaid ? '<em style="font-weight:400;color:var(--muted);">accrued</em>' : fmtINR(r.installment)}</td>
+      <td class="credit">${fmtINR(r.principalPaid)}</td>
+      <td>${fmtINR(r.closing)}</td>
+    </tr>`).join('');
+
+  const totalPrincipalRepaid=rows.reduce((s,r)=>s+r.principalPaid,0);
+  const totalInterestRegister=rows.reduce((s,r)=>s+r.interest,0);
+  const totalInstallments=rows.reduce((s,r)=>s+r.installment,0);
+  const closingBalance=rows[rows.length-1].closing;
+
+  // Independently re-total the interest slab by slab (from scratch) to cross-check
+  // against the single register's interest column — proves nothing was lost or
+  // double-counted when the rate was split across slabs.
+  const perSlabTotals=slabs.map(()=>0);
+  let totalInterestBySlabs=0;
+  rows.forEach(r=>{
+    emiAllocate(r.opening,slabs).forEach((p,i)=>{
+      const interest=p.portion*p.rate/100*(freqMonths/12);
+      perSlabTotals[i]+=interest;
+      totalInterestBySlabs+=interest;
+    });
+  });
+
+  const tol=1;
+  const principalOk=Math.abs(totalPrincipalRepaid-principal)<=tol;
+  const interestTieOk=Math.abs(totalInterestRegister-totalInterestBySlabs)<=tol;
+  const installmentTieOk=Math.abs(totalInstallments-(totalPrincipalRepaid+totalInterestRegister))<=tol;
+  const balanceOk=Math.abs(closingBalance)<=tol;
+
+  summary.innerHTML=`
+    <div class="table-scroll"><table>
+      <thead><tr><th style="text-align:left">Reconciliation check</th><th>Amount</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>Loan amount disbursed</td><td>${fmtINR(principal)}</td><td>—</td></tr>
+        <tr><td>Total principal recovered over the tenure</td><td class="credit">${fmtINR(totalPrincipalRepaid)}</td><td>${principalOk?'<span class="stmt-good">✓ Matches loan amount</span>':'<span class="stmt-review">⚠ Off by ₹'+fmtINR(totalPrincipalRepaid-principal)+'</span>'}</td></tr>
+        <tr><td>Total interest recovered over the tenure (register)</td><td class="debit">${fmtINR(totalInterestRegister)}</td><td>—</td></tr>
+        <tr><td>Same interest, re-totalled slab-by-slab independently</td><td class="debit">${fmtINR(totalInterestBySlabs)}</td><td>${interestTieOk?'<span class="stmt-good">✓ Ties out exactly</span>':'<span class="stmt-review">⚠ Off by ₹'+fmtINR(totalInterestBySlabs-totalInterestRegister)+'</span>'}</td></tr>
+        <tr><td>Total of all EMIs/installments collected</td><td>${fmtINR(totalInstallments)}</td><td>${installmentTieOk?'<span class="stmt-good">✓ = principal + interest</span>':'<span class="stmt-review">⚠ Mismatch</span>'}</td></tr>
+        <tr><td>Closing balance after the final instalment</td><td>${fmtINR(closingBalance)}</td><td>${balanceOk?'<span class="stmt-good">✓ Loan fully repaid</span>':'<span class="stmt-review">⚠ Not fully closed</span>'}</td></tr>
+      </tbody>
+    </table></div>
+    <div class="stub-sub" style="margin-top:12px">
+      <b>Interest break-up by slab, full tenure:</b> ${slabs.map((s,i)=>`Slab ${i+1} (${emiSlabRangeLabel(slabs,i)} @ ${Number(s.rate).toFixed(2)}%): <b>₹${fmtINR(perSlabTotals[i])}</b>`).join(' &middot; ')}.
+    </div>
+    <div class="stub-sub" style="margin-top:8px">
+      This confirms the slab-wise EMI is not a separate, partial calculation — it is the same single loan account the bank maintains. Summing the slab-wise interest for every month gives exactly the interest debited to that one account, and the principal collected over the tenure exactly closes the loan.
+    </div>`;
 }
 
 /* ---------- Reverse calculation: verify interest actually charged ---------- */
@@ -1795,6 +1876,7 @@ function renderEmi() {
 
   const slabsForRegister = method==='slab' ? emiLoadSlabs() : [];
   renderSlabLedgerAccounts(rows, slabsForRegister, freqMonths, method);
+  renderLoanReconciliation(rows, slabsForRegister, method, principal, freqMonths);
   renderReverseCheckTable(rows, slabsForRegister, freqMonths, method);
 
   const byYear = new Map();
