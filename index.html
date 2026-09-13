@@ -273,6 +273,12 @@ tr.reverse-row-ok{background:#EAF6F1}
 body.dark tr.reverse-row-ok{background:#152A22}
 .stmt-good{color:var(--green);font-weight:700}
 .stmt-review{color:var(--clay);font-weight:700}
+.stmt-row-credit{background:#EAF6F1}
+.stmt-row-debit{background:#FDEDEB}
+.stmt-row-charge{background:#FBF6EC}
+body.dark .stmt-row-credit{background:#152A22}
+body.dark .stmt-row-debit{background:#3A231F}
+body.dark .stmt-row-charge{background:#332C18}
 .loan-recon-card{margin-top:28px}
 .loan-recon-card .stub{border-left-color:var(--brass)}
 .loan-recon-table td:first-child{text-align:left}
@@ -511,7 +517,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calculator with Bank Interest Comparison</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; SHG Grading &middot; <strong>v8.21</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; SHG Grading &middot; <strong>v8.22</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -1338,6 +1344,14 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
     <div id="stmtResults" style="display:none;">
       <div class="summary" id="stmtSummary"></div>
 
+      <div class="card ledger" id="stmtBankEntriesCard">
+        <div class="stub">
+          <div class="stub-title">🧾 Detected Interest &amp; Charge Entries — with Particulars</div>
+          <div class="stub-sub">Every transaction the app has read as bank interest or a bank charge, with its date, exact narration (particulars) and amount, so you can check none of the entries above were picked up wrongly &mdash; and add any that were missed.</div>
+        </div>
+        <div class="table-scroll"><table id="stmtBankEntriesTable"></table></div>
+      </div>
+
       <div class="card input-card" id="stmtLoanComparisonCard" style="display:none;margin-bottom:24px;">
         <div class="stub-title">🏦 Statement Interest Comparison</div>
         <div class="stub-sub" style="margin:4px 0 14px;color:var(--muted)">
@@ -1623,7 +1637,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.21</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.22</strong>
   </footer>
 </div>
 
@@ -5494,18 +5508,19 @@ function stmtRenderResults(result,slabs){
   const be=document.getElementById('stmtBankEntriesTable');
   if(be){
     const entries=result.bankEntries||[];
-    let eh='<thead><tr><th style="text-align:left">Date</th><th style="text-align:left">Bank narration</th><th>Type</th><th>Amount</th></tr></thead><tbody>';
+    let eh='<thead><tr><th style="text-align:left">Date</th><th style="text-align:left">Bank narration (particulars)</th><th>Type</th><th>Amount</th></tr></thead><tbody>';
     if(!entries.length){
       eh+='<tr><td colspan="4" style="text-align:left">No interest or charge entries were detected in the uploaded statement.</td></tr>';
     }else{
+      const rowStyle=t=>t==='Interest credited'?' class="stmt-row-credit"':(t==='Interest charged'?' class="stmt-row-debit"':(t==='Other charge'?' class="stmt-row-charge"':''));
       entries.forEach(ehrow=>{
-        eh+=`<tr><td style="text-align:left">${stmtDate(ehrow.date)}</td><td style="text-align:left">${stmtEsc(ehrow.narration||'')}</td><td>${stmtEsc(ehrow.type)}</td><td>${ehrow.amount?'₹'+stmtMoney(ehrow.amount):'—'}</td></tr>`;
+        eh+=`<tr${rowStyle(ehrow.type)}><td style="text-align:left">${stmtDate(ehrow.date)}</td><td style="text-align:left">${stmtEsc(ehrow.narration||'')}</td><td>${stmtEsc(ehrow.type)}</td><td>${ehrow.amount?'₹'+stmtMoney(ehrow.amount):'—'}</td></tr>`;
       });
     }
     const ic=entries.filter(e=>e.type==='Interest credited').reduce((a,e)=>a+e.amount,0);
     const id=entries.filter(e=>e.type==='Interest charged').reduce((a,e)=>a+e.amount,0);
     const oc=entries.filter(e=>e.type==='Other charge').reduce((a,e)=>a+e.amount,0);
-    eh+=`</tbody><tfoot><tr><th colspan="2" style="text-align:left">Detected totals</th><th>Interest / Charges</th><th>Credit ₹${stmtMoney(ic)} · Debit ₹${stmtMoney(id)} · Other charges ₹${stmtMoney(oc)}</th></tr></tfoot>`;
+    eh+=`</tbody><tfoot><tr><th colspan="2" style="text-align:left">Detected totals &middot; ${entries.length} entr${entries.length===1?'y':'ies'}</th><th>Interest / Charges</th><th>Credit ₹${stmtMoney(ic)} · Debit ₹${stmtMoney(id)} · Other charges ₹${stmtMoney(oc)}</th></tr></tfoot>`;
     be.innerHTML=eh;
   }
 
