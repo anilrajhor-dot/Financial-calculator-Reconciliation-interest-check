@@ -504,7 +504,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calculator with Bank Interest Comparison</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; SHG Grading &middot; <strong>v8.18</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; SHG Grading &middot; <strong>v8.19</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -694,9 +694,9 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
     </div>
 
     <div id="qtrWrapper" style="display:none;">
-      <div class="eyebrow">LEDGER &middot; QUARTERLY / HALF-YEARLY INTEREST DEBIT</div>
-      <h1 class="page-title">Quarterly / Half-Yearly Interest Debit — Detailed Statement</h1>
-      <p class="lede">For loans where the bank recovers <strong>principal every month</strong> but debits <strong>interest only at each quarter- or half-year-end</strong> (common for SHG/term loans serviced under DAY-NRLM). Interest still accrues daily on the outstanding balance between principal-recovery dates — it is just billed to the account less often. Works with a single flat rate or the progressive slab rates configured above.</p>
+      <div class="eyebrow">LEDGER &middot; QUARTERLY / HALF-YEARLY INSTALMENTS</div>
+      <h1 class="page-title">Quarterly / Half-Yearly Instalments &mdash; Detailed Statement</h1>
+      <p class="lede">For loans repaid quarterly or half-yearly instead of monthly. Choose an <strong>equated instalment</strong> (principal + interest combined in one level instalment, like an EMI, so the loan runs to exactly nil at the end of the tenure) or <strong>equal principal with interest billed separately</strong> at each quarter/half-year end. Interest always accrues on the <strong>actual number of days</strong> the balance was outstanding. Works with a single flat rate or the progressive slab rates configured above.</p>
 
       <div class="card input-card">
         <div class="grid">
@@ -722,26 +722,46 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
             <select id="qtrMonths"><option value="0" selected>0 Months</option><option value="1">1 Month</option><option value="2">2 Months</option><option value="3">3 Months</option><option value="4">4 Months</option><option value="5">5 Months</option><option value="6">6 Months</option><option value="7">7 Months</option><option value="8">8 Months</option><option value="9">9 Months</option><option value="10">10 Months</option><option value="11">11 Months</option></select>
           </div>
           <div>
-            <label for="qtrPrincipalFreq">Principal repayment frequency</label>
-            <select id="qtrPrincipalFreq"><option value="1" selected>Monthly (equal principal)</option><option value="3">Quarterly (equal principal)</option></select>
+            <label for="qtrRepayType">Repayment type</label>
+            <select id="qtrRepayType">
+              <option value="equal-instalment" selected>Equated instalment (principal + interest, quarterly/half-yearly)</option>
+              <option value="equal-principal">Equal principal; interest billed separately at quarter/half-year end</option>
+            </select>
           </div>
           <div>
+            <label for="qtrPrincipalFreq">Instalment frequency</label>
+            <select id="qtrPrincipalFreq"><option value="1">Monthly</option><option value="3" selected>Quarterly</option><option value="6">Half-Yearly</option></select>
+          </div>
+          <div id="qtrDebitFreqWrap">
             <label for="qtrDebitFreq">Interest debit frequency</label>
             <select id="qtrDebitFreq"><option value="3" selected>Quarterly</option><option value="6">Half-Yearly</option></select>
           </div>
           <div>
-            <label for="qtrStartDate">First principal instalment date</label>
+            <label for="qtrStartDate">First instalment date</label>
             <input type="date" id="qtrStartDate" />
           </div>
         </div>
-        <div class="note">Principal is recovered in equal instalments every month (or quarter). Interest accrues daily on whatever the outstanding balance actually is between those instalment dates and is billed as one lump sum at each quarter/half-year point &mdash; it is not part of the monthly principal instalment.</div>
+        <div class="note" id="qtrNote">With the <strong>equated instalment</strong>, every quarter/half-year you pay the same total amount &mdash; part interest, part principal &mdash; solved so the balance reaches exactly nil at the last instalment, just like a normal EMI but billed less often. With <strong>equal principal</strong>, only the principal is recovered on the instalment schedule; interest still accrues daily on the outstanding balance and is billed as one separate lump sum at each quarter/half-year point.</div>
       </div>
 
       <div class="summary" id="qtrSummary"></div>
 
-      <div class="card ledger">
+      <div class="card ledger" id="qtrEquatedCard">
         <div class="stub">
-          <div class="stub-title">Principal Repayment Ledger &mdash; Month-wise</div>
+          <div class="stub-title">Loan Account Ledger &mdash; Equated Instalment</div>
+          <div class="stub-sub" id="qtrEquatedSub"></div>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>#</th><th>Due date</th><th>Days</th><th>Opening bal.</th><th>Interest</th><th>Principal</th><th>Instalment credited</th><th>Closing bal.</th></tr></thead>
+            <tbody id="qtrEquatedBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card ledger" id="qtrPrincipalCard" style="display:none;">
+        <div class="stub">
+          <div class="stub-title">Principal Repayment Ledger &mdash; Instalment-wise</div>
           <div class="stub-sub" id="qtrPrincipalSub"></div>
         </div>
         <div class="table-scroll">
@@ -752,7 +772,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
         </div>
       </div>
 
-      <div class="card ledger" style="margin-top:24px">
+      <div class="card ledger" id="qtrInterestCard" style="display:none;margin-top:24px">
         <div class="stub">
           <div class="stub-title">Interest Debits &mdash; Quarterly / Half-Yearly</div>
           <div class="stub-sub" id="qtrInterestSub"></div>
@@ -768,7 +788,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
       <div class="card ledger loan-recon-card" style="margin-top:24px">
         <div class="stub">
           <div class="stub-title">&#127974; Reconciliation &mdash; Full Tenure</div>
-          <div class="stub-sub">Confirms the quarterly/half-yearly interest debits plus the monthly principal recovery together account for the entire loan.</div>
+          <div class="stub-sub">Confirms the instalments (and, for the separate-billing option, the interest debits) together account for the entire loan and bring it down to nil.</div>
         </div>
         <div style="padding:16px 20px 4px" id="qtrReconSummary"></div>
       </div>
@@ -1426,7 +1446,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.18</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.19</strong>
   </footer>
 </div>
 
@@ -1885,20 +1905,115 @@ function qtrBuildSchedule({principal,count,freqMonths,startDate,debitFreqMonths,
   return {principalRows,interestDebits};
 }
 
+/* Equated instalment (principal + interest combined, level every period,
+   like a normal EMI) at quarterly/half-yearly frequency, with interest
+   computed on the actual number of days the balance was outstanding rather
+   than a fixed 1/12-month fraction. Solved by bisection so the closing
+   balance is exactly nil at the last instalment. Works for a flat rate or
+   slab rates. */
+function qtrBuildEquatedSchedule({principal,count,freqMonths,startDate,isSlab,flatRate,slabs}){
+  const dueDates=[],days=[];
+  let prev=startDate;
+  for(let i=1;i<=count;i++){
+    const d=addMonths(startDate,i*freqMonths);
+    dueDates.push(d);
+    days.push(Math.max(0,Math.round((d-prev)/86400000)));
+    prev=d;
+  }
+  function interestFor(balance,dayCount){
+    if(isSlab) return emiAllocate(balance,slabs).reduce((s,p)=>s+p.portion*p.rate/100*(dayCount/365),0);
+    return balance*flatRate/100*(dayCount/365);
+  }
+  function remaining(inst){
+    let b=principal;
+    for(let i=0;i<count;i++){
+      const interest=interestFor(b,days[i]);
+      b-=(inst-interest);
+      if(b<=0) return 0;
+    }
+    return b;
+  }
+  let lo=0,hi=Math.max(principal/count,1);
+  for(let z=0;z<100&&remaining(hi)>0.0001;z++) hi*=2;
+  for(let z=0;z<120;z++){ const mid=(lo+hi)/2; if(remaining(mid)>0) lo=mid; else hi=mid; }
+  const installment=hi;
+  let balance=principal;
+  const rows=[];
+  for(let i=0;i<count;i++){
+    const opening=balance;
+    const interest=interestFor(opening,days[i]);
+    let principalPaid=installment-interest, inst=installment;
+    if(i===count-1){ principalPaid=balance; inst=principalPaid+interest; }
+    balance=Math.max(0,balance-principalPaid);
+    rows.push({period:i+1,dueDate:dueDates[i],days:days[i],opening,interest,principalPaid,installment:inst,closing:balance});
+  }
+  return {rows,installment};
+}
+
 function renderQtr(){
   const principal=Number(document.getElementById('qtrPrincipal').value)||0;
   const startDateVal=document.getElementById('qtrStartDate').value;
   const count=qtrSyncPeriodToCount();
-  const freqMonths=Number(document.getElementById('qtrPrincipalFreq').value)||1;
+  const freqMonths=Number(document.getElementById('qtrPrincipalFreq').value)||3;
   const debitFreqMonths=Number(document.getElementById('qtrDebitFreq').value)||3;
+  const repayType=document.getElementById('qtrRepayType').value;
+  const isEquated=repayType==='equal-instalment';
   const rateMode=document.getElementById('qtrRateMode').value;
   const isSlab=rateMode==='slab';
   const flatRate=Number(document.getElementById('qtrFlatRate').value)||0;
   const flatWrap=document.getElementById('qtrFlatRateWrap');
   if(flatWrap) flatWrap.style.display=isSlab?'none':'block';
+  const debitFreqWrap=document.getElementById('qtrDebitFreqWrap');
+  if(debitFreqWrap) debitFreqWrap.style.display=isEquated?'none':'block';
+  document.getElementById('qtrEquatedCard').style.display=isEquated?'block':'none';
+  document.getElementById('qtrPrincipalCard').style.display=isEquated?'none':'block';
+  document.getElementById('qtrInterestCard').style.display=isEquated?'none':'block';
   if(!principal||!count||!startDateVal) return;
   const startDate=new Date(startDateVal+"T00:00:00");
   const slabs=isSlab?emiLoadSlabs():[];
+  const freqLabel=freqMonths===1?'monthly':(freqMonths===3?'quarterly':'half-yearly');
+
+  if(isEquated){
+    const {rows,installment}=qtrBuildEquatedSchedule({principal,count,freqMonths,startDate,isSlab,flatRate,slabs});
+    const totalPrincipal=rows.reduce((s,r)=>s+r.principalPaid,0);
+    const totalInterest=rows.reduce((s,r)=>s+r.interest,0);
+    document.getElementById('qtrSummary').innerHTML=[
+      {label:`Equated instalment (${freqLabel})`,value:'₹ '+fmtINR(installment),color:'var(--ink)'},
+      {label:'Total principal recovered',value:'₹ '+fmtINR(totalPrincipal),color:'var(--green)'},
+      {label:'Total interest paid',value:'₹ '+fmtINR(totalInterest),color:'var(--clay)'},
+      {label:'Total repayment',value:'₹ '+fmtINR(totalPrincipal+totalInterest),color:'var(--brass)'},
+    ].map(s=>`<div class="stat"><div class="stat-label">${s.label}</div><div class="stat-value" style="color:${s.color}">${s.value}</div></div>`).join('');
+
+    document.getElementById('qtrEquatedSub').textContent=`${rows.length} ${freqLabel} instalments of ₹${fmtINR(installment)} each (last instalment adjusted for rounding) — ${isSlab?'progressive slab rates':'a single flat rate'}, interest on actual days outstanding`;
+    document.getElementById('qtrEquatedBody').innerHTML=rows.map(r=>`
+      <tr><td>${r.period}</td><td>${fmtDate(r.dueDate)}</td><td>${r.days}</td><td>${fmtINR(r.opening)}</td><td class="debit">${fmtINR(r.interest)}</td><td class="credit">${fmtINR(r.principalPaid)}</td><td style="font-weight:600">${fmtINR(r.installment)}</td><td>${fmtINR(r.closing)}</td></tr>`).join('');
+
+    const closingBalance=rows.length?rows[rows.length-1].closing:principal;
+    const tol=1;
+    const principalOk=Math.abs(totalPrincipal-principal)<=tol;
+    const balanceOk=Math.abs(closingBalance)<=tol;
+    let slabTieHtml='';
+    if(isSlab){
+      const perSlabTotal=slabs.map(()=>0);
+      rows.forEach(r=>{ emiAllocate(r.opening,slabs).forEach((p,i)=>{ perSlabTotal[i]+=p.portion*p.rate/100*(r.days/365); }); });
+      const slabSum=perSlabTotal.reduce((a,b)=>a+b,0);
+      const tieOk=Math.abs(slabSum-totalInterest)<=tol;
+      slabTieHtml=`<div class="stub-sub" style="margin-top:10px"><b>Interest break-up by slab, full tenure:</b> ${slabs.map((s,i)=>`Slab ${i+1} (${emiSlabRangeLabel(slabs,i)} @ ${Number(s.rate).toFixed(2)}%): <b>₹${fmtINR(perSlabTotal[i])}</b>`).join(' &middot; ')} ${tieOk?'<span class="stmt-good">✓ Ties to total interest paid</span>':'<span class="stmt-review">⚠ Off by ₹'+fmtINR(slabSum-totalInterest)+'</span>'}</div>`;
+    }
+    document.getElementById('qtrReconSummary').innerHTML=`
+      <div class="table-scroll"><table>
+        <thead><tr><th style="text-align:left">Reconciliation check</th><th>Amount</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>Loan amount disbursed</td><td>${fmtINR(principal)}</td><td>—</td></tr>
+          <tr><td>Total principal recovered over the tenure</td><td class="credit">${fmtINR(totalPrincipal)}</td><td>${principalOk?'<span class="stmt-good">✓ Matches loan amount</span>':'<span class="stmt-review">⚠ Off by ₹'+fmtINR(totalPrincipal-principal)+'</span>'}</td></tr>
+          <tr><td>Total interest paid across all ${rows.length} instalments</td><td class="debit">${fmtINR(totalInterest)}</td><td>—</td></tr>
+          <tr><td>Closing balance after the final instalment</td><td>${fmtINR(closingBalance)}</td><td>${balanceOk?'<span class="stmt-good">✓ Loan fully repaid — nil balance</span>':'<span class="stmt-review">⚠ Not fully closed</span>'}</td></tr>
+        </tbody>
+      </table></div>${slabTieHtml}
+      <div class="stub-sub" style="margin-top:8px">Each ${freqLabel} instalment of ₹${fmtINR(installment)} covers that period's interest first (computed on the actual days outstanding), then reduces principal — exactly like a monthly EMI, just billed ${freqLabel}. Following the ledger down to the last row, the closing balance reaches nil at the end of the tenure.</div>`;
+    return;
+  }
+
   const {principalRows,interestDebits}=qtrBuildSchedule({principal,count,freqMonths,startDate,debitFreqMonths,isSlab,flatRate,slabs});
 
   const totalPrincipal=principalRows.reduce((s,r)=>s+r.principalPaid,0);
@@ -1956,7 +2071,7 @@ document.getElementById('qtrSlabQuickBtn')?.addEventListener('click',()=>{
   emiRenderSlabs();
   renderQtr();
 });
-['qtrPrincipal','qtrFlatRate','qtrYears','qtrMonths','qtrPrincipalFreq','qtrDebitFreq','qtrStartDate'].forEach(id=>{
+['qtrPrincipal','qtrFlatRate','qtrYears','qtrMonths','qtrPrincipalFreq','qtrDebitFreq','qtrRepayType','qtrStartDate'].forEach(id=>{
   document.getElementById(id)?.addEventListener('input',renderQtr);
   document.getElementById(id)?.addEventListener('change',renderQtr);
 });
