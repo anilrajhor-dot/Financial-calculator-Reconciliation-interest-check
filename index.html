@@ -254,6 +254,24 @@ body.dark .card.ledger tbody tr:hover{
 .slab-amort-card{margin-top:28px}
 .slab-amort-card .chart-subtitle{font-size:12.5px;color:var(--muted);padding:0 12px 12px}
 body.dark .slab-amort-card .chart-subtitle{color:#C7D3CD}
+</style><style id="slabLedgerReverseV31">
+.slab-ledger-card{margin-top:28px}
+.slab-ledger-card .stub{border-left-color:var(--green)}
+.slab-account-total{font-size:12px;color:var(--muted);padding:8px 20px;background:#FBFAF6;border-top:1px dashed var(--rule)}
+body.dark .slab-account-total{background:#151D19;color:#C8D5CE;border-top-color:#3E4E46}
+.reverse-check-card{margin-top:28px}
+.reverse-check-card .stub{border-left-color:var(--clay)}
+.reverse-quick-row{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end;margin-top:8px}
+.reverse-quick-row label{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:4px}
+.reverse-quick-row input{width:100%}
+@media(max-width:700px){.reverse-quick-row{grid-template-columns:1fr 1fr}}
+.reverse-actual-input{width:112px;text-align:right}
+tr.reverse-row-mismatch{background:#FDEDEB}
+body.dark tr.reverse-row-mismatch{background:#3A231F}
+tr.reverse-row-ok{background:#EAF6F1}
+body.dark tr.reverse-row-ok{background:#152A22}
+.stmt-good{color:var(--green);font-weight:700}
+.stmt-review{color:var(--clay);font-weight:700}
 </style><style id="folioContrastV29">
 /* v2.9 — fix dim folio/register text in dark mode */
 body.dark .ledger .stub{
@@ -601,6 +619,14 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
       <canvas id="slabAmortChart" height="125"></canvas>
     </div>
 
+    <div class="card ledger slab-ledger-card" id="slabLedgerCard" style="display:none;">
+      <div class="stub">
+        <div class="stub-title">Slab-wise Ledger Accounts — Month-wise</div>
+        <div class="stub-sub">A separate account for each interest slab: the portion of the outstanding balance falling in that slab, the rate, and the interest charged, for every instalment. Tap a slab to expand.</div>
+      </div>
+      <div id="slabLedgerAccounts"></div>
+    </div>
+
     <div class="card ledger">
       <div class="stub">
         <div class="stub-title">Installment-wise register</div>
@@ -617,6 +643,32 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
 
 <div id="folios"></div>
       <div id="fyInterestSummary" style="margin-top:16px"></div>
+    </div>
+
+    <div class="card ledger reverse-check-card" id="reverseCheckCard" style="display:none;">
+      <div class="stub">
+        <div class="stub-title">🔍 Reverse Calculation — Verify Interest Charged</div>
+        <div class="stub-sub">Enter the interest actually debited by the bank/lender for any instalment and compare it against the slab-wise calculation, using the slab rates configured above.</div>
+      </div>
+      <div style="padding:16px 20px 4px">
+        <div class="formula-box">
+          <b>Quick check</b> — verify any balance/period on its own, independent of the schedule below (uses the slab rates configured above).
+          <div class="reverse-quick-row">
+            <div><label>Opening balance (₹)</label><input type="number" id="revQuickBalance" min="0" step="1" placeholder="e.g. 500000"></div>
+            <div><label>Period (months)</label><input type="number" id="revQuickMonths" min="0.03" step="0.01" value="1"></div>
+            <div><label>Interest actually charged (₹)</label><input type="number" id="revQuickActual" min="0" step="0.01" placeholder="from passbook/statement"></div>
+            <div><button class="btn sm" type="button" id="revQuickBtn">Verify</button></div>
+          </div>
+          <div id="revQuickResult" style="margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:12.5px"></div>
+        </div>
+        <div class="stub-sub" id="reverseCheckSummary" style="margin:14px 0 10px">Enter the interest actually debited by the bank for any instalment below to verify it against the slab calculation for the full schedule above.</div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>#</th><th>Due date</th><th>Opening bal.</th><th>Computed interest</th><th>Actual interest charged</th><th>Variance</th><th>Status</th></tr></thead>
+          <tbody id="reverseCheckBody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -1392,11 +1444,148 @@ function computeSchedule({ principal, annualRate, count, freqMonths, startDate, 
 let chart = null;
 let slabAmortChart = null;
 let expandedYear = null;
+let expandedSlabAccount = 0;
 
 
 function emiInterestBreakdown(balance,slabs,freqMonths){
   return emiAllocate(balance,slabs).map((p,i)=>'S'+(i+1)+': ₹'+fmtINR(p.portion)+' @ '+Number(p.rate).toFixed(2)+'% = ₹'+fmtINR(p.portion*p.rate/100*(freqMonths/12))).join('<br>');
 }
+
+/* ---------- Slab-wise ledger accounts: one account per slab, month-wise ---------- */
+function emiSlabRangeLabel(slabs,i){
+  const s=slabs[i], prevTo=i>0?slabs[i-1].to:0;
+  if(s.to===null) return i===0 ? 'Full balance' : ('Above ₹'+fmtINR(prevTo));
+  return i===0 ? ('First ₹'+fmtINR(s.to)) : ('₹'+fmtINR(prevTo)+' to ₹'+fmtINR(s.to));
+}
+
+function renderSlabLedgerAccounts(rows, slabs, freqMonths, method){
+  const card=document.getElementById('slabLedgerCard');
+  const el=document.getElementById('slabLedgerAccounts');
+  if(!card||!el) return;
+  if(method!=='slab' || !slabs.length){ card.style.display='none'; return; }
+  card.style.display='block';
+  el.innerHTML=slabs.map((s,i)=>{
+    let cumulative=0, anyRow=false;
+    const body=rows.map(r=>{
+      const p=emiAllocate(r.opening,slabs)[i];
+      if(!p) return '';
+      anyRow=true;
+      const interest=p.portion*p.rate/100*(freqMonths/12);
+      cumulative+=interest;
+      return `<tr${r.moratorium?' style="background:#FBFAF6;"':''}>
+        <td>${r.moratorium?'M'+r.period:r.period}</td>
+        <td>${fmtDate(r.dueDate)}</td>
+        <td>${fmtINR(p.portion)}</td>
+        <td>${Number(p.rate).toFixed(2)}%</td>
+        <td class="debit">${fmtINR(interest)}</td>
+        <td>${fmtINR(cumulative)}</td>
+      </tr>`;
+    }).join('');
+    const open=expandedSlabAccount===i;
+    return `<div>
+      <button class="folio-toggle slab-account-toggle" data-slab="${i}">
+        <span class="folio-name">Slab ${i+1} — ${emiSlabRangeLabel(slabs,i)} @ ${Number(s.rate).toFixed(2)}%</span>
+        <span class="folio-meta">${anyRow?('Total interest <span class="debit">₹'+fmtINR(cumulative)+'</span>'):'Not reached in this schedule'} &middot; ${open?'−':'+'}</span>
+      </button>
+      ${open?`<div class="table-scroll"><table>
+        <thead><tr><th>#</th><th>Due date</th><th>Slab balance</th><th>Rate</th><th>Interest this period</th><th>Cumulative interest</th></tr></thead>
+        <tbody>${body||'<tr><td colspan="6" style="text-align:center;color:var(--muted)">Outstanding balance never reaches this slab in the selected schedule.</td></tr>'}</tbody>
+      </table></div>`:''}
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.slab-account-toggle').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const i=Number(btn.dataset.slab);
+      expandedSlabAccount=expandedSlabAccount===i?-1:i;
+      renderEmi();
+    });
+  });
+}
+
+/* ---------- Reverse calculation: verify interest actually charged ---------- */
+function reverseCheckLoad(){try{const x=JSON.parse(localStorage.getItem('financial_emi_reverse_actuals_v1')||'{}');return (x&&typeof x==='object')?x:{};}catch(e){return {};}}
+function reverseCheckSave(obj){try{localStorage.setItem('financial_emi_reverse_actuals_v1',JSON.stringify(obj));}catch(e){}}
+function reverseCheckVariance(actual,computed){return Number(actual)-computed;}
+
+function renderReverseCheckTable(rows, slabs, freqMonths, method){
+  const card=document.getElementById('reverseCheckCard');
+  const body=document.getElementById('reverseCheckBody');
+  if(!card||!body) return;
+  if(method!=='slab'){ card.style.display='none'; return; }
+  card.style.display='block';
+  const actuals=reverseCheckLoad();
+  body.innerHTML=rows.map(r=>{
+    const a=actuals[r.period];
+    const hasActual=a!==undefined&&a!==''&&!isNaN(Number(a));
+    const variance=hasActual?reverseCheckVariance(a,r.interest):null;
+    const ok=hasActual&&Math.abs(variance)<=1;
+    const rowClass=hasActual?(ok?'reverse-row-ok':'reverse-row-mismatch'):'';
+    return `<tr data-period="${r.period}" class="${rowClass}">
+      <td>${r.moratorium?'M'+r.period:r.period}</td>
+      <td>${fmtDate(r.dueDate)}</td>
+      <td>${fmtINR(r.opening)}</td>
+      <td class="debit">${fmtINR(r.interest)}</td>
+      <td><input type="number" class="reverse-actual-input" data-period="${r.period}" step="0.01" placeholder="Enter bank figure" value="${hasActual?a:''}"></td>
+      <td class="reverse-variance">${hasActual?fmtINR(variance):'—'}</td>
+      <td class="reverse-status">${!hasActual?'':(ok?'<span class="stmt-good">✓ Matches</span>':'<span class="stmt-review">⚠ Mismatch</span>')}</td>
+    </tr>`;
+  }).join('');
+  body.querySelectorAll('.reverse-actual-input').forEach(inp=>{
+    inp.addEventListener('input',()=>{
+      const period=inp.dataset.period;
+      const a=reverseCheckLoad();
+      if(inp.value==='') delete a[period]; else a[period]=inp.value;
+      reverseCheckSave(a);
+      updateReverseCheckRow(period,rows);
+    });
+  });
+  updateReverseCheckSummary(rows);
+}
+
+function updateReverseCheckRow(period,rows){
+  const r=rows.find(x=>String(x.period)===String(period));
+  const tr=document.querySelector(`#reverseCheckBody tr[data-period="${period}"]`);
+  if(!r||!tr) return;
+  const a=reverseCheckLoad();
+  const actualVal=a[period];
+  const hasActual=actualVal!==undefined&&actualVal!==''&&!isNaN(Number(actualVal));
+  const variance=hasActual?reverseCheckVariance(actualVal,r.interest):null;
+  const ok=hasActual&&Math.abs(variance)<=1;
+  tr.classList.remove('reverse-row-ok','reverse-row-mismatch');
+  if(hasActual) tr.classList.add(ok?'reverse-row-ok':'reverse-row-mismatch');
+  tr.querySelector('.reverse-variance').textContent=hasActual?fmtINR(variance):'—';
+  tr.querySelector('.reverse-status').innerHTML=!hasActual?'':(ok?'<span class="stmt-good">✓ Matches</span>':'<span class="stmt-review">⚠ Mismatch</span>');
+  updateReverseCheckSummary(rows);
+}
+
+function updateReverseCheckSummary(rows){
+  const summary=document.getElementById('reverseCheckSummary');
+  if(!summary) return;
+  const a=reverseCheckLoad();
+  const checked=rows.filter(r=>{const v=a[r.period];return v!==undefined&&v!==''&&!isNaN(Number(v));});
+  const mismatches=checked.filter(r=>Math.abs(reverseCheckVariance(a[r.period],r.interest))>1);
+  summary.innerHTML=checked.length
+    ? `${checked.length} of ${rows.length} instalment(s) checked &middot; ${mismatches.length?('<span class="stmt-review">'+mismatches.length+' mismatch(es) found</span>'):'<span class="stmt-good">all checked instalments match</span>'}`
+    : 'Enter the interest actually debited by the bank for any instalment below to verify it against the slab calculation for the full schedule above.';
+}
+
+document.getElementById('revQuickBtn')?.addEventListener('click',()=>{
+  const balance=Number(document.getElementById('revQuickBalance').value)||0;
+  const months=Number(document.getElementById('revQuickMonths').value)||0;
+  const actualRaw=document.getElementById('revQuickActual').value;
+  const slabs=emiLoadSlabs();
+  const parts=emiAllocate(balance,slabs);
+  const computed=parts.reduce((s,p)=>s+p.portion*p.rate/100*(months/12),0);
+  const breakdown=parts.map((p,i)=>`Slab ${i+1}: ₹${fmtINR(p.portion)} @ ${Number(p.rate).toFixed(2)}% for ${months} mo. = ₹${fmtINR(p.portion*p.rate/100*(months/12))}`).join('<br>');
+  let statusHtml='';
+  if(actualRaw!==''&&!isNaN(Number(actualRaw))){
+    const variance=Number(actualRaw)-computed;
+    const ok=Math.abs(variance)<=1;
+    statusHtml=`<div style="margin-top:8px">Bank charged: ₹${fmtINR(Number(actualRaw))} &middot; Variance: ${ok?('<span class="stmt-good">₹'+fmtINR(variance)+' — matches ✓</span>'):('<span class="stmt-review">₹'+fmtINR(variance)+' — mismatch ⚠</span>')}</div>`;
+  }
+  const resultEl=document.getElementById('revQuickResult');
+  if(resultEl) resultEl.innerHTML=`<div><b>Computed interest:</b> ₹${fmtINR(computed)}</div><div style="margin-top:6px;color:var(--muted);font-size:12px">${breakdown||'No slab matched (balance is zero or negative).'}</div>${statusHtml}`;
+});
 
 function syncEmiPeriodToCount(){
   const y=Math.max(0,Math.floor(Number(document.getElementById('periodYears')?.value)||0));
@@ -1603,6 +1792,10 @@ function renderEmi() {
       if (slabAmortChart) { slabAmortChart.destroy(); slabAmortChart=null; }
     }
   }
+
+  const slabsForRegister = method==='slab' ? emiLoadSlabs() : [];
+  renderSlabLedgerAccounts(rows, slabsForRegister, freqMonths, method);
+  renderReverseCheckTable(rows, slabsForRegister, freqMonths, method);
 
   const byYear = new Map();
   rows.forEach(r => {
