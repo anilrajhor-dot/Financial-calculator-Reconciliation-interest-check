@@ -276,6 +276,13 @@ body.dark tr.reverse-row-ok{background:#152A22}
 .loan-recon-card{margin-top:28px}
 .loan-recon-card .stub{border-left-color:var(--brass)}
 .loan-recon-table td:first-child{text-align:left}
+@media print {
+  #tabs, .masthead-badge, .appearance-tools, #loanCalculatorMenus, .input-card, button, select, .no-print, #askMeModal, .folio-toggle { display:none !important; }
+  body { background:#fff; color:#000; }
+  .card { box-shadow:none !important; border:1px solid #999 !important; break-inside:avoid; }
+  table { font-size:11px; }
+  a[href]:after { content:""; }
+}
 </style><style id="folioContrastV29">
 /* v2.9 — fix dim folio/register text in dark mode */
 body.dark .ledger .stub{
@@ -504,7 +511,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   <div class="masthead">
     <div>
       <h2 class="masthead-title">Financial Calculator with Bank Interest Comparison</h2>
-      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; SHG Grading &middot; <strong>v8.20</strong></div>
+      <div class="masthead-sub">EMI &middot; Deposits &middot; Age &middot; Bank Statement Interest &middot; Reconciliation &middot; SHG Grading &middot; <strong>v8.21</strong></div>
     </div>
     <div class="masthead-badge">
       <strong>Anil Sharma</strong>
@@ -638,6 +645,64 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
       <div id="floatRateResult" style="margin-top:14px"></div>
     </div>
 
+    <div class="card input-card" id="prepayCard" style="margin-top:16px;">
+      <div class="stub-title">&#128176; Part-Prepayment / Foreclosure (optional)</div>
+      <div class="stub-sub" style="margin:4px 0 12px;color:var(--muted)">Model a one-time lump-sum prepayment and compare the bank's two options: keep the EMI the same and shorten the tenure, or keep the tenure the same and reduce the EMI. Works with the standard single-rate EMI and the slab-wise EMI.</div>
+      <div class="grid">
+        <div>
+          <label style="display:block">&nbsp;</label>
+          <label style="font-weight:600;font-size:13px"><input type="checkbox" id="prepayEnable" style="width:auto;margin-right:6px;vertical-align:middle"> Enable part-prepayment</label>
+        </div>
+        <div>
+          <label for="prepayAfter">Prepayment after instalment #</label>
+          <input type="number" id="prepayAfter" min="1" value="12">
+        </div>
+        <div>
+          <label for="prepayAmount">Prepayment amount (&#8377;)</label>
+          <input type="number" id="prepayAmount" min="0" step="1" value="100000">
+        </div>
+        <div>
+          <label for="prepayMode">After the prepayment</label>
+          <select id="prepayMode">
+            <option value="reduce-tenure" selected>Keep the EMI, reduce the tenure</option>
+            <option value="reduce-emi">Keep the tenure, reduce the EMI</option>
+          </select>
+        </div>
+      </div>
+      <div id="prepayResult" style="margin-top:14px"></div>
+    </div>
+
+    <div class="card input-card" id="scenarioCard" style="margin-top:16px;">
+      <div class="stub-title">&#128190; Save / Load Scenario</div>
+      <div class="stub-sub" style="margin:4px 0 12px;color:var(--muted)">Save the current loan amount, rate, tenure and settings under a name (e.g. a borrower or SHG) and reload them later. Saved on this device only.</div>
+      <div class="grid">
+        <div>
+          <label for="scenarioName">Scenario name</label>
+          <input type="text" id="scenarioName" placeholder="e.g. Ramesh Kirana Store loan">
+        </div>
+        <div>
+          <label style="display:block">&nbsp;</label>
+          <button class="btn sm" type="button" id="scenarioSaveBtn">Save current as scenario</button>
+        </div>
+        <div>
+          <label for="scenarioSelect">Saved scenarios</label>
+          <select id="scenarioSelect"><option value="">— none saved —</option></select>
+        </div>
+        <div>
+          <label style="display:block">&nbsp;</label>
+          <button class="btn sm" type="button" id="scenarioLoadBtn">Load</button>
+          <button class="btn sm" type="button" id="scenarioDeleteBtn" style="background:var(--clay);margin-left:6px">Delete</button>
+        </div>
+      </div>
+      <div id="scenarioMsg" class="hint" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card input-card no-print" id="emiExportCard" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn sm" type="button" id="emiPrintBtn">&#128424;&#65039; Print / Save as PDF</button>
+      <button class="btn sm" type="button" id="emiExcelBtn">&#128202; Export to Excel</button>
+      <span class="hint">Exports the full instalment register (and, in slab mode, the slab ledger and reconciliation).</span>
+    </div>
+
     <div class="summary" id="summary"></div>
 
     <div class="card chart-card">
@@ -697,6 +762,8 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
         <div class="stub-sub">Enter the interest actually debited by the bank/lender for any instalment and compare it against the slab-wise calculation. Interest here is computed on the <strong>actual number of calendar days</strong> between instalment dates — the same way a bank charges on daily outstanding balance — not a flat 1/12th-of-a-month assumption, so it stays correct even when due dates fall on 28, 30 or 31-day gaps.</div>
       </div>
       <div style="padding:16px 20px 4px">
+        <label style="font-weight:600;font-size:13px"><input type="checkbox" id="revActualActual" style="width:auto;margin-right:6px;vertical-align:middle"> Actual/Actual day-count (366 in leap years)</label>
+        <div class="hint" style="margin-bottom:10px">Unchecked uses Actual/365 fixed &mdash; the RBI-standard convention used by most Indian banks.</div>
         <div class="formula-box">
           <b>Quick check</b> — verify any balance over any real date range, independent of the schedule below (uses the slab rates configured above, and the exact number of days between the two dates).
           <div class="reverse-quick-row">
@@ -715,6 +782,38 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
           <thead><tr><th>#</th><th>Due date</th><th>Days</th><th>Opening bal.</th><th>Computed interest (actual days)</th><th>Actual interest charged</th><th>Variance</th><th>Status</th></tr></thead>
           <tbody id="reverseCheckBody"></tbody>
         </table>
+      </div>
+    </div>
+
+    <div class="card ledger reverse-check-card" style="margin-top:24px">
+      <div class="stub">
+        <div class="stub-title">&#9200; Overdue / Penal Interest</div>
+        <div class="stub-sub">If an instalment is paid late, compute the extra penal interest charged on the overdue amount for the days it was late &mdash; on top of the normal interest for that instalment.</div>
+      </div>
+      <div style="padding:16px 20px">
+        <div class="grid">
+          <div>
+            <label for="penalOverdueAmount">Overdue amount (&#8377;)</label>
+            <input type="number" id="penalOverdueAmount" min="0" step="1" placeholder="e.g. 20190">
+          </div>
+          <div>
+            <label for="penalDueDate">Original due date</label>
+            <input type="date" id="penalDueDate">
+          </div>
+          <div>
+            <label for="penalPaidDate">Actual payment date</label>
+            <input type="date" id="penalPaidDate">
+          </div>
+          <div>
+            <label for="penalRate">Penal rate (% p.a., extra over normal)</label>
+            <input type="number" id="penalRate" min="0" step="0.01" value="2">
+          </div>
+          <div>
+            <label style="display:block">&nbsp;</label>
+            <button class="btn sm" type="button" id="penalCalcBtn">Calculate</button>
+          </div>
+        </div>
+        <div id="penalResult" style="margin-top:12px;font-family:'IBM Plex Mono',monospace;font-size:13px"></div>
       </div>
     </div>
     </div>
@@ -770,9 +869,56 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
             <label style="display:block">&nbsp;</label>
             <label style="font-weight:600;font-size:13px"><input type="checkbox" id="qtrRoundToRupee" style="width:auto;margin-right:6px;vertical-align:middle"> Round instalment to nearest &#8377;1</label>
           </div>
+          <div>
+            <label for="qtrMoratMonths">Moratorium period (months)</label>
+            <input type="number" id="qtrMoratMonths" value="0" min="0" />
+          </div>
+          <div>
+            <label for="qtrMoratMode">During moratorium</label>
+            <select id="qtrMoratMode">
+              <option value="paid" selected>Interest paid each month</option>
+              <option value="accrued">Interest accrued (added to principal)</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block">&nbsp;</label>
+            <label style="font-weight:600;font-size:13px"><input type="checkbox" id="qtrActualActual" style="width:auto;margin-right:6px;vertical-align:middle"> Actual/Actual day-count (366 in leap years)</label>
+            <div class="hint">Unchecked uses Actual/365 fixed &mdash; the RBI-standard convention used by most Indian banks.</div>
+          </div>
         </div>
-        <div class="note" id="qtrNote">With the <strong>equated instalment</strong>, every quarter/half-year you pay the same total amount &mdash; part interest, part principal &mdash; solved so the balance reaches exactly nil at the last instalment, just like a normal EMI but billed less often. With <strong>equal principal</strong>, only the principal is recovered on the instalment schedule; interest still accrues daily on the outstanding balance and is billed as one separate lump sum at each quarter/half-year point.</div>
+        <div class="note" id="qtrNote">With the <strong>equated instalment</strong>, every quarter/half-year you pay the same total amount &mdash; part interest, part principal &mdash; solved so the balance reaches exactly nil at the last instalment, just like a normal EMI but billed less often. With <strong>equal principal</strong>, only the principal is recovered on the instalment schedule; interest still accrues daily on the outstanding balance and is billed as one separate lump sum at each quarter/half-year point. During a <strong>moratorium</strong>, no principal is recovered: choose whether interest is paid each month or accrued (capitalized) before instalments begin.</div>
         <div id="qtrValidationMsg" class="note" style="display:none;border-left-color:var(--clay)"></div>
+      </div>
+
+      <div class="card input-card" id="qtrScenarioCard">
+        <div class="stub-title">&#128190; Save / Load Scenario</div>
+        <div class="stub-sub" style="margin:4px 0 12px;color:var(--muted)">Save the current loan amount, rate, tenure and settings under a name and reload them later. Saved on this device only.</div>
+        <div class="grid">
+          <div>
+            <label for="qtrScenarioName">Scenario name</label>
+            <input type="text" id="qtrScenarioName" placeholder="e.g. Ramesh Kirana Store loan">
+          </div>
+          <div>
+            <label style="display:block">&nbsp;</label>
+            <button class="btn sm" type="button" id="qtrScenarioSaveBtn">Save current as scenario</button>
+          </div>
+          <div>
+            <label for="qtrScenarioSelect">Saved scenarios</label>
+            <select id="qtrScenarioSelect"><option value="">— none saved —</option></select>
+          </div>
+          <div>
+            <label style="display:block">&nbsp;</label>
+            <button class="btn sm" type="button" id="qtrScenarioLoadBtn">Load</button>
+            <button class="btn sm" type="button" id="qtrScenarioDeleteBtn" style="background:var(--clay);margin-left:6px">Delete</button>
+          </div>
+        </div>
+        <div id="qtrScenarioMsg" class="hint" style="margin-top:8px"></div>
+      </div>
+
+      <div class="card input-card no-print" id="qtrExportCard" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn sm" type="button" id="qtrPrintBtn">&#128424;&#65039; Print / Save as PDF</button>
+        <button class="btn sm" type="button" id="qtrExcelBtn">&#128202; Export to Excel</button>
+        <span class="hint">Exports the full ledger and reconciliation shown below.</span>
       </div>
 
       <div class="summary" id="qtrSummary"></div>
@@ -1477,7 +1623,7 @@ body.dark #askMeModal .ask-result-row{background:#18211D!important;border-color:
   </div>
 
   <footer>
-    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.20</strong>
+    Developed by <strong>Anil Sharma</strong>, Former General Manager, Central Bank of India &middot; <strong>v8.21</strong>
   </footer>
 </div>
 
@@ -1497,6 +1643,23 @@ const fmtDate = (d) => d.toLocaleDateString("en-IN", { day: "2-digit", month: "s
 const fmtINR = (n) => isFinite(n) ? n.toLocaleString("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 }) : "—";
 const addMonths = (date, months) => { const d = new Date(date); d.setMonth(d.getMonth() + months); return d; };
 
+/* ---------- Day-count convention: Actual/365 fixed (default, RBI-standard) vs
+   Actual/Actual (366 in leap years). A "day factor" is the fraction of a year
+   a single day counts for, summed over the days in a period, then multiplied
+   by balance*rate/100 to get interest for that period. Precomputing this once
+   per period (rather than re-looping inside a bisection solver) keeps the
+   quarterly/half-yearly equated-instalment solver fast. ---------- */
+function isLeapYear(y){ return (y%4===0 && y%100!==0) || y%400===0; }
+function periodDayFactor(fromDate, toDate, actualActual){
+  if(!actualActual){
+    const days=Math.max(0,Math.round((toDate-fromDate)/86400000));
+    return days/365;
+  }
+  let factor=0; const d=new Date(fromDate);
+  while(d<toDate){ factor += 1/(isLeapYear(d.getFullYear())?366:365); d.setDate(d.getDate()+1); }
+  return factor;
+}
+
 const EMI_DEFAULT_SLABS=[{to:300000,rate:7},{to:500000,rate:8},{to:null,rate:9}];
 function emiNormaliseSlabs(slabs){return (slabs||[]).map(x=>({to:(x.to===null||x.to===''||x.to===undefined)?null:Number(x.to),rate:Number(x.rate)||0})).filter(x=>x.to===null||isFinite(x.to));}
 function emiLoadSlabs(){try{const x=JSON.parse(localStorage.getItem('financial_emi_interest_slabs_v1')||'null');if(Array.isArray(x)&&x.length)return emiNormaliseSlabs(x);}catch(e){}return EMI_DEFAULT_SLABS.map(x=>({...x}));}
@@ -1506,6 +1669,8 @@ function emiSlabInterest(balance,slabs,periodFactor){return emiAllocate(balance,
 function emiRenderSlabs(){const el=document.getElementById('emiSlabs');if(!el)return;const slabs=emiLoadSlabs();el.innerHTML=slabs.map((x,i)=>`<div class="stmt-slab-row"><div class="wide"><div class="slab-label">Slab ${i+1}</div></div><div><label>Upto amount</label><input class="emi-slab-to" type="number" min="0" step="1" value="${x.to===null?'':x.to}" placeholder="No limit"></div><div><label>Annual rate %</label><input class="emi-slab-rate" type="number" min="0" step="0.01" value="${x.rate}"></div><div><label>Coverage</label><div class="hint">${x.to===null?'Above previous slab':'First ₹'+fmtINR(x.to)}</div></div><div><button class="btn sm" type="button" onclick="emiRemoveSlab(${i})" ${slabs.length<=1?'disabled':''}>Remove</button></div></div>`).join('');el.querySelectorAll('input').forEach(inp=>inp.addEventListener('change',emiPersistSlabs));}
 function emiCurrentSlabs(){return [...document.querySelectorAll('#emiSlabs .stmt-slab-row')].map(r=>({to:r.querySelector('.emi-slab-to').value===''?null:Number(r.querySelector('.emi-slab-to').value),rate:Number(r.querySelector('.emi-slab-rate').value)||0}));}
 let currentLoanMode='standard';
+let lastEmiExport=null;
+let lastQtrExport=null;
 function refreshActiveCalculator(){ if(currentLoanMode==='quarterly') renderQtr(); else renderEmi(); }
 function emiPersistSlabs(){emiSaveSlabs(emiCurrentSlabs());if(document.getElementById('emiSlabSave'))document.getElementById('emiSlabSave').textContent='✓ Saved. Slabs remain unchanged until Reset EMI slabs.';refreshActiveCalculator();}
 function emiAddSlab(){const s=emiLoadSlabs(),last=s[s.length-1];if(last.to===null){const prev=s.length>1?s[s.length-2].to:500000;s.splice(s.length-1,0,{to:Number(prev||0)+200000,rate:last.rate});}else s.push({to:null,rate:last.rate});emiSaveSlabs(s);emiRenderSlabs();refreshActiveCalculator();}
@@ -1734,13 +1899,14 @@ let reverseCheckDayComputed={};
 /* Interest on the actual number of calendar days between instalment dates —
    matches how a bank charges on daily outstanding balance, instead of the
    1/12-month-per-instalment approximation used to size the EMI schedule. */
-function reverseCheckBuildDayComputed(rows,slabs,startDate){
+function reverseCheckBuildDayComputed(rows,slabs,startDate,actualActual){
   const map={};
   let prevDate=startDate;
   rows.forEach(r=>{
     const days=Math.max(0,Math.round((r.dueDate-prevDate)/86400000));
+    const factor=periodDayFactor(prevDate,r.dueDate,actualActual);
     const parts=emiAllocate(r.opening,slabs);
-    const interest=parts.reduce((s,p)=>s+p.portion*p.rate/100*(days/365),0);
+    const interest=parts.reduce((s,p)=>s+p.portion*p.rate/100*factor,0);
     map[r.period]={days,interest,parts};
     prevDate=r.dueDate;
   });
@@ -1753,7 +1919,8 @@ function renderReverseCheckTable(rows, slabs, freqMonths, method, startDate){
   if(!card||!body) return;
   if(method!=='slab'){ card.style.display='none'; return; }
   card.style.display='block';
-  reverseCheckDayComputed=reverseCheckBuildDayComputed(rows,slabs,startDate);
+  const actualActual=document.getElementById('revActualActual')?.checked||false;
+  reverseCheckDayComputed=reverseCheckBuildDayComputed(rows,slabs,startDate,actualActual);
   const actuals=reverseCheckLoad();
   body.innerHTML=rows.map(r=>{
     const dc=reverseCheckDayComputed[r.period];
@@ -1818,15 +1985,17 @@ document.getElementById('revQuickBtn')?.addEventListener('click',()=>{
   const fromVal=document.getElementById('revQuickFrom').value;
   const toVal=document.getElementById('revQuickTo').value;
   const actualRaw=document.getElementById('revQuickActual').value;
+  const actualActual=document.getElementById('revActualActual')?.checked||false;
   const resultEl=document.getElementById('revQuickResult');
   if(!fromVal||!toVal){ if(resultEl) resultEl.innerHTML='<span class="stmt-review">Enter both the From and To dates.</span>'; return; }
   const from=new Date(fromVal+'T00:00:00'), to=new Date(toVal+'T00:00:00');
   const days=Math.round((to-from)/86400000);
   if(days<=0){ if(resultEl) resultEl.innerHTML='<span class="stmt-review">To date must be after the From date.</span>'; return; }
+  const factor=periodDayFactor(from,to,actualActual);
   const slabs=emiLoadSlabs();
   const parts=emiAllocate(balance,slabs);
-  const computed=parts.reduce((s,p)=>s+p.portion*p.rate/100*(days/365),0);
-  const breakdown=parts.map((p,i)=>`Slab ${i+1}: ₹${fmtINR(p.portion)} @ ${Number(p.rate).toFixed(2)}% for ${days} day(s) = ₹${fmtINR(p.portion*p.rate/100*(days/365))}`).join('<br>');
+  const computed=parts.reduce((s,p)=>s+p.portion*p.rate/100*factor,0);
+  const breakdown=parts.map((p,i)=>`Slab ${i+1}: ₹${fmtINR(p.portion)} @ ${Number(p.rate).toFixed(2)}% for ${days} day(s) = ₹${fmtINR(p.portion*p.rate/100*factor)}`).join('<br>');
   let statusHtml='';
   if(actualRaw!==''&&!isNaN(Number(actualRaw))){
     const variance=Number(actualRaw)-computed;
@@ -1835,6 +2004,7 @@ document.getElementById('revQuickBtn')?.addEventListener('click',()=>{
   }
   if(resultEl) resultEl.innerHTML=`<div><b>${days} day(s) &middot; Computed interest:</b> ₹${fmtINR(computed)}</div><div style="margin-top:6px;color:var(--muted);font-size:12px">${breakdown||'No slab matched (balance is zero or negative).'}</div>${statusHtml}`;
 });
+document.getElementById('revActualActual')?.addEventListener('change',renderEmi);
 document.getElementById('revQuickTo')?.addEventListener('change',()=>{
   if(!document.getElementById('revQuickFrom').value){
     const to=new Date(document.getElementById('revQuickTo').value+'T00:00:00');
@@ -1904,39 +2074,64 @@ function qtrSyncPeriodToCount(){
 
 /* Equal-principal schedule, recovered every `freqMonths`, with interest
    accruing daily on the actual outstanding balance and billed as one lump
-   sum every `debitFreqMonths`. Works for a flat rate or slab rates. */
-function qtrBuildSchedule({principal,count,freqMonths,startDate,debitFreqMonths,isSlab,flatRate,slabs,round}){
-  let pp=principal/count;
-  if(round) pp=Math.round(pp);
+   sum every `debitFreqMonths`. Works for a flat rate or slab rates.
+   Optional moratorium: no principal recovered for `moratMonths`, interest
+   either paid each moratorium month (separate debit) or capitalized. */
+function qtrBuildSchedule({principal,count,freqMonths,startDate,debitFreqMonths,isSlab,flatRate,slabs,round,moratMonths,moratMode,actualActual}){
+  moratMonths=Math.max(0,Math.floor(moratMonths||0));
   let balance=principal;
   let prevDate=startDate;
   const principalRows=[];
   const interestDebits=[];
-  let accrued=0, perSlabAccrued=isSlab?slabs.map(()=>0):null, monthsSinceDebit=0, debitFrom=startDate;
+  let moratoriumInterest=0;
+  function interestFor(bal,fromD,toD){
+    const factor=periodDayFactor(fromD,toD,actualActual);
+    return isSlab? emiAllocate(bal,slabs).reduce((s,p)=>s+p.portion*p.rate/100*factor,0) : bal*flatRate/100*factor;
+  }
+  for(let m=1;m<=moratMonths;m++){
+    const d=addMonths(startDate,m);
+    const days=Math.max(0,Math.round((d-prevDate)/86400000));
+    const opening=balance;
+    const interest=interestFor(opening,prevDate,d);
+    moratoriumInterest+=interest;
+    if(moratMode==='accrued'){
+      balance=opening+interest;
+      principalRows.push({period:'M'+m,dueDate:d,opening,principalPaid:0,closing:balance,days,moratorium:true});
+    } else {
+      interestDebits.push({period:interestDebits.length+1,fromDate:prevDate,toDate:d,days,interest,slabBreakup:null,moratorium:true});
+      principalRows.push({period:'M'+m,dueDate:d,opening,principalPaid:0,closing:balance,days,moratorium:true});
+    }
+    prevDate=d;
+  }
+  const scheduleStart=prevDate;
+  let pp=balance/count;
+  if(round) pp=Math.round(pp);
+  let accrued=0, perSlabAccrued=isSlab?slabs.map(()=>0):null, monthsSinceDebit=0, debitFrom=scheduleStart;
   for(let i=1;i<=count;i++){
-    const dueDate=addMonths(startDate,i*freqMonths);
+    const dueDate=addMonths(scheduleStart,i*freqMonths);
     const days=Math.max(0,Math.round((dueDate-prevDate)/86400000));
+    const factor=periodDayFactor(prevDate,dueDate,actualActual);
     const opening=balance;
     if(isSlab){
       emiAllocate(opening,slabs).forEach((p,idx)=>{
-        const interest=p.portion*p.rate/100*(days/365);
+        const interest=p.portion*p.rate/100*factor;
         perSlabAccrued[idx]+=interest; accrued+=interest;
       });
     } else {
-      accrued+=opening*flatRate/100*(days/365);
+      accrued+=opening*flatRate/100*factor;
     }
     const principalPaid=(i===count)?balance:Math.min(balance,pp);
     balance=Math.max(0,balance-principalPaid);
-    principalRows.push({period:i,dueDate,opening,principalPaid,closing:balance,days});
+    principalRows.push({period:i,dueDate,opening,principalPaid,closing:balance,days,moratorium:false});
     monthsSinceDebit+=freqMonths;
     prevDate=dueDate;
     if(monthsSinceDebit>=debitFreqMonths || i===count){
-      interestDebits.push({period:interestDebits.length+1,fromDate:debitFrom,toDate:dueDate,days:Math.round((dueDate-debitFrom)/86400000),interest:accrued,slabBreakup:isSlab?perSlabAccrued.slice():null});
+      interestDebits.push({period:interestDebits.length+1,fromDate:debitFrom,toDate:dueDate,days:Math.round((dueDate-debitFrom)/86400000),interest:accrued,slabBreakup:isSlab?perSlabAccrued.slice():null,moratorium:false});
       accrued=0; if(isSlab) perSlabAccrued=slabs.map(()=>0);
       monthsSinceDebit=0; debitFrom=dueDate;
     }
   }
-  return {principalRows,interestDebits};
+  return {principalRows,interestDebits,moratoriumInterest,moratMonths};
 }
 
 /* Equated instalment (principal + interest combined, level every period,
@@ -1944,45 +2139,72 @@ function qtrBuildSchedule({principal,count,freqMonths,startDate,debitFreqMonths,
    computed on the actual number of days the balance was outstanding rather
    than a fixed 1/12-month fraction. Solved by bisection so the closing
    balance is exactly nil at the last instalment. Works for a flat rate or
-   slab rates. */
-function qtrBuildEquatedSchedule({principal,count,freqMonths,startDate,isSlab,flatRate,slabs,round}){
-  const dueDates=[],days=[];
-  let prev=startDate;
+   slab rates. Optional moratorium before the equated instalments begin. */
+function qtrBuildEquatedSchedule({principal,count,freqMonths,startDate,isSlab,flatRate,slabs,round,moratMonths,moratMode,actualActual}){
+  moratMonths=Math.max(0,Math.floor(moratMonths||0));
+  let balance=principal;
+  let prevDate=startDate;
+  const moratRows=[];
+  let moratoriumInterest=0;
+  function moratInterestFor(bal,fromD,toD){
+    const factor=periodDayFactor(fromD,toD,actualActual);
+    return isSlab? emiAllocate(bal,slabs).reduce((s,p)=>s+p.portion*p.rate/100*factor,0) : bal*flatRate/100*factor;
+  }
+  for(let m=1;m<=moratMonths;m++){
+    const d=addMonths(startDate,m);
+    const days=Math.max(0,Math.round((d-prevDate)/86400000));
+    const opening=balance;
+    const factor=periodDayFactor(prevDate,d,actualActual);
+    const interest=moratInterestFor(opening,prevDate,d);
+    moratoriumInterest+=interest;
+    if(moratMode==='accrued'){
+      balance=opening+interest;
+      moratRows.push({period:'M'+m,dueDate:d,days,opening,interest,principalPaid:0,installment:0,closing:balance,moratorium:true,factor});
+    } else {
+      moratRows.push({period:'M'+m,dueDate:d,days,opening,interest,principalPaid:0,installment:interest,closing:balance,moratorium:true,factor});
+    }
+    prevDate=d;
+  }
+  const scheduleStart=prevDate;
+  const principalStart=balance;
+  const dueDates=[],days=[],dayFactors=[];
+  let prev=scheduleStart;
   for(let i=1;i<=count;i++){
-    const d=addMonths(startDate,i*freqMonths);
+    const d=addMonths(scheduleStart,i*freqMonths);
     dueDates.push(d);
     days.push(Math.max(0,Math.round((d-prev)/86400000)));
+    dayFactors.push(periodDayFactor(prev,d,actualActual));
     prev=d;
   }
-  function interestFor(balance,dayCount){
-    if(isSlab) return emiAllocate(balance,slabs).reduce((s,p)=>s+p.portion*p.rate/100*(dayCount/365),0);
-    return balance*flatRate/100*(dayCount/365);
+  function interestFor(bal,i){
+    if(isSlab) return emiAllocate(bal,slabs).reduce((s,p)=>s+p.portion*p.rate/100*dayFactors[i],0);
+    return bal*flatRate/100*dayFactors[i];
   }
   function remaining(inst){
-    let b=principal;
+    let b=principalStart;
     for(let i=0;i<count;i++){
-      const interest=interestFor(b,days[i]);
+      const interest=interestFor(b,i);
       b-=(inst-interest);
       if(b<=0) return 0;
     }
     return b;
   }
-  let lo=0,hi=Math.max(principal/count,1);
+  let lo=0,hi=Math.max(principalStart/count,1);
   for(let z=0;z<100&&remaining(hi)>0.0001;z++) hi*=2;
   for(let z=0;z<120;z++){ const mid=(lo+hi)/2; if(remaining(mid)>0) lo=mid; else hi=mid; }
   let installment=hi;
   if(round) installment=Math.round(installment);
-  let balance=principal;
-  const rows=[];
+  balance=principalStart;
+  const rows=moratRows.slice();
   for(let i=0;i<count;i++){
     const opening=balance;
-    const interest=interestFor(opening,days[i]);
+    const interest=interestFor(opening,i);
     let principalPaid=installment-interest, inst=installment;
     if(i===count-1){ principalPaid=balance; inst=principalPaid+interest; }
     balance=Math.max(0,balance-principalPaid);
-    rows.push({period:i+1,dueDate:dueDates[i],days:days[i],opening,interest,principalPaid,installment:inst,closing:balance});
+    rows.push({period:i+1,dueDate:dueDates[i],days:days[i],opening,interest,principalPaid,installment:inst,closing:balance,moratorium:false,factor:dayFactors[i]});
   }
-  return {rows,installment};
+  return {rows,installment,moratoriumInterest,moratMonths};
 }
 
 function renderQtr(){
@@ -2014,24 +2236,30 @@ function renderQtr(){
   }
   if(qtrValidationEl) qtrValidationEl.style.display='none';
   const round=document.getElementById('qtrRoundToRupee')?.checked||false;
+  const actualActual=document.getElementById('qtrActualActual')?.checked||false;
+  const moratMonths=Number(document.getElementById('qtrMoratMonths')?.value)||0;
+  const moratMode=document.getElementById('qtrMoratMode')?.value||'paid';
   const startDate=new Date(startDateVal+"T00:00:00");
   const slabs=isSlab?emiLoadSlabs():[];
   const freqLabel=freqMonths===1?'monthly':(freqMonths===3?'quarterly':'half-yearly');
 
   if(isEquated){
-    const {rows,installment}=qtrBuildEquatedSchedule({principal,count,freqMonths,startDate,isSlab,flatRate,slabs,round});
+    const {rows,installment,moratoriumInterest}=qtrBuildEquatedSchedule({principal,count,freqMonths,startDate,isSlab,flatRate,slabs,round,moratMonths,moratMode,actualActual});
+    const regularRows=rows.filter(r=>!r.moratorium);
     const totalPrincipal=rows.reduce((s,r)=>s+r.principalPaid,0);
     const totalInterest=rows.reduce((s,r)=>s+r.interest,0);
-    document.getElementById('qtrSummary').innerHTML=[
+    const stats=[
       {label:`Equated instalment (${freqLabel})`,value:'₹ '+fmtINR(installment),color:'var(--ink)'},
       {label:'Total principal recovered',value:'₹ '+fmtINR(totalPrincipal),color:'var(--green)'},
       {label:'Total interest paid',value:'₹ '+fmtINR(totalInterest),color:'var(--clay)'},
       {label:'Total repayment',value:'₹ '+fmtINR(totalPrincipal+totalInterest),color:'var(--brass)'},
-    ].map(s=>`<div class="stat"><div class="stat-label">${s.label}</div><div class="stat-value" style="color:${s.color}">${s.value}</div></div>`).join('');
+    ];
+    if(moratMonths>0) stats.push({label:`Interest during ${moratMonths}-month moratorium`,value:'₹ '+fmtINR(moratoriumInterest),color:'var(--brass)'});
+    document.getElementById('qtrSummary').innerHTML=stats.map(s=>`<div class="stat"><div class="stat-label">${s.label}</div><div class="stat-value" style="color:${s.color}">${s.value}</div></div>`).join('');
 
-    document.getElementById('qtrEquatedSub').textContent=`${rows.length} ${freqLabel} instalments of ₹${fmtINR(installment)} each (last instalment adjusted for rounding) — ${isSlab?'progressive slab rates':'a single flat rate'}, interest on actual days outstanding`;
+    document.getElementById('qtrEquatedSub').textContent=`${regularRows.length} ${freqLabel} instalments of ₹${fmtINR(installment)} each${moratMonths>0?` (after a ${moratMonths}-month moratorium)`:''} — ${isSlab?'progressive slab rates':'a single flat rate'}, interest on ${actualActual?'Actual/Actual (366 in leap years)':'Actual/365'} days outstanding`;
     document.getElementById('qtrEquatedBody').innerHTML=rows.map(r=>`
-      <tr><td>${r.period}</td><td>${fmtDate(r.dueDate)}</td><td>${r.days}</td><td>${fmtINR(r.opening)}</td><td class="debit">${fmtINR(r.interest)}</td><td class="credit">${fmtINR(r.principalPaid)}</td><td style="font-weight:600">${fmtINR(r.installment)}</td><td>${fmtINR(r.closing)}</td></tr>`).join('');
+      <tr${r.moratorium?' style="background:#FBFAF6;"':''}><td>${r.period}</td><td>${fmtDate(r.dueDate)}</td><td>${r.days}</td><td>${fmtINR(r.opening)}</td><td class="debit">${fmtINR(r.interest)}</td><td class="credit">${fmtINR(r.principalPaid)}</td><td style="font-weight:600">${r.moratorium&&r.installment===0?'<em style="font-weight:400;color:var(--muted)">accrued</em>':fmtINR(r.installment)}</td><td>${fmtINR(r.closing)}</td></tr>`).join('');
 
     const closingBalance=rows.length?rows[rows.length-1].closing:principal;
     const tol=1;
@@ -2040,7 +2268,7 @@ function renderQtr(){
     let slabTieHtml='';
     if(isSlab){
       const perSlabTotal=slabs.map(()=>0);
-      rows.forEach(r=>{ emiAllocate(r.opening,slabs).forEach((p,i)=>{ perSlabTotal[i]+=p.portion*p.rate/100*(r.days/365); }); });
+      rows.forEach(r=>{ emiAllocate(r.opening,slabs).forEach((p,i)=>{ perSlabTotal[i]+=p.portion*p.rate/100*r.factor; }); });
       const slabSum=perSlabTotal.reduce((a,b)=>a+b,0);
       const tieOk=Math.abs(slabSum-totalInterest)<=tol;
       slabTieHtml=`<div class="stub-sub" style="margin-top:10px"><b>Interest break-up by slab, full tenure:</b> ${slabs.map((s,i)=>`Slab ${i+1} (${emiSlabRangeLabel(slabs,i)} @ ${Number(s.rate).toFixed(2)}%): <b>₹${fmtINR(perSlabTotal[i])}</b>`).join(' &middot; ')} ${tieOk?'<span class="stmt-good">✓ Ties to total interest paid</span>':'<span class="stmt-review">⚠ Off by ₹'+fmtINR(slabSum-totalInterest)+'</span>'}</div>`;
@@ -2055,28 +2283,30 @@ function renderQtr(){
           <tr><td>Closing balance after the final instalment</td><td>${fmtINR(closingBalance)}</td><td>${balanceOk?'<span class="stmt-good">✓ Loan fully repaid — nil balance</span>':'<span class="stmt-review">⚠ Not fully closed</span>'}</td></tr>
         </tbody>
       </table></div>${slabTieHtml}
-      <div class="stub-sub" style="margin-top:8px">Each ${freqLabel} instalment of ₹${fmtINR(installment)} covers that period's interest first (computed on the actual days outstanding), then reduces principal — exactly like a monthly EMI, just billed ${freqLabel}. Following the ledger down to the last row, the closing balance reaches nil at the end of the tenure.</div>`;
+      <div class="stub-sub" style="margin-top:8px">Each ${freqLabel} instalment of ₹${fmtINR(installment)} covers that period's interest first (computed on the actual days outstanding, ${actualActual?'Actual/Actual':'Actual/365'} convention), then reduces principal — exactly like a monthly EMI, just billed ${freqLabel}. Following the ledger down to the last row, the closing balance reaches nil at the end of the tenure.</div>`;
+    lastQtrExport={mode:'equated',rows,installment,principal,freqLabel};
     return;
   }
 
-  const {principalRows,interestDebits}=qtrBuildSchedule({principal,count,freqMonths,startDate,debitFreqMonths,isSlab,flatRate,slabs,round});
+  const {principalRows,interestDebits,moratoriumInterest}=qtrBuildSchedule({principal,count,freqMonths,startDate,debitFreqMonths,isSlab,flatRate,slabs,round,moratMonths,moratMode,actualActual});
 
   const totalPrincipal=principalRows.reduce((s,r)=>s+r.principalPaid,0);
   const totalInterest=interestDebits.reduce((s,d)=>s+d.interest,0);
-  document.getElementById('qtrSummary').innerHTML=[
+  const stats2=[
     {label:'Total principal recovered',value:'₹ '+fmtINR(totalPrincipal),color:'var(--green)'},
     {label:'Total interest debited',value:'₹ '+fmtINR(totalInterest),color:'var(--clay)'},
     {label:'Total repayment (principal + interest)',value:'₹ '+fmtINR(totalPrincipal+totalInterest),color:'var(--ink)'},
     {label:'Interest debit frequency',value:debitFreqMonths===3?'Quarterly':'Half-Yearly',color:'var(--brass)'},
-  ].map(s=>`<div class="stat"><div class="stat-label">${s.label}</div><div class="stat-value" style="color:${s.color}">${s.value}</div></div>`).join('');
+  ];
+  document.getElementById('qtrSummary').innerHTML=stats2.map(s=>`<div class="stat"><div class="stat-label">${s.label}</div><div class="stat-value" style="color:${s.color}">${s.value}</div></div>`).join('');
 
-  document.getElementById('qtrPrincipalSub').textContent=`${principalRows.length} principal instalments, ${isSlab?'progressive slab rates':'a single flat rate'} used to compute interest`;
+  document.getElementById('qtrPrincipalSub').textContent=`${principalRows.filter(r=>!r.moratorium).length} principal instalments${moratMonths>0?` after a ${moratMonths}-month moratorium`:''}, ${isSlab?'progressive slab rates':'a single flat rate'} used to compute interest`;
   document.getElementById('qtrPrincipalBody').innerHTML=principalRows.map(r=>`
-    <tr><td>${r.period}</td><td>${fmtDate(r.dueDate)}</td><td>${r.days}</td><td>${fmtINR(r.opening)}</td><td class="credit">${fmtINR(r.principalPaid)}</td><td>${fmtINR(r.closing)}</td></tr>`).join('');
+    <tr${r.moratorium?' style="background:#FBFAF6;"':''}><td>${r.period}</td><td>${fmtDate(r.dueDate)}</td><td>${r.days}</td><td>${fmtINR(r.opening)}</td><td class="credit">${r.moratorium?'<em style="font-weight:400;color:var(--muted)">—</em>':fmtINR(r.principalPaid)}</td><td>${fmtINR(r.closing)}</td></tr>`).join('');
 
   document.getElementById('qtrInterestSub').textContent=`${interestDebits.length} interest debit(s) over the tenure — each is the sum of daily interest accrued since the previous debit`;
   document.getElementById('qtrInterestBody').innerHTML=interestDebits.map(d=>`
-    <tr><td>${d.period}</td><td>${fmtDate(d.fromDate)} to ${fmtDate(d.toDate)}</td><td>${d.days}</td><td class="debit">${fmtINR(d.interest)}</td>
+    <tr${d.moratorium?' style="background:#FBFAF6;"':''}><td>${d.period}${d.moratorium?' (moratorium)':''}</td><td>${fmtDate(d.fromDate)} to ${fmtDate(d.toDate)}</td><td>${d.days}</td><td class="debit">${fmtINR(d.interest)}</td>
     <td style="text-align:left;font-size:12px">${d.slabBreakup?slabs.map((s,i)=>`Slab ${i+1} (${emiSlabRangeLabel(slabs,i)} @ ${Number(s.rate).toFixed(2)}%): ₹${fmtINR(d.slabBreakup[i])}`).join('<br>'):'—'}</td></tr>`).join('');
 
   const closingBalance=principalRows.length?principalRows[principalRows.length-1].closing:principal;
@@ -2100,7 +2330,8 @@ function renderQtr(){
         <tr><td>Closing balance after final principal instalment</td><td>${fmtINR(closingBalance)}</td><td>${balanceOk?'<span class="stmt-good">✓ Loan fully repaid</span>':'<span class="stmt-review">⚠ Not fully closed</span>'}</td></tr>
       </tbody>
     </table></div>${slabTieHtml}
-    <div class="stub-sub" style="margin-top:8px">Even though the bank bills interest only ${debitFreqMonths===3?'every quarter':'every half-year'}, it still accrues daily on the outstanding balance in between principal recoveries — this statement adds up every one of those daily slices, so the total interest here is exactly what the account should show at closure, whether the rate is a single flat rate or split across slabs.</div>`;
+    <div class="stub-sub" style="margin-top:8px">Even though the bank bills interest only ${debitFreqMonths===3?'every quarter':'every half-year'}, it still accrues daily on the outstanding balance in between principal recoveries (${actualActual?'Actual/Actual':'Actual/365'} convention) — this statement adds up every one of those daily slices, so the total interest here is exactly what the account should show at closure, whether the rate is a single flat rate or split across slabs.</div>`;
+  lastQtrExport={mode:'equal-principal',principalRows,interestDebits,principal,freqLabel};
 }
 
 document.getElementById('qtrRateMode')?.addEventListener('change',()=>{
@@ -2116,11 +2347,83 @@ document.getElementById('qtrSlabQuickBtn')?.addEventListener('click',()=>{
   emiRenderSlabs();
   renderQtr();
 });
-['qtrPrincipal','qtrFlatRate','qtrYears','qtrMonths','qtrPrincipalFreq','qtrDebitFreq','qtrRepayType','qtrStartDate','qtrRoundToRupee'].forEach(id=>{
+['qtrPrincipal','qtrFlatRate','qtrYears','qtrMonths','qtrPrincipalFreq','qtrDebitFreq','qtrRepayType','qtrStartDate','qtrRoundToRupee','qtrMoratMonths','qtrMoratMode','qtrActualActual'].forEach(id=>{
   document.getElementById(id)?.addEventListener('input',renderQtr);
   document.getElementById(id)?.addEventListener('change',renderQtr);
 });
 document.getElementById('qtrStartDate').value=new Date().toISOString().slice(0,10);
+wireScenarioUI('emi',{name:'scenarioName',save:'scenarioSaveBtn',select:'scenarioSelect',load:'scenarioLoadBtn',del:'scenarioDeleteBtn',msg:'scenarioMsg'});
+wireScenarioUI('qtr',{name:'qtrScenarioName',save:'qtrScenarioSaveBtn',select:'qtrScenarioSelect',load:'qtrScenarioLoadBtn',del:'qtrScenarioDeleteBtn',msg:'qtrScenarioMsg'});
+
+/* ---------- Print / PDF export ---------- */
+document.getElementById('emiPrintBtn')?.addEventListener('click',()=>window.print());
+document.getElementById('qtrPrintBtn')?.addEventListener('click',()=>window.print());
+
+/* ---------- Excel export (uses the SheetJS library already loaded for statement reading) ---------- */
+function xlsxRow(r,method){
+  return {
+    'Period': typeof r.period==='string'?r.period:(r.moratorium?('M'+r.period):r.period),
+    'Due Date': fmtDate(r.dueDate),
+    'Opening Balance': Number(r.opening.toFixed(2)),
+    'Interest': Number(r.interest.toFixed(2)),
+    'Principal': Number(r.principalPaid.toFixed(2)),
+    'Installment': Number((r.installment||0).toFixed(2)),
+    'Closing Balance': Number(r.closing.toFixed(2)),
+  };
+}
+document.getElementById('emiExcelBtn')?.addEventListener('click',()=>{
+  if(typeof XLSX==='undefined'){ alert('Excel export library did not load (offline or blocked CDN). Try again when online, or use Print / Save as PDF instead.'); return; }
+  if(!lastEmiExport){ alert('Nothing to export yet — fill in the loan details first.'); return; }
+  const {rows,method,freqMonths}=lastEmiExport;
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.map(r=>xlsxRow(r,method))),'Instalment Register');
+  if(method==='slab'){
+    const slabs=emiLoadSlabs();
+    const pf=(freqMonths||1)/12;
+    slabs.forEach((s,i)=>{
+      const label=('Slab '+(i+1)).slice(0,28);
+      const data=rows.map(r=>{
+        const p=emiAllocate(r.opening,slabs)[i];
+        return p? {'Period':r.moratorium?('M'+r.period):r.period,'Due Date':fmtDate(r.dueDate),'Slab Balance':Number(p.portion.toFixed(2)),'Rate %':s.rate,'Interest':Number((p.portion*p.rate/100*pf).toFixed(2))} : null;
+      }).filter(Boolean);
+      if(data.length) XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(data),label);
+    });
+  }
+  XLSX.writeFile(wb,(method==='slab'?'Slab_EMI_Schedule':'EMI_Schedule')+'.xlsx');
+});
+document.getElementById('qtrExcelBtn')?.addEventListener('click',()=>{
+  if(typeof XLSX==='undefined'){ alert('Excel export library did not load (offline or blocked CDN). Try again when online, or use Print / Save as PDF instead.'); return; }
+  if(!lastQtrExport){ alert('Nothing to export yet — fill in the loan details first.'); return; }
+  const wb=XLSX.utils.book_new();
+  if(lastQtrExport.mode==='equated'){
+    const data=lastQtrExport.rows.map(r=>({
+      'Period':r.period,'Due Date':fmtDate(r.dueDate),'Days':r.days,'Opening Balance':Number(r.opening.toFixed(2)),
+      'Interest':Number(r.interest.toFixed(2)),'Principal':Number(r.principalPaid.toFixed(2)),'Instalment':Number(r.installment.toFixed(2)),'Closing Balance':Number(r.closing.toFixed(2))
+    }));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(data),'Equated Instalment Ledger');
+  } else {
+    const pdata=lastQtrExport.principalRows.map(r=>({'Period':r.period,'Due Date':fmtDate(r.dueDate),'Days':r.days,'Opening Balance':Number(r.opening.toFixed(2)),'Principal Recovered':Number((r.principalPaid||0).toFixed(2)),'Closing Balance':Number(r.closing.toFixed(2))}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(pdata),'Principal Ledger');
+    const idata=lastQtrExport.interestDebits.map(d=>({'Bill #':d.period,'From':fmtDate(d.fromDate),'To':fmtDate(d.toDate),'Days':d.days,'Interest Debited':Number(d.interest.toFixed(2))}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(idata),'Interest Debits');
+  }
+  XLSX.writeFile(wb,'Quarterly_HalfYearly_Schedule.xlsx');
+});
+
+/* ---------- Overdue / penal interest ---------- */
+document.getElementById('penalCalcBtn')?.addEventListener('click',()=>{
+  const amount=Number(document.getElementById('penalOverdueAmount').value)||0;
+  const dueVal=document.getElementById('penalDueDate').value;
+  const paidVal=document.getElementById('penalPaidDate').value;
+  const penalRate=Number(document.getElementById('penalRate').value)||0;
+  const resultEl=document.getElementById('penalResult');
+  if(!amount||!dueVal||!paidVal){ if(resultEl) resultEl.innerHTML='<span class="stmt-review">Enter the overdue amount, due date and actual payment date.</span>'; return; }
+  const due=new Date(dueVal+'T00:00:00'), paid=new Date(paidVal+'T00:00:00');
+  const days=Math.round((paid-due)/86400000);
+  if(days<=0){ if(resultEl) resultEl.innerHTML='<span class="stmt-good">Paid on or before the due date — no overdue/penal interest applies.</span>'; return; }
+  const penalInterest=amount*penalRate/100*(days/365);
+  if(resultEl) resultEl.innerHTML=`<div>Overdue by <b>${days} day(s)</b> (${fmtDate(due)} to ${fmtDate(paid)}).</div><div style="margin-top:6px">Penal interest: <b>₹${amount} × ${penalRate}% × ${days}/365 = ₹${fmtINR(penalInterest)}</b></div><div class="stub-sub" style="margin-top:6px;color:var(--muted)">This is the extra penal interest only, on top of the instalment's normal interest — add it to the overdue instalment amount to get the total due.</div>`;
+});
 
 function showLoanCalculator(mode){
   const std=document.getElementById('standardEmiMenuPanel');
@@ -2205,6 +2508,159 @@ function renderFloatingRateImpact({principal,annualRate,count,freqMonths,startDa
     <div class="stub-sub" style="margin-top:10px"><b>Scenario A:</b> the EMI changes from ₹${fmtINR(originalEMI)} to ₹${fmtINR(scenarioA_EMI)} (${scenarioA_EMI>=originalEMI?'up':'down'} by ₹${fmtINR(Math.abs(scenarioA_EMI-originalEMI))}); the loan still closes on the originally scheduled date.<br><b>Scenario B:</b> the EMI stays at ₹${fmtINR(originalEMI)}; ${tenureChangeText}.</div>`;
 }
 
+/* ---------- Part-prepayment / foreclosure helpers — generic for flat or slab rate ---------- */
+function solveEMIForBalance({balance,count,freqMonths,isSlab,annualRate,slabs}){
+  if(count<=0) return 0;
+  if(isSlab){
+    const pf=freqMonths/12;
+    function remaining(emi){ let b=balance; for(let i=0;i<count;i++){ const interest=emiSlabInterest(b,slabs,pf); b-=emi-interest; if(b<=0) return 0; } return b; }
+    let lo=0,hi=Math.max(balance/count,1);
+    for(let z=0;z<100&&remaining(hi)>0.0001;z++) hi*=2;
+    for(let z=0;z<120;z++){ const mid=(lo+hi)/2; if(remaining(mid)>0) lo=mid; else hi=mid; }
+    return hi;
+  }
+  const periodRate=(annualRate/100)*(freqMonths/12);
+  if(periodRate===0) return balance/count;
+  const f=Math.pow(1+periodRate,count);
+  return (balance*periodRate*f)/(f-1);
+}
+function solveTenureForEMI({balance,emi,freqMonths,isSlab,annualRate,slabs}){
+  if(emi<=0) return Infinity;
+  if(isSlab){
+    const pf=freqMonths/12;
+    let b=balance,n=0;
+    while(b>0.5&&n<2000){
+      const interest=emiSlabInterest(b,slabs,pf);
+      if(emi-interest<=0) return Infinity;
+      b-=(emi-interest); n++;
+    }
+    return n;
+  }
+  const periodRate=(annualRate/100)*(freqMonths/12);
+  if(periodRate===0) return balance/emi;
+  const denom=emi-balance*periodRate;
+  if(denom<=0) return Infinity;
+  return Math.log(emi/denom)/Math.log(1+periodRate);
+}
+
+function renderPrepaymentImpact({rows,installment,method,annualRate,count,freqMonths,principal}){
+  const resultEl=document.getElementById('prepayResult');
+  if(!resultEl) return;
+  const enabled=document.getElementById('prepayEnable')?.checked;
+  if(!enabled){ resultEl.innerHTML=''; return; }
+  const afterN=Math.floor(Number(document.getElementById('prepayAfter').value)||0);
+  const amount=Number(document.getElementById('prepayAmount').value)||0;
+  const mode=document.getElementById('prepayMode').value;
+  const regularRows=rows.filter(r=>!r.moratorium);
+  if(afterN<1||afterN>=regularRows.length||!amount){
+    resultEl.innerHTML=`<div class="stub-sub" style="color:var(--clay)">Enter a prepayment instalment number (1–${Math.max(1,regularRows.length-1)}) and a prepayment amount greater than zero.</div>`;
+    return;
+  }
+  const isSlab=method==='slab';
+  const slabs=isSlab?emiLoadSlabs():[];
+  const balanceBefore=regularRows[afterN-1].closing;
+  const balanceAfter=Math.max(0,balanceBefore-amount);
+  const remainingCount=regularRows.length-afterN;
+  const dueDateAt=regularRows[afterN-1].dueDate;
+  const origInterestRemaining=regularRows.slice(afterN).reduce((s,r)=>s+r.interest,0);
+  const origEndDate=regularRows[regularRows.length-1].dueDate;
+
+  if(balanceAfter<=0){
+    resultEl.innerHTML=`<div class="stub-sub">After instalment #${afterN} (${fmtDate(dueDateAt)}), outstanding balance is ₹${fmtINR(balanceBefore)}. <b>The prepayment of ₹${fmtINR(amount)} fully covers this</b> — the loan is foreclosed right after instalment #${afterN}, saving the entire ₹${fmtINR(origInterestRemaining)} of interest that would otherwise have been paid over the remaining ${remainingCount} instalments (through ${fmtDate(origEndDate)}).</div>`;
+    return;
+  }
+  let html='';
+  if(mode==='reduce-tenure'){
+    const newN=solveTenureForEMI({balance:balanceAfter,emi:installment,freqMonths,isSlab,annualRate,slabs});
+    const newWhole=isFinite(newN)?Math.ceil(newN):Infinity;
+    const newTotalRepay=isFinite(newWhole)?installment*newWhole:NaN;
+    const newInterest=isFinite(newTotalRepay)?newTotalRepay-balanceAfter:NaN;
+    const newEndDate=isFinite(newWhole)?addMonths(dueDateAt,newWhole*freqMonths):null;
+    const savedPeriods=isFinite(newWhole)?remainingCount-newWhole:null;
+    html=`
+      <div class="stub-sub" style="margin-bottom:8px">After instalment #${afterN} (${fmtDate(dueDateAt)}), outstanding balance ₹${fmtINR(balanceBefore)} is reduced by the ₹${fmtINR(amount)} prepayment to ₹${fmtINR(balanceAfter)}.</div>
+      <div class="table-scroll"><table><thead><tr><th style="text-align:left">&nbsp;</th><th>Without prepayment</th><th>With prepayment (EMI unchanged, tenure reduced)</th></tr></thead><tbody>
+      <tr><td style="text-align:left">Instalment</td><td>₹${fmtINR(installment)}</td><td>₹${fmtINR(installment)} (unchanged)</td></tr>
+      <tr><td style="text-align:left">Remaining instalments</td><td>${remainingCount}</td><td>${isFinite(newWhole)?newWhole:'—'}</td></tr>
+      <tr><td style="text-align:left">Loan closes on</td><td>${fmtDate(origEndDate)}</td><td>${newEndDate?fmtDate(newEndDate):'—'}</td></tr>
+      <tr><td style="text-align:left">Interest remaining to be paid</td><td class="debit">₹${fmtINR(origInterestRemaining)}</td><td class="debit">${isFinite(newInterest)?'₹'+fmtINR(newInterest):'—'}</td></tr>
+      </tbody></table></div>
+      <div class="stub-sub" style="margin-top:8px">${savedPeriods>0?`Tenure shortens by <b>${savedPeriods} instalment(s)</b>, saving approximately <b>₹${fmtINR(origInterestRemaining-newInterest)}</b> in interest.`:'No change in tenure at this prepayment level.'}</div>`;
+  } else {
+    const newEMI=solveEMIForBalance({balance:balanceAfter,count:remainingCount,freqMonths,isSlab,annualRate,slabs});
+    const newTotalRepay=newEMI*remainingCount;
+    const newInterest=newTotalRepay-balanceAfter;
+    html=`
+      <div class="stub-sub" style="margin-bottom:8px">After instalment #${afterN} (${fmtDate(dueDateAt)}), outstanding balance ₹${fmtINR(balanceBefore)} is reduced by the ₹${fmtINR(amount)} prepayment to ₹${fmtINR(balanceAfter)}.</div>
+      <div class="table-scroll"><table><thead><tr><th style="text-align:left">&nbsp;</th><th>Without prepayment</th><th>With prepayment (tenure unchanged, EMI reduced)</th></tr></thead><tbody>
+      <tr><td style="text-align:left">Instalment</td><td>₹${fmtINR(installment)}</td><td>₹${fmtINR(newEMI)}</td></tr>
+      <tr><td style="text-align:left">Remaining instalments</td><td>${remainingCount}</td><td>${remainingCount} (unchanged)</td></tr>
+      <tr><td style="text-align:left">Interest remaining to be paid</td><td class="debit">₹${fmtINR(origInterestRemaining)}</td><td class="debit">₹${fmtINR(newInterest)}</td></tr>
+      </tbody></table></div>
+      <div class="stub-sub" style="margin-top:8px">EMI reduces from ₹${fmtINR(installment)} to ₹${fmtINR(newEMI)} (down by ₹${fmtINR(installment-newEMI)}), saving approximately <b>₹${fmtINR(origInterestRemaining-newInterest)}</b> in interest.</div>`;
+  }
+  resultEl.innerHTML=html;
+}
+
+/* ---------- Save / load scenarios (localStorage, per device) ---------- */
+const EMI_SCENARIO_FIELDS=['principal','rate','emiInterestMethod','periodYears','periodMonths','freq','startDate','repayType','moratMonths','moratMode','roundToRupee'];
+const QTR_SCENARIO_FIELDS=['qtrPrincipal','qtrRateMode','qtrFlatRate','qtrYears','qtrMonths','qtrRepayType','qtrPrincipalFreq','qtrDebitFreq','qtrStartDate','qtrRoundToRupee','qtrMoratMonths','qtrMoratMode','qtrActualActual'];
+function scenarioKey(kind){ return 'financial_scenarios_'+kind+'_v1'; }
+function loadScenarios(kind){ try{ const x=JSON.parse(localStorage.getItem(scenarioKey(kind))||'{}'); return (x&&typeof x==='object')?x:{}; }catch(e){ return {}; } }
+function saveScenariosObj(kind,obj){ try{ localStorage.setItem(scenarioKey(kind),JSON.stringify(obj)); return true; }catch(e){ return false; } }
+function captureScenario(kind){
+  const fields=kind==='emi'?EMI_SCENARIO_FIELDS:QTR_SCENARIO_FIELDS;
+  const data={};
+  fields.forEach(id=>{ const el=document.getElementById(id); if(!el) return; data[id]= el.type==='checkbox' ? el.checked : el.value; });
+  return data;
+}
+function applyScenario(kind,data){
+  const fields=kind==='emi'?EMI_SCENARIO_FIELDS:QTR_SCENARIO_FIELDS;
+  fields.forEach(id=>{ const el=document.getElementById(id); if(!el||!(id in data)) return; if(el.type==='checkbox') el.checked=!!data[id]; else el.value=data[id]; });
+}
+function refreshScenarioSelect(kind,selectId){
+  const sel=document.getElementById(selectId);
+  if(!sel) return;
+  const scenarios=loadScenarios(kind);
+  const names=Object.keys(scenarios);
+  sel.innerHTML='<option value="">— none saved —</option>'+names.map(n=>`<option value="${n.replace(/"/g,'&quot;')}">${n}</option>`).join('');
+}
+function wireScenarioUI(kind,ids){
+  const nameEl=document.getElementById(ids.name), saveBtn=document.getElementById(ids.save), selEl=document.getElementById(ids.select), loadBtn=document.getElementById(ids.load), delBtn=document.getElementById(ids.del), msgEl=document.getElementById(ids.msg);
+  if(!saveBtn) return;
+  refreshScenarioSelect(kind,ids.select);
+  saveBtn.addEventListener('click',()=>{
+    const name=(nameEl.value||'').trim();
+    if(!name){ if(msgEl) msgEl.textContent='Enter a name for this scenario before saving.'; return; }
+    const scenarios=loadScenarios(kind);
+    scenarios[name]=captureScenario(kind);
+    if(saveScenariosObj(kind,scenarios)){
+      refreshScenarioSelect(kind,ids.select);
+      selEl.value=name;
+      if(msgEl) msgEl.textContent=`✓ Saved "${name}".`;
+    } else if(msgEl) msgEl.textContent='Could not save — storage may be full or unavailable.';
+  });
+  loadBtn?.addEventListener('click',()=>{
+    const name=selEl.value;
+    if(!name){ if(msgEl) msgEl.textContent='Choose a saved scenario to load.'; return; }
+    const scenarios=loadScenarios(kind);
+    if(!scenarios[name]){ if(msgEl) msgEl.textContent='That scenario no longer exists.'; return; }
+    applyScenario(kind,scenarios[name]);
+    if(nameEl) nameEl.value=name;
+    if(msgEl) msgEl.textContent=`✓ Loaded "${name}".`;
+    if(kind==='emi') renderEmi(); else renderQtr();
+  });
+  delBtn?.addEventListener('click',()=>{
+    const name=selEl.value;
+    if(!name){ if(msgEl) msgEl.textContent='Choose a saved scenario to delete.'; return; }
+    const scenarios=loadScenarios(kind);
+    delete scenarios[name];
+    saveScenariosObj(kind,scenarios);
+    refreshScenarioSelect(kind,ids.select);
+    if(msgEl) msgEl.textContent=`Deleted "${name}".`;
+  });
+}
+
 function renderEmi() {
   const principal = Number(document.getElementById('principal').value) || 0;
   const annualRate = Number(document.getElementById('rate').value) || 0;
@@ -2233,6 +2689,8 @@ function renderEmi() {
   const { rows, installment, firstInstallment, lastInstallment, moratoriumInterest, effectivePrincipal } = calc;
 
   renderFloatingRateImpact({principal,annualRate,count,freqMonths,startDate,repaymentType,method,round});
+  renderPrepaymentImpact({rows,installment,method,annualRate,count,freqMonths,principal});
+  lastEmiExport={rows,method,principal,annualRate,count,freqMonths,startDate,repaymentType};
 
   const regularRows = rows.filter(r => !r.moratorium);
   const totalInterest = rows.reduce((s, r) => s + r.interest, 0);
@@ -2449,7 +2907,7 @@ function renderEmi() {
   });
 }
 
-['principal','rate','periodYears','periodMonths','freq','startDate','repayType','moratMonths','moratMode','roundToRupee','floatRateEnable','floatRateChangeMonth','floatNewRate'].forEach(id => {
+['principal','rate','periodYears','periodMonths','freq','startDate','repayType','moratMonths','moratMode','roundToRupee','floatRateEnable','floatRateChangeMonth','floatNewRate','prepayEnable','prepayAfter','prepayAmount','prepayMode'].forEach(id => {
   document.getElementById(id).addEventListener('input', renderEmi);
   document.getElementById(id).addEventListener('change', renderEmi);
 });
